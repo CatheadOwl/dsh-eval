@@ -1,0 +1,4 @@
+{"type":"session","version":1,"id":"session-child","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","parentSession":"session-parent","origin":"subagent","delegationDepth":1}
+{"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
+{"seq":1,"time":1755446400200,"type":"tool/call","data":{"turn":1,"step":1,"callId":"child-call","name":"bash","arguments":"{\"command\":\"echo child\"}"}}
+{"seq":2,"time":1755446400300,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

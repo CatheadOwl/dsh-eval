@@ -1,0 +1,7 @@
+{"type":"session","version":1,"id":"session-parent","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","delegationDepth":0}
+{"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
+{"seq":1,"time":1755446400200,"type":"text-chunks","data":{"turn":1,"step":1,"firstSeq":2,"count":3,"firstTime":1755446400210,"times":[0,5],"texts":["he","ll","o"]}}
+{"seq":5,"time":1755446400300,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-a","name":"bash","arguments":"{\"command\":\"echo hi\"}"}}
+{"seq":6,"time":1755446400400,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[5],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-a","content":[{"type":"text","text":"hi"}],"isError":false}],"source":{"kind":"tool","callId":"call-a"}}}}
+{"seq":7,"time":1755446400500,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"parent final"}]}}}
+{"seq":8,"time":1755446400600,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

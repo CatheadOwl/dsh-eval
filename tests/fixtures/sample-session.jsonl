@@ -1,0 +1,10 @@
+{"type":"session","version":1,"id":"session-fixture-1","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","delegationDepth":0}
+{"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
+{"seq":1,"time":1755446400200,"type":"step/start","data":{"turn":1,"step":1}}
+{"seq":2,"time":1755446400300,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-1","name":"coggit_status","arguments":"{}"}}
+{"seq":3,"time":1755446400400,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[2],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-1","content":[{"type":"text","text":"status: 3 tracked nodes"}],"isError":false}],"source":{"kind":"tool","callId":"call-1"}}}}
+{"seq":4,"time":1755446400500,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-2","name":"coggit_add","arguments":"{\"sourcePath\":\"src/example.ts\",\"overwrite\":false}"}}
+{"seq":5,"time":1755446400600,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[4],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-2","content":[{"type":"text","text":"created cognition for src/example.ts"}],"isError":false}],"source":{"kind":"tool","callId":"call-2"}}}}
+{"seq":6,"time":1755446400700,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"intermediate note"}]}}}
+{"seq":7,"time":1755446400800,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":2,"message":{"role":"assistant","content":[{"type":"text","text":"Done: cognition created."}]}}}
+{"seq":8,"time":1755446400900,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

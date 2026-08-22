@@ -1,0 +1,304 @@
+/**
+ * The eval run driver. One eval case = one `dsh --profile <p> --patch
+ * <generated-overlay> "<task>"` headless run in an isolated `DSH_HOME`, so
+ * the session JSONL trace lands alone under a per-run persistence root and
+ * needs no teardown of shared state. The overlay is generated per run:
+ *
+ * - always: `session-persistence-jsonl` re-rooted to the run dir, plaintext
+ *   one-event-per-line layout (config override is whole-replace, so every
+ *   field the backend needs is restated);
+ * - optional case persona: `system-prompt` persona override;
+ * - mock mode: `agent-default-model` re-pointed at the `eval-mock` provider
+ *   plus an insert mounting the scripted adapter plugin by `file://` URL
+ *   (relative plugin names resolve against the PROFILE dir, not the overlay
+ *   file, so an absolute URL is the portable reference).
+ */
+
+import { spawn } from 'node:child_process'
+import {
+  chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+} from 'node:fs'
+import { tmpdir, homedir } from 'node:os'
+import { isAbsolute, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { loadTraceDir } from './trace.mjs'
+
+/** This framework's root directory (the eval package dir). */
+const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+/** The scripted mock adapter plugin, referenced from generated overlays. */
+const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
+
+/**
+ * Stage the profile store into a temporary DSH_HOME. The BOOTED profile's
+ * directory is COPIED (sans node_modules): `prepareProfile` unconditionally
+ * rewrites the profile's root cordis.yml on every boot, and copying keeps
+ * that write inside the temporary home instead of leaking through a junction
+ * into the real store. Only the profile's own node_modules stays junctioned —
+ * out-of-tree plugin resolution needs it, and a task boot never writes it.
+ * The store-level shared node_modules fallback is deliberately NOT staged:
+ * `prepareProfile`'s `healProfilesModuleFallback` rebuilds it fresh in the
+ * temporary home on every boot, so staging it would only route that rebuild
+ * through a junction into the real store. An absent profile copies nothing:
+ * boot initializes shipped templates inside the temporary home.
+ * @param {string} realHome - the real Harness home holding `profiles/`.
+ * @param {string} tmpHome - the temporary home (created up to `profiles/`).
+ * @param {string} profileName - the profile this run boots.
+ * @returns {string[]} the created junction paths (unlink before rmSync).
+ */
+export function stageProfileStore(realHome, tmpHome, profileName) {
+  const junctions = []
+  const tmpProfiles = join(tmpHome, 'profiles')
+  mkdirSync(tmpProfiles, { recursive: true })
+  const realProfiles = join(realHome, 'profiles')
+  if (!existsSync(realProfiles)) return junctions
+  const realProfileDir = join(realProfiles, profileName)
+  if (!existsSync(join(realProfileDir, 'package.json'))) return junctions
+  const tmpProfileDir = join(tmpProfiles, profileName)
+  mkdirSync(tmpProfileDir, { recursive: true })
+  for (const entry of readdirSync(realProfileDir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules') continue
+    const from = join(realProfileDir, entry.name)
+    const to = join(tmpProfileDir, entry.name)
+    if (entry.isDirectory()) cpSync(from, to, { recursive: true })
+    else copyFileSync(from, to)
+  }
+  const profileModules = join(realProfileDir, 'node_modules')
+  if (existsSync(profileModules)) {
+    const target = join(tmpProfileDir, 'node_modules')
+    symlinkSync(profileModules, target, 'junction')
+    junctions.push(target)
+  }
+  return junctions
+}
+
+/** JSON double-quoted strings are valid YAML scalars — enough for this emitter. */
+function yamlScalar(value) {
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+  return JSON.stringify(String(value))
+}
+
+/**
+ * Serialize the per-run overlay patch list to YAML.
+ * @param {object} parts - overlay ingredients (see runEvalCase).
+ * @returns {string} the overlay file text.
+ */
+export function buildOverlayYaml(parts) {
+  const lines = []
+  lines.push('- id: session-persistence-jsonl')
+  lines.push('  config:')
+  lines.push(`    root: ${yamlScalar(parts.sessionsRoot)}`)
+  lines.push('    packChunks: false')
+  lines.push('    compression: none')
+  if (parts.persona !== undefined) {
+    lines.push('- id: system-prompt')
+    lines.push('  config:')
+    lines.push(`    persona: ${yamlScalar(parts.persona)}`)
+  }
+  if (parts.mock) {
+    lines.push('- id: agent-default-model')
+    lines.push('  config:')
+    lines.push('    provider: eval-mock')
+    lines.push('    model: eval-mock')
+    // The title generator also calls the default provider and would consume
+    // script steps; deterministic runs own every model call themselves.
+    lines.push('- id: session-title-llm')
+    lines.push('  disabled: true')
+    lines.push('- insert:')
+    lines.push('    - id: eval-mock-llm')
+    lines.push(`      name: ${yamlScalar(pathToFileURL(MOCK_ADAPTER_PATH).href)}`)
+  }
+  return `${lines.join('\n')}\n`
+}
+
+/**
+ * Run one eval case end to end.
+ *
+ * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
+ * script?: { steps: ChunkStep[] }, persona?: string,
+ * prepare?: (workspace: string) => void | Promise<void>,
+ * inspect?: (workspace: string, helpers: { trace }) => void | Promise<void>,
+ * timeoutMs?: number }`
+ *
+ * @param {object} evalCase - the case under test.
+ * @param {object} options
+ * @param {string} options.profile - the dsh profile booting the run (plugin installed there).
+ * @param {string} options.dshRepoDir - the deepseek-harness checkout (CLI runs from it).
+ * @param {'real' | 'mock'} [options.mode] - force a mode over the case's own.
+ * @param {string} [options.artifactsDir] - copy stdout/stderr/trace/session logs here (created).
+ * @returns {Promise<EvalRunResult>}
+ */
+export async function runEvalCase(evalCase, options) {
+  const mode = options.mode ?? evalCase.mode ?? 'real'
+  const dshRepoDir = resolve(options.dshRepoDir)
+  const binPath = join(dshRepoDir, 'apps', 'cli', 'lib', 'bin.js')
+  const timeoutMs = evalCase.timeoutMs ?? 180_000
+
+  const runDir = mkdtempSync(join(tmpdir(), 'dsh-eval-'))
+  const dshHome = join(runDir, 'dsh-home')
+  const workspace = join(runDir, 'workspace')
+  const sessionsRoot = join(runDir, 'sessions')
+  mkdirSync(workspace, { recursive: true })
+  await evalCase.prepare?.(workspace)
+
+  // Profiles resolve under $DSH_HOME/profiles, and eval overwrites DSH_HOME
+  // for session/settings isolation: stage the profile store (see
+  // stageProfileStore — the booted profile is copied, so boot's unconditional
+  // cordis.yml rewrite stays inside the temporary home; only the profile's
+  // read-only node_modules stays linked, and the shared fallback is rebuilt
+  // by boot inside the temporary home). The managed credential
+  // document is copied in because `dsh-credentials-local` resolves it per
+  // request. Falls back to the default `~/.dsh` when the ambient environment
+  // sets no home of its own.
+  const realHome = (process.env.DSH_HOME ?? '').trim() !== '' ? process.env.DSH_HOME : join(homedir(), '.dsh')
+  mkdirSync(dshHome, { recursive: true })
+  const junctions = stageProfileStore(realHome, dshHome, options.profile)
+  const realCredentials = join(realHome, '.credentials.yaml')
+  if (existsSync(realCredentials)) {
+    const credentialsCopy = join(dshHome, '.credentials.yaml')
+    copyFileSync(realCredentials, credentialsCopy)
+    try {
+      // Best-effort owner-only on POSIX (the harness's own e2e uses 0o600);
+      // a no-op beyond the read-only bit on Windows.
+      chmodSync(credentialsCopy, 0o600)
+    } catch { /* permission tightening is best-effort */ }
+  }
+
+  const env = {
+    ...process.env,
+    DSH_HOME: dshHome,
+    DSH_TELEMETRY_DISABLED: '1',
+  }
+  if (mode === 'mock') {
+    if (evalCase.script === undefined) {
+      throw new Error(`case '${evalCase.id}': mock mode requires a script`)
+    }
+    const scriptPath = join(runDir, 'mock-script.json')
+    writeFileSync(scriptPath, JSON.stringify(evalCase.script))
+    env.DSH_EVAL_MOCK_SCRIPT = scriptPath
+  }
+
+  const overlayPath = join(runDir, 'eval-overlay.yml')
+  writeFileSync(overlayPath, buildOverlayYaml({
+    sessionsRoot,
+    persona: evalCase.persona,
+    mock: mode === 'mock',
+  }))
+
+  const cliArgs = [
+    binPath,
+    '--profile', options.profile,
+    '--patch', overlayPath,
+    evalCase.task,
+  ]
+  const child = spawn(process.execPath, cliArgs, { cwd: workspace, env })
+
+  let stdout = ''
+  let stderr = ''
+  child.stdout.on('data', chunk => { stdout += chunk })
+  child.stderr.on('data', chunk => { stderr += chunk })
+
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    child.kill('SIGTERM')
+  }, timeoutMs)
+
+  const exitCode = await new Promise(resolveExit => {
+    child.on('error', error => { stderr += `\ndsh-eval: failed to spawn dsh CLI: ${error.message}\n`; resolveExit(127) })
+    child.on('exit', code => resolveExit(code ?? 1))
+  })
+  clearTimeout(timer)
+
+  const trace = loadTraceDir(sessionsRoot)
+  const sessionLogs = collectSessionLogTexts(sessionsRoot)
+
+  // Workspace assertions live HERE, before the run dir cleanup: a case's
+  // `inspect(workspace, { trace })` may throw; the failure text rides the
+  // result instead of leaking past cleanup.
+  let inspectError
+  if (typeof evalCase.inspect === 'function') {
+    try {
+      await evalCase.inspect(workspace, { trace })
+    } catch (error) {
+      inspectError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  if (options.artifactsDir !== undefined) {
+    mkdirSync(options.artifactsDir, { recursive: true })
+    writeFileSync(join(options.artifactsDir, 'stdout.txt'), stdout)
+    writeFileSync(join(options.artifactsDir, 'stderr.txt'), stderr)
+    writeFileSync(join(options.artifactsDir, 'trace.json'), JSON.stringify({
+      caseId: evalCase.id,
+      mode,
+      task: evalCase.task,
+      exitCode,
+      timedOut,
+      trace,
+    }, undefined, 2))
+    try {
+      cpSync(sessionsRoot, join(options.artifactsDir, 'sessions'), { recursive: true })
+    } catch { /* no session materialized — nothing to copy */ }
+  }
+
+  if (process.env.DSH_EVAL_KEEP_TMP !== '1') {
+    // Drop every junction first so cleanup can never descend into the real
+    // profile store.
+    for (const junction of junctions) {
+      try {
+        unlinkSync(junction)
+      } catch { /* junction absent — nothing to drop */ }
+    }
+    rmSync(runDir, { recursive: true, force: true })
+  }
+
+  return {
+    caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
+    stdout, stderr, trace, sessionLogs, inspectError, runDir,
+  }
+}
+
+/** Read every session artifact under the root as text (best-effort, pre-cleanup). */
+function collectSessionLogTexts(sessionsRoot) {
+  const texts = []
+  const walk = (dir) => {
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (entry.name === 'session.jsonl') texts.push(readFileSync(path, 'utf8'))
+    }
+  }
+  walk(sessionsRoot)
+  return texts
+}
+
+/**
+ * @typedef {object} EvalRunResult
+ * @property {string} caseId
+ * @property {'real' | 'mock'} mode
+ * @property {string} task
+ * @property {number} exitCode - the headless CLI's exit code (0 = turn completed).
+ * @property {boolean} timedOut
+ * @property {string} stdout - printed final assistant text (plus any startup chatter).
+ * @property {string} stderr
+ * @property {import('./trace.mjs').EvalTrace | undefined} trace
+ * @property {string[]} sessionLogs - raw session artifact texts, pre-cleanup.
+ * @property {string | undefined} inspectError - the case's `inspect` failure text, when it threw.
+ * @property {string} runDir - removed unless DSH_EVAL_KEEP_TMP=1.
+ */
+
+/** Re-exported so bin can resolve the framework without guessing paths. */
+export { FRAMEWORK_ROOT }
+
+/** Whether a candidate dsh repo dir looks like one (the CLI artifact exists). */
+export function looksLikeDshRepo(dir) {
+  if (!isAbsolute(dir)) return false
+  return existsSync(join(dir, 'apps', 'cli', 'lib', 'bin.js'))
+}
