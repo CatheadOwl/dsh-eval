@@ -13,10 +13,13 @@ import {
   toolResultFor,
   finalTextIncludes,
   finalTextMatches,
+  systemPromptIncludes,
+  toolMounted,
 } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const trace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))])
+const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
 
 describe('toolCalled', () => {
   it('matches exact names and regexps', () => {
@@ -100,5 +103,31 @@ describe('finalText', () => {
     assert.equal(finalTextIncludes('intermediate').check(trace).ok, false)
     assert.equal(finalTextMatches(/^Done:/).check(trace).ok, true)
     assert.equal(finalTextMatches(/^intermediate/).check(trace).ok, false)
+  })
+})
+
+describe('systemPromptIncludes', () => {
+  it('matches a substring of any request header system prompt', () => {
+    assert.equal(systemPromptIncludes('subagent_at tool when a task must run').check(headerTrace).ok, true)
+    assert.equal(systemPromptIncludes('Use the read tool').check(headerTrace).ok, false)
+  })
+
+  it('fails with an explanation when no request/header event exists', () => {
+    const outcome = systemPromptIncludes('anything').check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /request\/header event/)
+  })
+})
+
+describe('toolMounted', () => {
+  it('matches a mounted tool name in the request header', () => {
+    assert.equal(toolMounted('subagent_at').check(headerTrace).ok, true)
+    assert.equal(toolMounted('bash').check(headerTrace).ok, false)
+  })
+
+  it('fails with an explanation when no request/header event exists', () => {
+    const outcome = toolMounted('anything').check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /request\/header event/)
   })
 })

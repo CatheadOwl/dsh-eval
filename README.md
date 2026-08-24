@@ -127,7 +127,7 @@ export default {
 }
 ```
 
-matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`finalTextIncludes`、`finalTextMatches`。mock helper：`toolCallStep`、`textStep`。
+matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）。mock helper：`toolCallStep`、`textStep`。
 
 ```bash
 node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \

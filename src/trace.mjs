@@ -93,8 +93,21 @@ export function buildTrace(logs) {
   const toolCalls = []
   const toolResults = []
   const assistantTexts = []
+  const requestHeaders = []
   for (const event of events) {
-    if (event.type === 'tool/call') {
+    if (event.type === 'request/header') {
+      // The assembled model request header: system prompt + mounted tool
+      // schemas. What the model is told it can do and how — the "did my
+      // plugin's section inject?" projection.
+      requestHeaders.push({
+        seq: event.seq,
+        reason: event.data?.reason,
+        system: event.data?.header?.system ?? '',
+        toolNames: Array.isArray(event.data?.header?.tools)
+          ? event.data.header.tools.map(tool => tool?.name).filter(name => typeof name === 'string')
+          : [],
+      })
+    } else if (event.type === 'tool/call') {
       toolCalls.push({
         seq: event.seq,
         turn: event.data.turn,
@@ -125,6 +138,7 @@ export function buildTrace(logs) {
     toolCalls,
     toolResults,
     assistantTexts,
+    requestHeaders,
     finalText: assistantTexts.at(-1) ?? '',
   }
 }
@@ -165,5 +179,7 @@ export function loadTraceDir(sessionsRoot) {
  * @property {{ seq: number, turn: number, step: number, callId: string, name: string, arguments: string, parsedArguments: unknown }[]} toolCalls
  * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined }[]} toolResults
  * @property {string[]} assistantTexts - non-empty assembled assistant messages, log order.
+ * @property {{ seq: number, reason: string, system: string, toolNames: string[] }[]} requestHeaders
+ *   - projected `request/header` events (assembled system prompt + mounted tools).
  * @property {string} finalText - the last assembled assistant text ('' when none).
  */

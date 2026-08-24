@@ -164,3 +164,38 @@ export function finalTextMatches(regex) {
     },
   }
 }
+
+/** The assembled system prompt of a request contains `substring`. */
+export function systemPromptIncludes(substring) {
+  return {
+    describe: `system prompt includes: '${substring}'`,
+    check(trace) {
+      const headers = trace.requestHeaders
+      if (headers.length === 0) {
+        return { ok: false, message: 'expected a request/header event; the run produced none' }
+      }
+      const hit = headers.some(header => header.system.includes(substring))
+      return hit
+        ? { ok: true, message: '' }
+        : { ok: false, message: `no request/header system prompt contains '${substring}' (${headers.length} header(s) seen)` }
+    },
+  }
+}
+
+/** A tool named `matcher` is mounted in some request header (not merely called). */
+export function toolMounted(matcher) {
+  return {
+    describe: `tool mounted: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const headers = trace.requestHeaders
+      if (headers.length === 0) {
+        return { ok: false, message: 'expected a request/header event; the run produced none' }
+      }
+      const names = [...new Set(headers.flatMap(header => header.toolNames))]
+      const hit = names.some(name => nameMatches(matcher, name))
+      return hit
+        ? { ok: true, message: '' }
+        : { ok: false, message: `expected ${describeMatcher(matcher)} among mounted tools; saw [${names.join(', ')}]` }
+    },
+  }
+}

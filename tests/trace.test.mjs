@@ -46,6 +46,18 @@ describe('buildTrace', () => {
     assert.equal(trace.toolCalls[0].callId, 'call-1')
   })
 
+  it('projects request/header system prompts and mounted tools', () => {
+    const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
+    assert.equal(headerTrace.requestHeaders.length, 1)
+    assert.equal(headerTrace.requestHeaders[0].reason, 'initial')
+    assert.ok(headerTrace.requestHeaders[0].system.includes('subagent_at'))
+    assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'subagent_at'])
+  })
+
+  it('projects an empty requestHeaders list when no request/header event exists', () => {
+    assert.deepEqual(trace.requestHeaders, [])
+  })
+
   it('pairs tool results by callId', () => {
     assert.deepEqual(trace.toolResults.map(result => result.callId), ['call-1', 'call-2'])
     assert.equal(trace.toolResults[0].text, 'status: 3 tracked nodes')

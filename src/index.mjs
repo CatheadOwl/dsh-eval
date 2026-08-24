@@ -13,6 +13,8 @@ export {
   toolResultFor,
   finalTextIncludes,
   finalTextMatches,
+  systemPromptIncludes,
+  toolMounted,
 } from './assertions.mjs'
 
 export { toolCallStep, textStep } from './mock/script.mjs'
