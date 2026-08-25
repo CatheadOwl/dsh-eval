@@ -68,6 +68,18 @@ function toolResultText(message) {
     .join('')
 }
 
+/**
+ * Extract the `isError` flag from a tool-result message's wrapper block.
+ * Returns `undefined` when the flag is absent (treated as success by
+ * matchers — see `toolResultSucceeded`).
+ */
+function toolResultIsError(message) {
+  const content = message?.content
+  if (!Array.isArray(content)) return undefined
+  const wrapper = content.find(block => block?.type === 'tool-result')
+  return wrapper?.isError
+}
+
 /** Best-effort parse of a tool call's raw JSON arguments string. */
 function parseArguments(raw) {
   try {
@@ -125,6 +137,7 @@ export function buildTrace(logs) {
         callId: event.data.message?.source?.callId,
         text: toolResultText(event.data.message),
         error: event.data.error,
+        isError: toolResultIsError(event.data.message),
       })
     } else if (event.type === 'assistant/message') {
       const text = messageText(event.data.message)
@@ -177,7 +190,7 @@ export function loadTraceDir(sessionsRoot) {
  * @property {{ header: object, events: object[] }[]} sessions - every parsed log.
  * @property {string | undefined} sessionId - the main session's id.
  * @property {{ seq: number, turn: number, step: number, callId: string, name: string, arguments: string, parsedArguments: unknown }[]} toolCalls
- * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined }[]} toolResults
+ * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined, isError: boolean | undefined }[]} toolResults
  * @property {string[]} assistantTexts - non-empty assembled assistant messages, log order.
  * @property {{ seq: number, reason: string, system: string, toolNames: string[] }[]} requestHeaders
  *   - projected `request/header` events (assembled system prompt + mounted tools).

@@ -11,6 +11,9 @@ import {
   toolSequence,
   toolCallArgs,
   toolResultFor,
+  toolResultIsError,
+  toolResultSucceeded,
+  toolResultTextIncludes,
   finalTextIncludes,
   finalTextMatches,
   systemPromptIncludes,
@@ -20,6 +23,7 @@ import {
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const trace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))])
 const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
+const errorTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8'))])
 
 describe('toolCalled', () => {
   it('matches exact names and regexps', () => {
@@ -94,6 +98,89 @@ describe('toolResultFor', () => {
   it('fails when the call has no result', () => {
     const orphan = { ...trace, toolResults: [] }
     assert.equal(toolResultFor('coggit_status').check(orphan).ok, false)
+  })
+})
+
+describe('toolResultIsError', () => {
+  it('passes when a matching call produced an error result', () => {
+    assert.equal(toolResultIsError('bash').check(errorTrace).ok, true)
+  })
+
+  it('fails when matching calls all succeeded', () => {
+    const outcome = toolResultIsError('read').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /isError/)
+  })
+
+  it('fails when the tool was never called', () => {
+    const outcome = toolResultIsError('nonexistent').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /expected a/)
+  })
+
+  it('supports regex matchers', () => {
+    assert.equal(toolResultIsError(/^bash$/).check(errorTrace).ok, true)
+    assert.equal(toolResultIsError(/^read$/).check(errorTrace).ok, false)
+  })
+
+  it('fails when the call has no result', () => {
+    const orphan = { ...errorTrace, toolResults: [] }
+    const outcome = toolResultIsError('bash').check(orphan)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no tool\/result arrived/)
+  })
+})
+
+describe('toolResultSucceeded', () => {
+  it('passes when a matching call produced a success result', () => {
+    assert.equal(toolResultSucceeded('read').check(errorTrace).ok, true)
+  })
+
+  it('passes when isError is false (sample-session)', () => {
+    assert.equal(toolResultSucceeded('coggit_status').check(trace).ok, true)
+  })
+
+  it('fails when all matching calls produced error results', () => {
+    const outcome = toolResultSucceeded('bash').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /isError: true/)
+  })
+
+  it('fails when the tool was never called', () => {
+    const outcome = toolResultSucceeded('nonexistent').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /expected a/)
+  })
+})
+
+describe('toolResultTextIncludes', () => {
+  it('passes when a matching result text contains the substring', () => {
+    assert.equal(toolResultTextIncludes('bash', 'permission denied').check(errorTrace).ok, true)
+    assert.equal(toolResultTextIncludes('read', 'file contents').check(errorTrace).ok, true)
+  })
+
+  it('fails when no matching result text contains the substring', () => {
+    const outcome = toolResultTextIncludes('bash', 'success').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /texts seen/)
+  })
+
+  it('fails when the tool was never called', () => {
+    const outcome = toolResultTextIncludes('nonexistent', 'anything').check(errorTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /expected a/)
+  })
+
+  it('supports the existing sample trace', () => {
+    assert.equal(toolResultTextIncludes('coggit_status', '3 tracked nodes').check(trace).ok, true)
+    assert.equal(toolResultTextIncludes('coggit_add', 'created cognition').check(trace).ok, true)
+  })
+
+  it('fails when the call has no result', () => {
+    const orphan = { ...errorTrace, toolResults: [] }
+    const outcome = toolResultTextIncludes('bash', 'denied').check(orphan)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no tool\/result arrived/)
   })
 })
 

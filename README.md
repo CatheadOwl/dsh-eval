@@ -127,14 +127,19 @@ export default {
 }
 ```
 
-matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）。mock helper：`toolCallStep`、`textStep`。
+matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）。mock helper：`toolCallStep`、`textStep`。
 
 ```bash
 node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \
-  [--mode real|mock|all] [--keep-artifacts] <case file or directory...>
+  [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] \
+  <case file or directory...>
 ```
 
 每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
+
+`--fail-on-skip` 用于 CI 门禁：当选中 case > 0 但全部被 skip（无凭证或 `--mode` 过滤）时返回非零退出码，避免“根本没跑但成功”的误判。本地开发默认不启用，体验不变。
+
+runner 用 `try/finally` 保证临时目录与 junction 在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不会残留临时文件或泄漏到真实 profile store。
 
 ## 自测与宿主证据
 

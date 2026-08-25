@@ -4,7 +4,8 @@
  *
  * Usage:
  *   dsh-eval run --profile <name> --repo <deepseek-harness dir>
- *                [--mode real|mock|all] [--keep-artifacts] <case paths...>
+ *                [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip]
+ *                <case paths...>
  *
  * A case path is a `*.eval.mjs` file or a directory scanned recursively for
  * them. Each file default-exports one case object (or an array of them):
@@ -22,7 +23,7 @@ import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
 
 function usage(error) {
   const text = [
-    'usage: dsh-eval run --profile <name> --repo <deepseek-harness> [--mode real|mock|all] [--keep-artifacts] <case paths...>',
+    'usage: dsh-eval run --profile <name> --repo <deepseek-harness> [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] <case paths...>',
   ].join('\n')
   if (error === undefined) {
     process.stdout.write(`${text}\n`)
@@ -34,7 +35,7 @@ function usage(error) {
 
 /** Parse argv: known flags, then case paths. */
 function parseArgs(argv) {
-  const options = { profile: undefined, repo: undefined, mode: 'all', keepArtifacts: false }
+  const options = { profile: undefined, repo: undefined, mode: 'all', keepArtifacts: false, failOnSkip: false }
   const paths = []
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -43,6 +44,7 @@ function parseArgs(argv) {
     if (arg === '--repo') { options.repo = argv[++i]; continue }
     if (arg === '--mode') { options.mode = argv[++i]; continue }
     if (arg === '--keep-artifacts') { options.keepArtifacts = true; continue }
+    if (arg === '--fail-on-skip') { options.failOnSkip = true; continue }
     if (arg === '-h' || arg === '--help') usage()
     paths.push(arg)
   }
@@ -141,6 +143,7 @@ if (files.length === 0) usage('error: no *.eval.mjs case files found')
 let passed = 0
 let failed = 0
 let skipped = 0
+let selected = 0
 
 for (const file of files.sort()) {
   let cases
@@ -152,6 +155,7 @@ for (const file of files.sort()) {
     continue
   }
   for (const evalCase of cases) {
+    selected += 1
     const skip = skipReason(evalCase, options.mode)
     if (skip !== undefined) {
       skipped += 1
@@ -205,5 +209,6 @@ for (const file of files.sort()) {
   }
 }
 
-process.stdout.write(`\n${passed} passed, ${failed} failed, ${skipped} skipped\n`)
-process.exit(failed === 0 ? 0 : 1)
+process.stdout.write(`\n${selected} selected, ${passed} passed, ${failed} failed, ${skipped} skipped\n`)
+const exitFail = failed > 0 || (options.failOnSkip && selected > 0 && passed + failed === 0)
+process.exit(exitFail ? 1 : 0)

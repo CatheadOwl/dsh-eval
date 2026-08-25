@@ -22,6 +22,27 @@ function callList(trace) {
   return names.length === 0 ? '(no tool calls)' : `[${names.join(', ')}]`
 }
 
+/**
+ * Collect the tool results paired with calls matching `matcher`.
+ * @returns {{ callIds: Set<string>, results: object[] }}
+ *   `callIds` is empty when no call satisfies `matcher`;
+ *   `results` is the subset of `trace.toolResults` paired with those calls.
+ */
+function resultsForMatcher(matcher, trace) {
+  const callIds = new Set(
+    trace.toolCalls.filter(call => nameMatches(matcher, call.name)).map(call => call.callId),
+  )
+  const results = callIds.size === 0
+    ? []
+    : trace.toolResults.filter(r => callIds.has(r.callId))
+  return { callIds, results }
+}
+
+/** Truncate a string for diagnostics. */
+function truncate(text, max = 200) {
+  return text.length > max ? `${text.slice(0, max)}…` : text
+}
+
 /** A tool matching `matcher` was called at least once. */
 export function toolCalled(matcher) {
   return {
@@ -125,9 +146,7 @@ export function toolResultFor(matcher) {
   return {
     describe: `tool result present for: ${describeMatcher(matcher)}`,
     check(trace) {
-      const callIds = new Set(
-        trace.toolCalls.filter(call => nameMatches(matcher, call.name)).map(call => call.callId),
-      )
+      const { callIds } = resultsForMatcher(matcher, trace)
       if (callIds.size === 0) {
         return { ok: false, message: `expected a ${describeMatcher(matcher)} call; saw ${callList(trace)}` }
       }
@@ -135,6 +154,89 @@ export function toolResultFor(matcher) {
       return hit
         ? { ok: true, message: '' }
         : { ok: false, message: `${describeMatcher(matcher)} was called but no tool/result arrived for it` }
+    },
+  }
+}
+
+/**
+ * A call matching `matcher` produced a tool result with `isError === true`.
+ * Fails when the tool was never called, never received a result, or every
+ * result was a success.
+ */
+export function toolResultIsError(matcher) {
+  return {
+    describe: `tool result isError: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const { callIds, results } = resultsForMatcher(matcher, trace)
+      if (callIds.size === 0) {
+        return { ok: false, message: `expected a ${describeMatcher(matcher)} call; saw ${callList(trace)}` }
+      }
+      if (results.length === 0) {
+        return { ok: false, message: `${describeMatcher(matcher)} was called but no tool/result arrived for it` }
+      }
+      const hit = results.some(r => r.isError === true)
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `expected ${describeMatcher(matcher)} to produce an error result; `
+              + `saw isError: [${results.map(r => String(r.isError)).join(', ')}]`,
+          }
+    },
+  }
+}
+
+/**
+ * A call matching `matcher` produced a tool result with `isError` NOT true
+ * (i.e. `false` or `undefined` — treated as success).
+ */
+export function toolResultSucceeded(matcher) {
+  return {
+    describe: `tool result succeeded: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const { callIds, results } = resultsForMatcher(matcher, trace)
+      if (callIds.size === 0) {
+        return { ok: false, message: `expected a ${describeMatcher(matcher)} call; saw ${callList(trace)}` }
+      }
+      if (results.length === 0) {
+        return { ok: false, message: `${describeMatcher(matcher)} was called but no tool/result arrived for it` }
+      }
+      const hit = results.some(r => r.isError !== true)
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `expected ${describeMatcher(matcher)} to produce a success result; `
+              + `all ${results.length} result(s) had isError: true`,
+          }
+    },
+  }
+}
+
+/**
+ * A call matching `matcher` produced a tool result whose text contains
+ * `substring`. The text is the same projection used by `toolResultFor`
+ * (concatenated inner text blocks of the tool-result wrapper).
+ */
+export function toolResultTextIncludes(matcher, substring) {
+  return {
+    describe: `tool result text includes: ${describeMatcher(matcher)} → '${substring}'`,
+    check(trace) {
+      const { callIds, results } = resultsForMatcher(matcher, trace)
+      if (callIds.size === 0) {
+        return { ok: false, message: `expected a ${describeMatcher(matcher)} call; saw ${callList(trace)}` }
+      }
+      if (results.length === 0) {
+        return { ok: false, message: `${describeMatcher(matcher)} was called but no tool/result arrived for it` }
+      }
+      const hit = results.some(r => r.text.includes(substring))
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `no ${describeMatcher(matcher)} result text includes '${substring}'; `
+              + `texts seen: [${results.map(r => JSON.stringify(truncate(r.text))).join(', ')}]`,
+          }
     },
   }
 }

@@ -64,6 +64,22 @@ describe('buildTrace', () => {
     assert.equal(trace.toolResults[0].error, undefined)
   })
 
+  it('projects isError from the tool-result wrapper block', () => {
+    // sample-session: both results have isError: false
+    assert.equal(trace.toolResults[0].isError, false)
+    assert.equal(trace.toolResults[1].isError, false)
+  })
+
+  it('projects isError: true for error results', () => {
+    const errorText = readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8')
+    const errorTrace = buildTrace([parseSessionLog(errorText)])
+    const okResult = errorTrace.toolResults.find(r => r.callId === 'call-ok')
+    const failResult = errorTrace.toolResults.find(r => r.callId === 'call-fail')
+    assert.equal(okResult.isError, false)
+    assert.equal(failResult.isError, true)
+    assert.equal(failResult.text, 'permission denied: insufficient privileges')
+  })
+
   it('takes the last non-empty assistant text as finalText', () => {
     assert.deepEqual(trace.assistantTexts, ['intermediate note', 'Done: cognition created.'])
     assert.equal(trace.finalText, 'Done: cognition created.')

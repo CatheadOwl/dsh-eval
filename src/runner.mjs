@@ -135,127 +135,145 @@ export async function runEvalCase(evalCase, options) {
   const timeoutMs = evalCase.timeoutMs ?? 180_000
 
   const runDir = mkdtempSync(join(tmpdir(), 'dsh-eval-'))
-  const dshHome = join(runDir, 'dsh-home')
-  const workspace = join(runDir, 'workspace')
-  const sessionsRoot = join(runDir, 'sessions')
-  mkdirSync(workspace, { recursive: true })
-  await evalCase.prepare?.(workspace)
+  // Everything past this point is wrapped in try/finally so the temp dir
+  // (and any junctions) are cleaned up even when `prepare`, profile
+  // staging, or spawn throw.  Previously only the normal exit path
+  // cleaned up — a `prepare` failure leaked the entire runDir.
+  try {
+    const dshHome = join(runDir, 'dsh-home')
+    const workspace = join(runDir, 'workspace')
+    const sessionsRoot = join(runDir, 'sessions')
+    mkdirSync(workspace, { recursive: true })
+    await evalCase.prepare?.(workspace)
 
-  // Profiles resolve under $DSH_HOME/profiles, and eval overwrites DSH_HOME
-  // for session/settings isolation: stage the profile store (see
-  // stageProfileStore — the booted profile is copied, so boot's unconditional
-  // cordis.yml rewrite stays inside the temporary home; only the profile's
-  // read-only node_modules stays linked, and the shared fallback is rebuilt
-  // by boot inside the temporary home). The managed credential
-  // document is copied in because `dsh-credentials-local` resolves it per
-  // request. Falls back to the default `~/.dsh` when the ambient environment
-  // sets no home of its own.
-  const realHome = (process.env.DSH_HOME ?? '').trim() !== '' ? process.env.DSH_HOME : join(homedir(), '.dsh')
-  mkdirSync(dshHome, { recursive: true })
-  const junctions = stageProfileStore(realHome, dshHome, options.profile)
-  const realCredentials = join(realHome, '.credentials.yaml')
-  if (existsSync(realCredentials)) {
-    const credentialsCopy = join(dshHome, '.credentials.yaml')
-    copyFileSync(realCredentials, credentialsCopy)
-    try {
-      // Best-effort owner-only on POSIX (the harness's own e2e uses 0o600);
-      // a no-op beyond the read-only bit on Windows.
-      chmodSync(credentialsCopy, 0o600)
-    } catch { /* permission tightening is best-effort */ }
-  }
-
-  const env = {
-    ...process.env,
-    DSH_HOME: dshHome,
-    DSH_TELEMETRY_DISABLED: '1',
-  }
-  if (mode === 'mock') {
-    if (evalCase.script === undefined) {
-      throw new Error(`case '${evalCase.id}': mock mode requires a script`)
-    }
-    const scriptPath = join(runDir, 'mock-script.json')
-    writeFileSync(scriptPath, JSON.stringify(evalCase.script))
-    env.DSH_EVAL_MOCK_SCRIPT = scriptPath
-  }
-
-  const overlayPath = join(runDir, 'eval-overlay.yml')
-  writeFileSync(overlayPath, buildOverlayYaml({
-    sessionsRoot,
-    persona: evalCase.persona,
-    mock: mode === 'mock',
-  }))
-
-  const cliArgs = [
-    binPath,
-    '--profile', options.profile,
-    '--patch', overlayPath,
-    evalCase.task,
-  ]
-  const child = spawn(process.execPath, cliArgs, { cwd: workspace, env })
-
-  let stdout = ''
-  let stderr = ''
-  child.stdout.on('data', chunk => { stdout += chunk })
-  child.stderr.on('data', chunk => { stderr += chunk })
-
-  let timedOut = false
-  const timer = setTimeout(() => {
-    timedOut = true
-    child.kill('SIGTERM')
-  }, timeoutMs)
-
-  const exitCode = await new Promise(resolveExit => {
-    child.on('error', error => { stderr += `\ndsh-eval: failed to spawn dsh CLI: ${error.message}\n`; resolveExit(127) })
-    child.on('exit', code => resolveExit(code ?? 1))
-  })
-  clearTimeout(timer)
-
-  const trace = loadTraceDir(sessionsRoot)
-  const sessionLogs = collectSessionLogTexts(sessionsRoot)
-
-  // Workspace assertions live HERE, before the run dir cleanup: a case's
-  // `inspect(workspace, { trace })` may throw; the failure text rides the
-  // result instead of leaking past cleanup.
-  let inspectError
-  if (typeof evalCase.inspect === 'function') {
-    try {
-      await evalCase.inspect(workspace, { trace })
-    } catch (error) {
-      inspectError = error instanceof Error ? error.message : String(error)
-    }
-  }
-
-  if (options.artifactsDir !== undefined) {
-    mkdirSync(options.artifactsDir, { recursive: true })
-    writeFileSync(join(options.artifactsDir, 'stdout.txt'), stdout)
-    writeFileSync(join(options.artifactsDir, 'stderr.txt'), stderr)
-    writeFileSync(join(options.artifactsDir, 'trace.json'), JSON.stringify({
-      caseId: evalCase.id,
-      mode,
-      task: evalCase.task,
-      exitCode,
-      timedOut,
-      trace,
-    }, undefined, 2))
-    try {
-      cpSync(sessionsRoot, join(options.artifactsDir, 'sessions'), { recursive: true })
-    } catch { /* no session materialized — nothing to copy */ }
-  }
-
-  if (process.env.DSH_EVAL_KEEP_TMP !== '1') {
-    // Drop every junction first so cleanup can never descend into the real
-    // profile store.
-    for (const junction of junctions) {
+    // Profiles resolve under $DSH_HOME/profiles, and eval overwrites DSH_HOME
+    // for session/settings isolation: stage the profile store (see
+    // stageProfileStore — the booted profile is copied, so boot's unconditional
+    // cordis.yml rewrite stays inside the temporary home; only the profile's
+    // read-only node_modules stays linked, and the shared fallback is rebuilt
+    // by boot inside the temporary home). The managed credential
+    // document is copied in because `dsh-credentials-local` resolves it per
+    // request. Falls back to the default `~/.dsh` when the ambient environment
+    // sets no home of its own.
+    const realHome = (process.env.DSH_HOME ?? '').trim() !== '' ? process.env.DSH_HOME : join(homedir(), '.dsh')
+    mkdirSync(dshHome, { recursive: true })
+    stageProfileStore(realHome, dshHome, options.profile)
+    const realCredentials = join(realHome, '.credentials.yaml')
+    if (existsSync(realCredentials)) {
+      const credentialsCopy = join(dshHome, '.credentials.yaml')
+      copyFileSync(realCredentials, credentialsCopy)
       try {
-        unlinkSync(junction)
-      } catch { /* junction absent — nothing to drop */ }
+        // Best-effort owner-only on POSIX (the harness's own e2e uses 0o600);
+        // a no-op beyond the read-only bit on Windows.
+        chmodSync(credentialsCopy, 0o600)
+      } catch { /* permission tightening is best-effort */ }
     }
-    rmSync(runDir, { recursive: true, force: true })
-  }
 
-  return {
-    caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
-    stdout, stderr, trace, sessionLogs, inspectError, runDir,
+    const env = {
+      ...process.env,
+      DSH_HOME: dshHome,
+      DSH_TELEMETRY_DISABLED: '1',
+    }
+    if (mode === 'mock') {
+      if (evalCase.script === undefined) {
+        throw new Error(`case '${evalCase.id}': mock mode requires a script`)
+      }
+      const scriptPath = join(runDir, 'mock-script.json')
+      writeFileSync(scriptPath, JSON.stringify(evalCase.script))
+      env.DSH_EVAL_MOCK_SCRIPT = scriptPath
+    }
+
+    const overlayPath = join(runDir, 'eval-overlay.yml')
+    writeFileSync(overlayPath, buildOverlayYaml({
+      sessionsRoot,
+      persona: evalCase.persona,
+      mock: mode === 'mock',
+    }))
+
+    const cliArgs = [
+      binPath,
+      '--profile', options.profile,
+      '--patch', overlayPath,
+      evalCase.task,
+    ]
+    const child = spawn(process.execPath, cliArgs, { cwd: workspace, env })
+
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', chunk => { stdout += chunk })
+    child.stderr.on('data', chunk => { stderr += chunk })
+
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGTERM')
+    }, timeoutMs)
+
+    const exitCode = await new Promise(resolveExit => {
+      child.on('error', error => { stderr += `\ndsh-eval: failed to spawn dsh CLI: ${error.message}\n`; resolveExit(127) })
+      child.on('exit', code => resolveExit(code ?? 1))
+    })
+    clearTimeout(timer)
+
+    const trace = loadTraceDir(sessionsRoot)
+    const sessionLogs = collectSessionLogTexts(sessionsRoot)
+
+    // Workspace assertions live HERE, before the run dir cleanup: a case's
+    // `inspect(workspace, { trace })` may throw; the failure text rides the
+    // result instead of leaking past cleanup.
+    let inspectError
+    if (typeof evalCase.inspect === 'function') {
+      try {
+        await evalCase.inspect(workspace, { trace })
+      } catch (error) {
+        inspectError = error instanceof Error ? error.message : String(error)
+      }
+    }
+
+    if (options.artifactsDir !== undefined) {
+      mkdirSync(options.artifactsDir, { recursive: true })
+      writeFileSync(join(options.artifactsDir, 'stdout.txt'), stdout)
+      writeFileSync(join(options.artifactsDir, 'stderr.txt'), stderr)
+      writeFileSync(join(options.artifactsDir, 'trace.json'), JSON.stringify({
+        caseId: evalCase.id,
+        mode,
+        task: evalCase.task,
+        exitCode,
+        timedOut,
+        trace,
+      }, undefined, 2))
+      try {
+        cpSync(sessionsRoot, join(options.artifactsDir, 'sessions'), { recursive: true })
+      } catch { /* no session materialized — nothing to copy */ }
+    }
+
+    return {
+      caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
+      stdout, stderr, trace, sessionLogs, inspectError, runDir,
+    }
+  } finally {
+    if (process.env.DSH_EVAL_KEEP_TMP !== '1') {
+      // Drop every junction first so cleanup can never descend into the
+      // real profile store. Junctions may not exist when the error
+      // happened before stageProfileStore ran — readdirSync catches that.
+      try {
+        const profileJunctions = []
+        const walk = (dir) => {
+          let entries
+          try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+          for (const entry of entries) {
+            const full = join(dir, entry.name)
+            if (entry.isSymbolicLink()) profileJunctions.push(full)
+            else if (entry.isDirectory()) walk(full)
+          }
+        }
+        walk(join(runDir, 'dsh-home'))
+        for (const junction of profileJunctions) {
+          try { unlinkSync(junction) } catch { /* junction absent — nothing to drop */ }
+        }
+      } catch { /* dsh-home not created yet */ }
+      rmSync(runDir, { recursive: true, force: true })
+    }
   }
 }
 
