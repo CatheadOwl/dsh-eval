@@ -141,6 +141,8 @@ node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \
 
 runner 用 `try/finally` 保证临时目录与 junction 在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不会残留临时文件或泄漏到真实 profile store。
 
+behavior 与 review CLI 共享 `src/discovery.mjs` 目录扫描，均跳过 `.runs` 与 `node_modules`。behavior CLI 在加载时做 case shape 校验（id / task / mode / expect matcher shape / mock script.steps），并在跨文件时检测重复 id，尽早失败而非运行期才报错。
+
 ## 自测与宿主证据
 
 ```bash

@@ -7,11 +7,12 @@
  * `.runs/<experiment id>/`.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { materializeReviewExperiment } from '../src/experiment/review.mjs'
 import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
+import { discoverFiles } from '../src/discovery.mjs'
 
 function usage(error) {
   const message = 'usage: dsh-review [--dry-run] [--runs N] [--profile NAME --repo DIR] [--timeout MS] <*.review.mjs or directories...>'
@@ -41,19 +42,8 @@ function parseArgs(argv) {
   return { options, paths }
 }
 
-function discover(path, out = []) {
-  const absolute = resolve(path)
-  if (!existsSync(absolute)) usage(`error: no such experiment path: ${path}`)
-  if (statSync(absolute).isFile()) {
-    if (absolute.endsWith('.review.mjs')) out.push(absolute)
-    return out
-  }
-  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
-    const child = join(absolute, entry.name)
-    if (entry.isDirectory() && entry.name !== '.runs' && entry.name !== 'node_modules') discover(child, out)
-    else if (entry.isFile() && entry.name.endsWith('.review.mjs')) out.push(child)
-  }
-  return out
+function discover(path) {
+  return discoverFiles(path, '.review.mjs')
 }
 
 async function loadExperiment(file) {
@@ -84,6 +74,9 @@ function writeMaterialized(experiment, materialized, extra = {}) {
 }
 
 const { options, paths } = parseArgs(process.argv.slice(2))
+for (const path of paths) {
+  if (!existsSync(resolve(path))) usage(`error: no such experiment path: ${path}`)
+}
 const files = paths.flatMap(path => discover(path)).sort()
 if (files.length === 0) usage('error: no *.review.mjs experiment files found')
 

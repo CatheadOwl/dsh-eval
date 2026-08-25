@@ -15,11 +15,12 @@
  * `<case file dir>/.runs/<case id>/`.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
+import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
 
 function usage(error) {
   const text = [
@@ -56,29 +57,17 @@ function parseArgs(argv) {
 }
 
 /** Recursively collect `*.eval.mjs` files from one file or directory path. */
-function discoverCaseFiles(path, out = []) {
-  const absolute = resolve(path)
-  if (statSync(absolute).isFile()) {
-    if (absolute.endsWith('.eval.mjs')) out.push(absolute)
-    return out
-  }
-  for (const item of readdirSync(absolute, { withFileTypes: true })) {
-    const full = join(absolute, item.name)
-    if (item.isDirectory()) discoverCaseFiles(full, out)
-    else if (item.name.endsWith('.eval.mjs')) out.push(full)
-  }
-  return out
+function discoverCaseFiles(path) {
+  return discoverFiles(path, '.eval.mjs')
 }
 
-/** Import one case file and normalize its default export to a case array. */
+/** Import one case file, validate shape, and normalize to a case array. */
 async function loadCases(file) {
   const module = await import(pathToFileURL(file).href)
   const exported = module.default
   const list = Array.isArray(exported) ? exported : [exported]
   for (const evalCase of list) {
-    if (typeof evalCase?.id !== 'string' || typeof evalCase?.task !== 'string' || !Array.isArray(evalCase?.expect)) {
-      throw new Error(`${file}: case must export { id, task, expect: Matcher[] }`)
-    }
+    validateEvalCase(evalCase, file)
   }
   return list.map(evalCase => ({ ...evalCase, __file: file }))
 }
@@ -144,6 +133,7 @@ let passed = 0
 let failed = 0
 let skipped = 0
 let selected = 0
+const seenIds = new Map()
 
 for (const file of files.sort()) {
   let cases
@@ -154,6 +144,26 @@ for (const file of files.sort()) {
     process.stderr.write(`FAIL ${file}: failed to load cases: ${error.message}\n`)
     continue
   }
+  // Intra-file duplicate check
+  try {
+    detectDuplicateIds(cases)
+  } catch (error) {
+    failed += 1
+    process.stderr.write(`FAIL ${file}: ${error.message}\n`)
+    continue
+  }
+  // Cross-file duplicate check (only add to seenIds after all pass)
+  let hasDuplicate = false
+  for (const c of cases) {
+    if (seenIds.has(c.id)) {
+      failed += 1
+      process.stderr.write(`FAIL ${file}: duplicate case id '${c.id}' (also in ${seenIds.get(c.id)})\n`)
+      hasDuplicate = true
+      break
+    }
+  }
+  if (hasDuplicate) continue
+  for (const c of cases) seenIds.set(c.id, file)
   for (const evalCase of cases) {
     selected += 1
     const skip = skipReason(evalCase, options.mode)
