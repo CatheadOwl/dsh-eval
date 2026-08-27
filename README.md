@@ -57,7 +57,7 @@ behavior *.eval.mjs ───────────────────►
     rubric.md
 ```
 
-当前迁移实例：[`any_routes/eval/`](../any_routes/eval/README.md) 与 [`coggit/eval/`](../coggit/eval/README.md)。
+当前迁移实例：[`any_routes/eval/`](/dsh-plugin-dev/any_routes/eval/README.md) 与 [`coggit/eval/`](/dsh-plugin-dev/coggit/eval/README.md)。
 
 ## 理解实验定义
 
@@ -149,4 +149,4 @@ behavior 与 review CLI 共享 `src/discovery.mjs` 目录扫描，均跳过 `.ru
 pnpm test
 ```
 
-宿主 seam 的源溯登记在 [`explorer/eval-seams/`](../../explorer/eval-seams/summary.md)。dsh runner 依赖已构建的 `deepseek-harness/apps/cli/lib/bin.js`；real 层需要 `DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`，mock 与 review dry-run 不需要。
+宿主 seam 的源溯登记在 [`explorer/eval-seams/`](/explorer/eval-seams/summary.md)。dsh runner 依赖已构建的 `deepseek-harness/apps/cli/lib/bin.js`；real 层需要 `DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`，mock 与 review dry-run 不需要。
