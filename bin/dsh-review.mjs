@@ -15,14 +15,14 @@ import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
 import { discoverFiles } from '../src/discovery.mjs'
 
 function usage(error) {
-  const message = 'usage: dsh-review [--dry-run] [--runs N] [--profile NAME --repo DIR] [--timeout MS] <*.review.mjs or directories...>'
+  const message = 'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] <*.review.mjs or directories...>'
   if (error) process.stderr.write(`${error}\n${message}\n`)
   else process.stdout.write(`${message}\n`)
   process.exit(error ? 2 : 0)
 }
 
 function parseArgs(argv) {
-  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined }
+  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: 'headless', repo: undefined }
   const paths = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -37,7 +37,6 @@ function parseArgs(argv) {
   if (paths.length === 0) usage('error: at least one review experiment path is required')
   if (options.runs !== undefined && (!Number.isInteger(options.runs) || options.runs < 1)) usage('error: --runs must be a positive integer')
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)) usage('error: --timeout must be a positive integer')
-  if (!options.dryRun && !options.profile) usage('error: --profile is required unless --dry-run is used')
   if (!options.dryRun && !options.repo) usage('error: --repo is required unless --dry-run is used')
   return { options, paths }
 }
@@ -108,6 +107,7 @@ for (const file of files) {
       const payload = attempt.result ?? {}
       if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.stdout, 'utf8')
       if (payload.stderr) writeFileSync(join(output, `run-${attempt.index}.stderr.txt`), payload.stderr, 'utf8')
+      if (payload.toolBoundaryEvidence) writeFileSync(join(output, `run-${attempt.index}.tool-boundary-evidence.json`), payload.toolBoundaryEvidence, 'utf8')
       if (!attempt.ok) {
         failures += 1
         writeFileSync(join(output, `run-${attempt.index}.error.txt`), attempt.error, 'utf8')

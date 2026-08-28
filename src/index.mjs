@@ -39,3 +39,8 @@ export {
   resolveDshCli,
   runDshReviewExperiment,
 } from './adapters/dsh/review.mjs'
+
+export {
+  validateToolBoundary,
+  renderToolBoundaryEvidence,
+} from './tool-validation.mjs'

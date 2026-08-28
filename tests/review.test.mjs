@@ -98,3 +98,88 @@ test('dsh adapter gives every reviewer an isolated DSH_HOME', async () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('defaults to the headless sterile profile when no profile is specified', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-default-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    mkdirSync(realHome, { recursive: true })
+    const cli = join(root, 'fake-cli.mjs')
+    writeFileSync(cli, 'console.log(JSON.stringify({ args: process.argv.slice(2) }))\n')
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    const result = await execute('task')
+    const output = JSON.parse(result.stdout)
+    assert.equal(output.args[1], 'headless')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('fails on tool boundary violation when session trace shows unexpected tools', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-boundary-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    mkdirSync(realHome, { recursive: true })
+    const cli = join(root, 'fake-cli.mjs')
+    // The fake CLI writes a session JSONL with a tool leak, then exits 0.
+    writeFileSync(cli, [
+      "import { mkdirSync, writeFileSync } from 'node:fs'",
+      "import { join } from 'node:path'",
+      "const home = process.env.DSH_HOME",
+      "const dir = join(home, 'sessions')",
+      "mkdirSync(dir, { recursive: true })",
+      "writeFileSync(join(dir, 'session.jsonl'),",
+      "  '{\"type\":\"session\",\"id\":\"s1\"}\\n'",
+      "  + '{\"seq\":0,\"type\":\"request/header\",\"data\":{\"reason\":\"initial\",\"header\":{\"system\":\"s\",\"tools\":[{\"name\":\"coggit_status\"}]}}}\\n')",
+      '',
+    ].join('\n'))
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    await assert.rejects(
+      () => execute('task'),
+      (error) => {
+        assert.match(error.message, /tool boundary violation/)
+        assert.match(error.message, /coggit_status/)
+        // Evidence is attached to result for the caller to persist
+        // (the adapter's runDir is ephemeral — removed by finally).
+        assert.ok(error.result.toolBoundaryEvidence, 'evidence must be attached to result')
+        const evidence = JSON.parse(error.result.toolBoundaryEvidence)
+        assert.equal(evidence.status, 'tool-boundary-violation')
+        assert.deepEqual(evidence.unexpectedTools, ['coggit_status'])
+        return true
+      },
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('skips tool boundary check when no session log materializes', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-no-trace-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    mkdirSync(realHome, { recursive: true })
+    const cli = join(root, 'fake-cli.mjs')
+    // The fake CLI exits 0 without writing any session log.
+    writeFileSync(cli, 'console.log("ok")\n')
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    const result = await execute('task')
+    assert.equal(result.toolValidation, undefined)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

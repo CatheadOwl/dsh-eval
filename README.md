@@ -94,13 +94,15 @@ export default defineReviewExperiment({
 node bin/dsh-review.mjs --dry-run <experiment file or directory>
 
 node bin/dsh-review.mjs \
-  --profile <headless-profile> \
+  --profile <sterile-profile> \
   --repo ../../deepseek-harness \
   [--runs 5] [--timeout 300000] \
   <experiment file or directory>
 ```
 
-真实运行会把 reviewer 置为**无工具**：适配器生成一份 `--patch` 覆盖层，禁用所有宿主模型可见工具（`tool-fs`、`tool-fs-search`、shell、web、subagent 等），并把 cwd 指向空临时目录——reviewer 只能从物化的观测文本推理，无法调工具查真实目录（盲评泄露 workspace 的问题）。扩展自行注册的工具（如 `coggit_*`）仍保留，但它们只查会话 workspace 的 CogGit 状态、不读文件树。
+真实运行使用**专用 sterile profile**（默认 `headless`，即宿主模板 `dsh-base` + `dsh-headless`，无树外插件）：适配器生成一份 `--patch` 覆盖层禁用所有宿主模型可见工具（`tool-fs`、`tool-fs-search`、shell、web、subagent 等），并把 cwd 指向空临时目录——reviewer 只能从物化的观测文本推理。运行后解析 session trace 的 `request/header` 事件做**工具边界校验**：发现任何非预期工具即视为 adapter failure（证据写入 `.runs/<id>/run-N.tool-boundary-evidence.json`）。
+
+> **运维前提**：`stageProfileStore` 在真实 home 已有同名 profile 时**原样复制**（含已安装插件与 patch 层）。若本机 `~/.dsh/profiles/headless` 装过树外插件，暂存后的 profile **不是无菌的**——工具边界校验会当场 fail-loud（这是设计的正确行为）。保持无菌的方式：删掉本机 `headless` profile 让 boot 重建出厂模板，或指定一个确认无插件的 profile。
 
 产物落在 review 文件旁的 `.runs/<experiment id>/`：
 
