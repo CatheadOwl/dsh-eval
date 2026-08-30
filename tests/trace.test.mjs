@@ -85,6 +85,19 @@ describe('buildTrace', () => {
     assert.equal(trace.finalText, 'Done: cognition created.')
   })
 
+  it('projects user messages with their source (task prompt vs plugin steer)', () => {
+    const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
+    assert.equal(steerTrace.userMessages.length, 2)
+    assert.deepEqual(steerTrace.userMessages[0].source, { kind: 'user' })
+    assert.equal(steerTrace.userMessages[0].text, 'write task-a.md')
+    assert.deepEqual(steerTrace.userMessages[1].source, { kind: 'plugin', plugin: 'gates' })
+    assert.ok(steerTrace.userMessages[1].text.includes('task-a.md'))
+  })
+
+  it('projects an empty userMessages list when no user/message event exists', () => {
+    assert.deepEqual(trace.userMessages, [])
+  })
+
   it('selects the main session over subagent logs', () => {
     const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
     const child = parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8'))

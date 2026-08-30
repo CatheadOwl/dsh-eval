@@ -16,6 +16,24 @@ function nameMatches(matcher, name) {
   return matcher instanceof RegExp ? matcher.test(name) : name === matcher
 }
 
+/**
+ * Whether a message `source` satisfies a source matcher. A string or RegExp
+ * matches `source.plugin` (the producer name — e.g. `'gates'` for steer);
+ * a function receives the full `source` object (for `kind`-based matching).
+ */
+function sourceMatches(matcher, source) {
+  if (typeof matcher === 'function') return matcher(source) === true
+  const plugin = source?.plugin
+  if (matcher instanceof RegExp) return typeof plugin === 'string' && matcher.test(plugin)
+  return plugin === matcher
+}
+
+/** Render a source matcher for diagnostics. */
+function describeSource(matcher) {
+  if (typeof matcher === 'function') return '<source predicate>'
+  return describeMatcher(matcher)
+}
+
 /** Render the trace's call sequence for failure messages. */
 function callList(trace) {
   const names = trace.toolCalls.map(call => call.name)
@@ -298,6 +316,55 @@ export function toolMounted(matcher) {
       return hit
         ? { ok: true, message: '' }
         : { ok: false, message: `expected ${describeMatcher(matcher)} among mounted tools; saw [${names.join(', ')}]` }
+    },
+  }
+}
+
+/**
+ * A user message from a source matching `sourceMatcher` contains `substring`.
+ * Source matcher: string/RegExp against `source.plugin`, or a predicate over
+ * the full `source`. This is how a case asserts plugin steer — a `user/message`
+ * with a plugin source — separately from the task prompt (`kind: 'user'`).
+ */
+export function userMessageTextIncludes(sourceMatcher, substring) {
+  return {
+    describe: `user message from ${describeSource(sourceMatcher)} includes: '${substring}'`,
+    check(trace) {
+      const messages = trace.userMessages.filter(message => sourceMatches(sourceMatcher, message.source))
+      if (messages.length === 0) {
+        return { ok: false, message: `expected a user message from ${describeSource(sourceMatcher)}; the run produced none` }
+      }
+      const hit = messages.some(message => message.text.includes(substring))
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `no ${describeSource(sourceMatcher)} user message includes '${substring}'; `
+              + `texts seen: [${messages.map(message => JSON.stringify(truncate(message.text))).join(', ')}]`,
+          }
+    },
+  }
+}
+
+/**
+ * No user message from a source matching `sourceMatcher` contains `substring`.
+ * Passes vacuously when no such message exists — pair it with
+ * `userMessageTextIncludes` to also prove the message arrived. This is the
+ * "not steered on someone else's file" half of an isolation assertion.
+ */
+export function userMessageTextExcludes(sourceMatcher, substring) {
+  return {
+    describe: `user message from ${describeSource(sourceMatcher)} excludes: '${substring}'`,
+    check(trace) {
+      const messages = trace.userMessages.filter(message => sourceMatches(sourceMatcher, message.source))
+      const hit = messages.find(message => message.text.includes(substring))
+      return hit === undefined
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `a ${describeSource(sourceMatcher)} user message includes '${substring}': `
+              + `${JSON.stringify(truncate(hit.text))}`,
+          }
     },
   }
 }

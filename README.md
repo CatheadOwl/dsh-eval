@@ -31,6 +31,8 @@ behavior *.eval.mjs ───────────────────►
 
 理解评审不尝试用 trace matcher 自动化，因为“缺少应有提示”“字段容易误读”是设计缺口，不是固定字符串回归。相反，行为层不负责评价自由文本设计。
 
+行为层的断言对象是 session 事件投影，不只是「模型产出」：`requestHeaders` 已投影模型被挂载的工具与 system prompt（输入面），`userMessages` 补上 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）。这让 behavior mock 能断言插件的**驱动级 steer**——例如 gates「归责过滤后只 steer 自己文件」——而不只断工具选择或最终文本。steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），所以区分靠 `source`（gates 为 `{ kind: 'plugin', plugin: 'gates' }`，任务 prompt 为 `{ kind: 'user' }`），由 `userMessageTextIncludes` / `userMessageTextExcludes` 的 `source` matcher 承担。
+
 ## 从早期 eval 固化下来的规则
 
 1. **冻结输入，实时投影输出。** fixture 保存 raw SDK result、合成知识库或调用参数；`observe()` 必须调用当前构建产物。不要提交一份会随实现漂移的 projected-output 快照。
@@ -129,7 +131,7 @@ export default {
 }
 ```
 
-matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）。mock helper：`toolCallStep`、`textStep`。
+matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
 
 ```bash
 node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \

@@ -105,6 +105,7 @@ export function buildTrace(logs) {
   const toolCalls = []
   const toolResults = []
   const assistantTexts = []
+  const userMessages = []
   const requestHeaders = []
   for (const event of events) {
     if (event.type === 'request/header') {
@@ -142,6 +143,19 @@ export function buildTrace(logs) {
     } else if (event.type === 'assistant/message') {
       const text = messageText(event.data.message)
       if (text !== '') assistantTexts.push(text)
+    } else if (event.type === 'user/message') {
+      // The user-role model-visible surface: the task prompt (kind 'user'),
+      // plugin steering, or injected context. `source` tells them apart —
+      // steer has no dedicated event type (the legacy `steering/message` was
+      // migrated to `user/message`), so the matcher side filters by `source`.
+      const text = messageText(event.data)
+      if (text !== '') {
+        userMessages.push({
+          seq: event.seq,
+          source: event.data?.source,
+          text,
+        })
+      }
     }
   }
 
@@ -151,6 +165,7 @@ export function buildTrace(logs) {
     toolCalls,
     toolResults,
     assistantTexts,
+    userMessages,
     requestHeaders,
     finalText: assistantTexts.at(-1) ?? '',
   }
@@ -192,6 +207,11 @@ export function loadTraceDir(sessionsRoot) {
  * @property {{ seq: number, turn: number, step: number, callId: string, name: string, arguments: string, parsedArguments: unknown }[]} toolCalls
  * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined, isError: boolean | undefined }[]} toolResults
  * @property {string[]} assistantTexts - non-empty assembled assistant messages, log order.
+ * @property {{ seq: number, source: object, text: string }[]} userMessages
+ *   - non-empty `user/message` events (task prompt, plugin steer, injected
+ *     context) with their verbatim `source` (`kind` + plugin-specific fields),
+ *     in log order. Steer has no dedicated event type; matchers filter by
+ *     `source`.
  * @property {{ seq: number, reason: string, system: string, toolNames: string[] }[]} requestHeaders
  *   - projected `request/header` events (assembled system prompt + mounted tools).
  * @property {string} finalText - the last assembled assistant text ('' when none).

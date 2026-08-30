@@ -1,0 +1,11 @@
+{"type":"session","id":"session-fixture-steer","origin":"main"}
+{"seq":0,"time":1755446400000,"type":"turn/start","data":{"turn":1}}
+{"seq":1,"time":1755446400100,"type":"step/start","data":{"turn":1,"step":1}}
+{"seq":2,"time":1755446400200,"type":"user/message","surfaceOp":"append","data":{"id":"msg-task","role":"user","content":[{"type":"text","text":"write task-a.md"}],"source":{"kind":"user"}}}
+{"seq":3,"time":1755446400300,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-write","name":"write","arguments":"{\"file_path\":\"task-a.md\"}"}}
+{"seq":4,"time":1755446400400,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[3],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-write","content":[{"type":"text","text":"wrote task-a.md"}],"isError":false}],"source":{"kind":"tool","callId":"call-write"}}}}
+{"seq":5,"time":1755446400500,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}}
+{"seq":6,"time":1755446400600,"type":"user/message","surfaceOp":"append","data":{"id":"msg-steer","role":"user","content":[{"type":"text","text":"broken link in task-a.md: [x](missing.md)"}],"source":{"kind":"plugin","plugin":"gates"}}}
+{"seq":7,"time":1755446400700,"type":"step/start","data":{"turn":1,"step":2}}
+{"seq":8,"time":1755446400800,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":2,"message":{"role":"assistant","content":[{"type":"text","text":"fixed the link"}]}}}
+{"seq":9,"time":1755446400900,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

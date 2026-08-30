@@ -18,12 +18,15 @@ import {
   finalTextMatches,
   systemPromptIncludes,
   toolMounted,
+  userMessageTextIncludes,
+  userMessageTextExcludes,
 } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const trace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))])
 const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
 const errorTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8'))])
+const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
 
 describe('toolCalled', () => {
   it('matches exact names and regexps', () => {
@@ -216,5 +219,41 @@ describe('toolMounted', () => {
     const outcome = toolMounted('anything').check(trace)
     assert.equal(outcome.ok, false)
     assert.match(outcome.message, /request\/header event/)
+  })
+})
+
+describe('userMessageTextIncludes', () => {
+  it('matches a plugin-sourced user message by plugin name', () => {
+    assert.equal(userMessageTextIncludes('gates', 'task-a.md').check(steerTrace).ok, true)
+    assert.equal(userMessageTextIncludes('gates', 'task-b.md').check(steerTrace).ok, false)
+  })
+
+  it('does not match the task prompt (kind: user) when scoped to a plugin', () => {
+    assert.equal(userMessageTextIncludes('gates', 'write task-a.md').check(steerTrace).ok, false)
+  })
+
+  it('supports regex and predicate source matchers', () => {
+    assert.equal(userMessageTextIncludes(/^gate/, 'task-a.md').check(steerTrace).ok, true)
+    assert.equal(userMessageTextIncludes(source => source.kind === 'user', 'write task-a.md').check(steerTrace).ok, true)
+  })
+
+  it('fails when no message from the source exists', () => {
+    const outcome = userMessageTextIncludes('nonexistent', 'anything').check(steerTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /produced none/)
+  })
+})
+
+describe('userMessageTextExcludes', () => {
+  it('passes when no source message contains the substring', () => {
+    assert.equal(userMessageTextExcludes('gates', 'task-b.md').check(steerTrace).ok, true)
+  })
+
+  it('fails when a source message contains the substring', () => {
+    assert.equal(userMessageTextExcludes('gates', 'task-a.md').check(steerTrace).ok, false)
+  })
+
+  it('passes vacuously when no message from the source exists', () => {
+    assert.equal(userMessageTextExcludes('nonexistent', 'anything').check(steerTrace).ok, true)
   })
 })
