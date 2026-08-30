@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, beforeEach, describe, it } from 'node:test'
@@ -80,6 +80,42 @@ describe('stageProfileStore', () => {
     const made = stageProfileStore(realHome, tmpHome, 'anything')
     assert.ok(existsSync(join(tmpHome, 'profiles')))
     assert.equal(made.length, 0)
+    cleanup()
+  })
+
+  it('skips the profile-local .dsh-module-fallback (rebuilt by boot)', () => {
+    const profile = seedStore('fallback-profile')
+    // A junction inside the fallback: the skip must happen before any descent.
+    const fallbackLink = join(profile, '.dsh-module-fallback', 'node_modules', 'link')
+    mkdirSync(join(profile, '.dsh-module-fallback', 'node_modules'), { recursive: true })
+    symlinkSync(join(profile, 'node_modules'), fallbackLink, 'junction')
+    junctions.push(fallbackLink)
+
+    junctions.push(...stageProfileStore(realHome, tmpHome, 'fallback-profile'))
+
+    const staged = join(tmpHome, 'profiles', 'fallback-profile')
+    assert.equal(existsSync(join(staged, '.dsh-module-fallback')), false, 'the fallback must not be staged')
+
+    try { unlinkSync(fallbackLink) } catch { /* already gone */ }
+    cleanup()
+  })
+
+  it('recreates a junction as a link instead of following it (self-loop)', () => {
+    const profile = seedStore('junction-profile')
+    const loopdir = join(profile, 'loopdir')
+    mkdirSync(loopdir)
+    const selfLoop = join(loopdir, 'self')
+    symlinkSync(loopdir, selfLoop, 'junction')
+    junctions.push(selfLoop)
+
+    const made = stageProfileStore(realHome, tmpHome, 'junction-profile')
+    junctions.push(...made)
+
+    const stagedSelf = join(tmpHome, 'profiles', 'junction-profile', 'loopdir', 'self')
+    assert.equal(lstatSync(stagedSelf).isSymbolicLink(), true, 'the junction is recreated, not followed')
+    assert.ok(made.includes(stagedSelf), 'the recreated junction is returned for cleanup')
+
+    try { unlinkSync(selfLoop) } catch { /* already gone */ }
     cleanup()
   })
 })

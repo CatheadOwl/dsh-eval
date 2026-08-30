@@ -16,7 +16,7 @@
 
 import { spawn } from 'node:child_process'
 import {
-  chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+  chmodSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
@@ -29,22 +29,28 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
 /** The scripted mock adapter plugin, referenced from generated overlays. */
 const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
 
+/** The profile-local module-fallback directory, rebuilt fresh by boot and never staged. */
+const MODULE_FALLBACK_DIR = '.dsh-module-fallback'
+
 /**
  * Stage the profile store into a temporary DSH_HOME. The BOOTED profile's
- * directory is COPIED (sans node_modules): `prepareProfile` unconditionally
- * rewrites the profile's root cordis.yml on every boot, and copying keeps
- * that write inside the temporary home instead of leaking through a junction
- * into the real store. Only the profile's own node_modules stays junctioned —
- * out-of-tree plugin resolution needs it, and a task boot never writes it.
- * The store-level shared node_modules fallback is deliberately NOT staged:
- * `prepareProfile`'s `healProfilesModuleFallback` rebuilds it fresh in the
- * temporary home on every boot, so staging it would only route that rebuild
- * through a junction into the real store. An absent profile copies nothing:
- * boot initializes shipped templates inside the temporary home.
+ * directory is COPIED (sans its own `node_modules` and `.dsh-module-fallback`):
+ * `prepareProfile` unconditionally rewrites the profile's root cordis.yml on
+ * every boot, and copying keeps that write inside the temporary home instead
+ * of leaking through a junction into the real store. Only the profile's own
+ * `node_modules` stays junctioned — out-of-tree plugin resolution needs it,
+ * and a task boot never writes it. The module-fallback directories (the
+ * store-level shared `profiles/node_modules` and the profile-local
+ * `.dsh-module-fallback`) are deliberately NOT staged: `healProfilesModuleFallback`
+ * rebuilds both fresh in the temporary home on every boot, and `.dsh-module-fallback`
+ * in particular is full of junctions that a naive recursive copy would follow
+ * into the real store. The copy is junction-aware — links are recreated as
+ * links, never descended (see `copyProfileEntry`). An absent profile copies
+ * nothing: boot initializes shipped templates inside the temporary home.
  * @param {string} realHome - the real Harness home holding `profiles/`.
  * @param {string} tmpHome - the temporary home (created up to `profiles/`).
  * @param {string} profileName - the profile this run boots.
- * @returns {string[]} the created junction paths (unlink before rmSync).
+ * @returns {string[]} every created junction path (unlink before rmSync).
  */
 export function stageProfileStore(realHome, tmpHome, profileName) {
   const junctions = []
@@ -57,11 +63,8 @@ export function stageProfileStore(realHome, tmpHome, profileName) {
   const tmpProfileDir = join(tmpProfiles, profileName)
   mkdirSync(tmpProfileDir, { recursive: true })
   for (const entry of readdirSync(realProfileDir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue
-    const from = join(realProfileDir, entry.name)
-    const to = join(tmpProfileDir, entry.name)
-    if (entry.isDirectory()) cpSync(from, to, { recursive: true })
-    else copyFileSync(from, to)
+    if (entry.name === 'node_modules' || entry.name === MODULE_FALLBACK_DIR) continue
+    copyProfileEntry(join(realProfileDir, entry.name), join(tmpProfileDir, entry.name), junctions)
   }
   const profileModules = join(realProfileDir, 'node_modules')
   if (existsSync(profileModules)) {
@@ -70,6 +73,33 @@ export function stageProfileStore(realHome, tmpHome, profileName) {
     junctions.push(target)
   }
   return junctions
+}
+
+/**
+ * Copy one profile entry (file, directory, or link) into the staged profile.
+ * A link is recreated as a link (`'junction'` on Windows) instead of being
+ * followed: Node's `cpSync` dereferences Windows junctions in recursive mode
+ * (no cycle guard), so a junction-bearing tree would recurse into the real
+ * store and overflow the native stack. Recreated junctions are appended to
+ * `junctions` so callers can unlink them before `rmSync` (which would
+ * otherwise descend through them into the real store).
+ */
+function copyProfileEntry(from, to, junctions) {
+  const stat = lstatSync(from)
+  if (stat.isSymbolicLink()) {
+    const target = readlinkSync(from)
+    symlinkSync(target, to, 'junction')
+    junctions.push(to)
+    return
+  }
+  if (stat.isDirectory()) {
+    mkdirSync(to, { recursive: true })
+    for (const child of readdirSync(from)) {
+      copyProfileEntry(join(from, child), join(to, child), junctions)
+    }
+    return
+  }
+  copyFileSync(from, to)
 }
 
 /** JSON double-quoted strings are valid YAML scalars — enough for this emitter. */
