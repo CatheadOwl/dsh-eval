@@ -127,10 +127,27 @@ export default {
   async prepare(workspace) {},
   async inspect(workspace, { trace }) {},
   script: { steps: [toolCallStep('x', {}), textStep('done')] }, // mock 必填
+  gates: 'off', // 可选；见下方「eval × gates 边界契约」
   timeoutMs: 300_000, // 可选；默认 180s，探索前置的发现式 case 放宽
   expect: [firstTool('x'), toolCalled('x')],
 }
 ```
+
+### eval × gates 边界契约
+
+turn-close blocking gate 会在 turn 收尾自动运行并向 inbox splice 反馈。当 case 的**终态本身**
+就是 gate 判违规的状态（skip 语义的断链现场、conflict 现场等），splice 会驱动模型产生脚本
+之外的额外 step，`finalText*` 断言随之失效。契约：
+
+- 默认**不声明** = gates 随 profile 装载照常运行（gate 交互 case——如断言 gates steer 的
+  `userMessageTextIncludes`——依赖此默认）。
+- case 声明 `gates: 'off'` = 本次 run 的 overlay 按 loader 行 id `gates`（权威：
+  `dsh-plugin-dev/gates/cordis.patch.yml`）禁用 gates 插件，终态违规不再触发 splice，
+  `finalText` 保持「脚本终步文本」的确定性语义。适用于测插件工具面、不测 gate 交互的 case。
+- 不依赖 gate 开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终
+  文本）。终态干净时仍应优先 `finalText*`。
+- per-gate 白名单（`gates: ['doc-link']`）暂不支持：per-gate disable 需要 gates 侧先提供
+  config 面；需要时先在 `workunits/eval` 登记。
 
 matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口，结构性问题见 [`workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md`](../../workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md)）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
 
@@ -144,7 +161,7 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 
 - 断言面最小：`toolCalled`（不是 `firstTool`，探索在前合法）+ `toolCallArgs` 子集（路由 payoff 在参数对）+ 语义关键时 `toolResultTextIncludes` 状态锚（如 `"status": "repaired"`）；不约束措辞与中间步骤。
 - `inspect` 守结果面 + 反捏造（不重建旧路径、不凭空造文件），不管模型走什么中间路径。
-- fixture 可区分性与门禁交互规避等通用规则见上游 §3/§4。dsh 侧已知交互：turn-close 阻塞门禁会 splice 反馈步骤污染判读（结构性问题登记在 [`workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md`](../../workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md)，case 级出口为 `assistantTextIncludes`）。
+- fixture 可区分性与门禁交互规避等通用规则见上游 §3/§4。dsh 侧已知交互：turn-close 阻塞门禁会 splice 反馈步骤污染判读——契约与 `gates: 'off'` 出口见上方「eval × gates 边界契约」（结构性问题登记在 [`workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md`](../../workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md)，case 级出口为 `assistantTextIncludes`）。
 - 无凭证 auto-skip；CI 门禁用 `--fail-on-skip` 防「根本没跑但成功」。
 
 实例：`coggit/eval/behavior/real/`、`md-rename/eval/behavior/real/`（后者的 repair / discovery / no-evidence / oldpath-missing 四连是「同一意图 × 数据面分流」成对设计的范本）。

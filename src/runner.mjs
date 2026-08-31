@@ -8,6 +8,10 @@
  *   one-event-per-line layout (config override is whole-replace, so every
  *   field the backend needs is restated);
  * - optional case persona: `system-prompt` persona override;
+ * - optional `gates: 'off'` case declaration: the `gates` plugin row is
+ *   disabled, so turn-close blocking gates cannot splice feedback steps past
+ *   the script's terminal step (the eval × gates boundary contract — see
+ *   workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md);
  * - mock mode: `agent-default-model` re-pointed at the `eval-mock` provider
  *   plus an insert mounting the scripted adapter plugin by `file://` URL
  *   (relative plugin names resolve against the PROFILE dir, not the overlay
@@ -28,6 +32,14 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 /** The scripted mock adapter plugin, referenced from generated overlays. */
 const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
+
+/**
+ * Loader row id of the gates plugin. Authority: the id the gates bundle
+ * itself inserts (`dsh-plugin-dev/gates/cordis.patch.yml`, `- id: gates`) —
+ * an overlay `- id: gates / disabled: true` patch targets that row, the
+ * same cross-layer disable mechanism as `session-title-llm`.
+ */
+const GATES_PLUGIN_ROW_ID = 'gates'
 
 /** The profile-local module-fallback directory, rebuilt fresh by boot and never staged. */
 const MODULE_FALLBACK_DIR = '.dsh-module-fallback'
@@ -125,6 +137,10 @@ export function buildOverlayYaml(parts) {
     lines.push('  config:')
     lines.push(`    persona: ${yamlScalar(parts.persona)}`)
   }
+  if (parts.gates === 'off') {
+    lines.push(`- id: ${GATES_PLUGIN_ROW_ID}`)
+    lines.push('  disabled: true')
+  }
   if (parts.mock) {
     lines.push('- id: agent-default-model')
     lines.push('  config:')
@@ -145,7 +161,7 @@ export function buildOverlayYaml(parts) {
  * Run one eval case end to end.
  *
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
- * script?: { steps: ChunkStep[] }, persona?: string,
+ * script?: { steps: ChunkStep[] }, persona?: string, gates?: 'off',
  * prepare?: (workspace: string) => void | Promise<void>,
  * inspect?: (workspace: string, helpers: { trace }) => void | Promise<void>,
  * timeoutMs?: number }`
@@ -214,9 +230,13 @@ export async function runEvalCase(evalCase, options) {
     }
 
     const overlayPath = join(runDir, 'eval-overlay.yml')
+    if (evalCase.gates !== undefined && evalCase.gates !== 'off') {
+      throw new Error(`case '${evalCase.id}': gates must be 'off' when present (got '${evalCase.gates}')`)
+    }
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
       persona: evalCase.persona,
+      gates: evalCase.gates,
       mock: mode === 'mock',
     }))
 

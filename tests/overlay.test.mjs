@@ -27,6 +27,12 @@ describe('buildOverlayYaml', () => {
     assert.match(yaml, /- id: eval-mock-llm/)
     assert.match(yaml, /name: "file:\/\/\/.+mock-adapter\.mjs"/)
   })
+
+  it('disables the gates plugin row only when the case declares gates off', () => {
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', gates: 'off' })
+    assert.match(yaml, /- id: gates\n  disabled: true/)
+    assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('- id: gates'))
+  })
 })
 
 describe('mock script builders', () => {

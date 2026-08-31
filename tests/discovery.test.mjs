@@ -73,6 +73,15 @@ describe('validateEvalCase', () => {
     }, file))
   })
 
+  it('accepts gates: off and rejects any other gates value', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'gates-off-1', task: 'test', expect: [validMatcher], gates: 'off',
+    }, file))
+    assert.throws(() => validateEvalCase({
+      id: 'gates-bad-1', task: 'test', expect: [validMatcher], gates: ['doc-link'],
+    }, file), /gates must be 'off' when present/)
+  })
+
   it('rejects a non-object', () => {
     assert.throws(() => validateEvalCase(null, file), /case must be an object/)
     assert.throws(() => validateEvalCase('string', file), /case must be an object/)
