@@ -16,6 +16,7 @@ import {
   toolResultTextIncludes,
   finalTextIncludes,
   finalTextMatches,
+  assistantTextIncludes,
   systemPromptIncludes,
   toolMounted,
   userMessageTextIncludes,
@@ -193,6 +194,27 @@ describe('finalText', () => {
     assert.equal(finalTextIncludes('intermediate').check(trace).ok, false)
     assert.equal(finalTextMatches(/^Done:/).check(trace).ok, true)
     assert.equal(finalTextMatches(/^intermediate/).check(trace).ok, false)
+  })
+})
+
+describe('assistantTextIncludes', () => {
+  it('matches a substring of any assistant text, including non-final ones', () => {
+    // 'intermediate' appears in an earlier assistant text but not the final
+    // one — the exact shape a turn-close gate splice produces.
+    assert.equal(assistantTextIncludes('cognition created').check(trace).ok, true)
+    assert.equal(assistantTextIncludes('intermediate').check(trace).ok, true)
+  })
+
+  it('fails with the observed texts when no assistant text matches', () => {
+    const outcome = assistantTextIncludes('bash output').check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no assistant text includes/)
+    assert.match(outcome.message, /texts seen/)
+  })
+
+  it('fails on an empty trace', () => {
+    const outcome = assistantTextIncludes('anything').check(buildTrace([]))
+    assert.equal(outcome.ok, false)
   })
 })
 

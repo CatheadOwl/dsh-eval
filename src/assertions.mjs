@@ -272,6 +272,25 @@ export function finalTextIncludes(substring) {
   }
 }
 
+/**
+ * Any assembled assistant text contains `substring`. Unlike
+ * `finalTextIncludes`, later turns cannot invalidate the assertion — blocking
+ * gates that splice feedback after the script ends (turn-close hooks) push
+ * their own trailing steps, so a scripted closing line may no longer be the
+ * FINAL text even though the script delivered it.
+ */
+export function assistantTextIncludes(substring) {
+  return {
+    describe: `assistant text includes: '${substring}'`,
+    check(trace) {
+      const hit = trace.assistantTexts.some(text => text.includes(substring))
+      return hit
+        ? { ok: true, message: '' }
+        : { ok: false, message: `no assistant text includes '${substring}'; texts seen: [${trace.assistantTexts.map(t => JSON.stringify(t.slice(0, 120))).join(', ')}]` }
+    },
+  }
+}
+
 /** The final assistant text matches `regex`. */
 export function finalTextMatches(regex) {
   return {

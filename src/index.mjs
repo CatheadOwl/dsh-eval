@@ -16,6 +16,7 @@ export {
   toolResultTextIncludes,
   finalTextIncludes,
   finalTextMatches,
+  assistantTextIncludes,
   systemPromptIncludes,
   toolMounted,
   userMessageTextIncludes,
