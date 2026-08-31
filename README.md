@@ -127,19 +127,36 @@ export default {
   async prepare(workspace) {},
   async inspect(workspace, { trace }) {},
   script: { steps: [toolCallStep('x', {}), textStep('done')] }, // mock 必填
+  timeoutMs: 300_000, // 可选；默认 180s，探索前置的发现式 case 放宽
   expect: [firstTool('x'), toolCalled('x')],
 }
 ```
 
-matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
+matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口，结构性问题见 [`workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md`](../../workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md)）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
+
+### real 意图 case 规约
+
+behavior real 断言「自然语言意图 → 工具选择与参数路由」，mock 断言「工具管线与写入 round-trip」：两层互补，不互相替代。宿主无关的**方法论上游**——为什么、触发表及其依据、case 设计规则、失败启发集——在 [`handbooks/agent-tools-dev/01-意图面-e2e.md`](../../handbooks/agent-tools-dev/01-意图面-e2e.md)；本节是它在 dsh 的承载面（触发速查 + matcher 落地 + CI 语义）。
+
+**何时写**（上游触发表的 dsh 速查，依据与展开见上游 §2）：注册了模型可见工具（happy path ≥1）／目标存在等价手工路径／描述 steering 变更／分支由数据面状态分流（成对 case）／拒绝路径面向模型消费（remedy 委派边界）／有误触发风险（负向 `toolNotCalled`，先例 coggit `intent-unrelated`）。
+
+**dsh 落地的断言与守卫**（上游规则的承载形态）：
+
+- 断言面最小：`toolCalled`（不是 `firstTool`，探索在前合法）+ `toolCallArgs` 子集（路由 payoff 在参数对）+ 语义关键时 `toolResultTextIncludes` 状态锚（如 `"status": "repaired"`）；不约束措辞与中间步骤。
+- `inspect` 守结果面 + 反捏造（不重建旧路径、不凭空造文件），不管模型走什么中间路径。
+- fixture 可区分性与门禁交互规避等通用规则见上游 §3/§4。dsh 侧已知交互：turn-close 阻塞门禁会 splice 反馈步骤污染判读（结构性问题登记在 [`workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md`](../../workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md)，case 级出口为 `assistantTextIncludes`）。
+- 无凭证 auto-skip；CI 门禁用 `--fail-on-skip` 防「根本没跑但成功」。
+
+实例：`coggit/eval/behavior/real/`、`md-rename/eval/behavior/real/`（后者的 repair / discovery / no-evidence / oldpath-missing 四连是「同一意图 × 数据面分流」成对设计的范本）。
 
 ```bash
+# 工作目录：本目录（dsh-plugin-dev/eval/）
 node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \
   [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] \
   <case file or directory...>
 ```
 
-每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
+前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
 
 `--fail-on-skip` 用于 CI 门禁：当选中 case > 0 但全部被 skip（无凭证或 `--mode` 过滤）时返回非零退出码，避免“根本没跑但成功”的误判。本地开发默认不启用，体验不变。
 
