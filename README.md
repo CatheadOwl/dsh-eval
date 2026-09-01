@@ -59,7 +59,7 @@ behavior *.eval.mjs ───────────────────►
     rubric.md
 ```
 
-当前迁移实例：[`any_routes/eval/`](../any_routes/eval/README.md) 与 [`coggit/eval/`](../coggit/eval/README.md)。
+当前迁移实例：[`any_routes/eval/`](../extras/modules/routes/eval/README.md) 与 [`coggit/eval/`](../coggit/eval/README.md)。
 
 ## 理解实验定义
 
