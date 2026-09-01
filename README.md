@@ -142,7 +142,7 @@ turn-close blocking gate 会在 turn 收尾自动运行并向 inbox splice 反�
 - 默认**不声明** = gates 随 profile 装载照常运行（gate 交互 case——如断言 gates steer 的
   `userMessageTextIncludes`——依赖此默认）。
 - case 声明 `gates: 'off'` = 本次 run 的 overlay 按 loader 行 id `gates`（权威：
-  `dsh-plugin-dev/gates/cordis.patch.yml`）禁用 gates 插件，终态违规不再触发 splice，
+  `dsh-plugin-dev/extras/cordis.patch.yml`）禁用 gates 插件，终态违规不再触发 splice，
   `finalText` 保持「脚本终步文本」的确定性语义。适用于测插件工具面、不测 gate 交互的 case。
 - 不依赖 gate 开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终
   文本）。终态干净时仍应优先 `finalText*`。

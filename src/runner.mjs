@@ -35,7 +35,7 @@ const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs'
 
 /**
  * Loader row id of the gates plugin. Authority: the id the gates bundle
- * itself inserts (`dsh-plugin-dev/gates/cordis.patch.yml`, `- id: gates`) —
+ * itself inserts (`dsh-plugin-dev/extras/cordis.patch.yml`, `- id: gates`) —
  * an overlay `- id: gates / disabled: true` patch targets that row, the
  * same cross-layer disable mechanism as `session-title-llm`.
  */
