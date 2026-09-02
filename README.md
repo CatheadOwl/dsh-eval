@@ -188,3 +188,5 @@ pnpm test
 ```
 
 宿主 seam 的源溯登记在 [`explorer/eval-seams/`](../../explorer/eval-seams/summary.md)。dsh runner 依赖已构建的 `deepseek-harness/apps/cli/lib/bin.js`；real 层需要 `DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`，mock 与 review dry-run 不需要。
+
+real 层还会以管道 stdio spawn 子 dsh CLI（headless 会话、子代理子运行时），因此需要一个能 spawn 子进程的运行面：受限文件沙箱内该 spawn 会被拒（`spawn EPERM`，凭证在也不够）——在 agent 会话内跑需要以更宽 sandbox 权限（升级 + 审批），或直接在宿主侧终端/CI 跑；提权是 real eval 的正常前置，不是异常（delegated subagent scope 无审批通道时不可升级，只能宿主侧或由父级升级执行）。mock 与 review dry-run 不 spawn 子 CLI，无此约束。
