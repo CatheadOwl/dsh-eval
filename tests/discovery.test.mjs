@@ -73,16 +73,21 @@ describe('validateEvalCase', () => {
     }, file))
   })
 
-  it('accepts disableRows and rejects malformed values plus the removed gates field', () => {
+  it('accepts disableRows (empty = explicit none) and rejects malformed values plus the removed gates field', () => {
     assert.doesNotThrow(() => validateEvalCase({
       id: 'rows-1', task: 'test', expect: [validMatcher], disableRows: ['gates'],
     }, file))
-    assert.throws(() => validateEvalCase({
-      id: 'rows-empty', task: 'test', expect: [validMatcher], disableRows: [],
-    }, file), /disableRows must be a non-empty string\[\]/)
+    // An explicit empty list is legal: it overrides a config-level default
+    // ("disable nothing here"), e.g. gate-interaction cases.
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'rows-empty-ok', task: 'test', expect: [validMatcher], disableRows: [],
+    }, file))
     assert.throws(() => validateEvalCase({
       id: 'rows-bad', task: 'test', expect: [validMatcher], disableRows: 'gates',
-    }, file), /disableRows must be a non-empty string\[\]/)
+    }, file), /disableRows must be a string\[\]/)
+    assert.throws(() => validateEvalCase({
+      id: 'rows-bad-item', task: 'test', expect: [validMatcher], disableRows: [''],
+    }, file), /disableRows must be a string\[\]/)
     assert.throws(() => validateEvalCase({
       id: 'gates-legacy', task: 'test', expect: [validMatcher], gates: 'off',
     }, file), /'gates' field was removed/)

@@ -142,22 +142,28 @@ export default {
 
 `disableRows: string[]` 是通用机制：按 loader 行 id 在本次 run 的 overlay 里禁用任意插件
 行（`- id: <row> / disabled: true`，与 `session-title-llm` 同一跨层禁用机制）。框架对行
-id 无任何内置知识，任何插件都可以成为禁用对象。
+id 无任何内置知识，任何插件都可以成为禁用对象。取值优先级：**case 声明 > config 默认 >
+不禁用**——case 级 `disableRows: []` 是合法的显式「全启用」，专门用来在默认禁 gate 行的
+包里恢复 gate 交互 case 的装载。
 
 它的首要使用场景是 turn-close blocking gate：gate 会在 turn 收尾自动运行并向 inbox splice
-反馈。当 case 的**终态本身**就是 gate 判违规的状态（skip 语义的断链现场、conflict 现场
-等），splice 会驱动模型产生脚本之外的额外 step，`finalText*` 断言随之失效。契约：
+反馈。当 case 的**终态本身**就是 gate 判违规的状态（skip 语义的断链现场、非 git 工作区的
+doc-link 报错现场等），splice 会驱动模型产生脚本之外的额外 step，`finalText*` 断言随之失
+效。契约：
 
 - 默认**不声明** = 所选 profile 装载的插件照常运行（gate 交互 case——如断言 gates steer
   的 `userMessageTextIncludes`——依赖此默认）。
-- case 声明 `disableRows: ['gates']` = 本次 run 禁用 gates 插件行（行 id 权威：
-  `dsh-plugin-dev/extras/cordis.patch.yml` 的 `- id: gates`），终态违规不再触发 splice，
-  `finalText` 保持「脚本终步文本」的确定性语义。适用于测插件工具面、不测 gate 交互的
-  case。禁用其他插件行同理，id 以该插件 patch 声明为准。
+- 声明 `disableRows: ['gates']`（case 级，或包级 `dsh-eval.config.mjs` 默认——eval 临
+  时工作区通常非 git 仓库，doc-link gate 会以 git 报错成 blocking 并 splice 反馈耗尽脚
+  本，测插件工具面的包普遍默认禁用）= 本次 run 禁用 gates 插件行（行 id 权威：
+  `@catheadowl/dsh-extras` 的 `cordis.patch.yml` `- id: gates`），终态违规不再触发
+  splice，`finalText` 保持「脚本终步文本」的确定性语义。禁用其他插件行同理。
+- gate 交互 case 在默认禁用的包里声明 `disableRows: []` 显式恢复装载（实例：extras 的
+  gates attribution-filter case）。
 - 不依赖插件开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终
   文本）。终态干净时仍应优先 `finalText*`。
-- per-gate 白名单（如 `disableRows` 之外只关 gates 的某个 gate）暂不支持：per-gate
-  disable 需要 gates 侧先提供 config 面；需要时先在 `workunits/eval` 登记。
+- per-gate 白名单（如只关 gates 的某个 gate）暂不支持：per-gate disable 需要 gates 侧先
+  提供 config 面；需要时先在开发仓 workunits/eval 登记。
 
 matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口，结构性问题的登记条目为开发仓 workunits/eval 的 TODO「turnclose-gate-eval-interaction」）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
 
@@ -195,6 +201,8 @@ export default {
   mode: 'mock',                     // behavior CLI 的 --mode 默认（review 无此项）
   failOnSkip: false,                // behavior CLI 默认
   report: 'eval-report.json',       // behavior CLI 的 --report 默认（锚定 config 目录）
+  disableRows: ['gates'],           // 每个 case 默认禁用的 loader 行；case 级声明
+                                     // 覆盖（显式 [] = 全启用，gate 交互 case 用）
 }
 ```
 

@@ -46,8 +46,11 @@ export function discoverFiles(path, suffix, out = []) {
  * - `id` is a non-empty string.
  * - `task` is a string.
  * - `mode` (if present) is `'real'` or `'mock'`.
- * - `disableRows` (if present) is an array of non-empty strings (loader row
- *   ids to disable in this run's overlay).
+ * - `disableRows` (if present) is an array of strings (loader row ids to
+ *   disable in this run's overlay). An EMPTY array is legal and means
+ *   "disable nothing, explicitly" — it overrides a `disableRows` default
+ *   from `dsh-eval.config.mjs`, which is how gate-interaction cases opt
+ *   back in inside a package that disables the gate row by default.
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
  * - mock mode requires a `script` with `steps` array.
  *
@@ -71,9 +74,9 @@ export function validateEvalCase(evalCase, file) {
     throw new Error(`${file}: case '${evalCase.id}': the 'gates' field was removed — declare disableRows: ['gates'] instead`)
   }
   if (evalCase.disableRows !== undefined) {
-    if (!Array.isArray(evalCase.disableRows) || evalCase.disableRows.length === 0
+    if (!Array.isArray(evalCase.disableRows)
       || evalCase.disableRows.some(row => typeof row !== 'string' || row === '')) {
-      throw new Error(`${file}: case '${evalCase.id}': disableRows must be a non-empty string[] of loader row ids (got '${JSON.stringify(evalCase.disableRows)}')`)
+      throw new Error(`${file}: case '${evalCase.id}': disableRows must be a string[] of loader row ids (empty = explicit none, overriding config; got '${JSON.stringify(evalCase.disableRows)}')`)
     }
   }
   if (!Array.isArray(evalCase.expect)) {

@@ -208,7 +208,13 @@ for (const file of files.sort()) {
   }
   if (hasDuplicate) continue
   for (const c of cases) seenIds.set(c.id, file)
-  for (const evalCase of cases) {
+  for (const rawCase of cases) {
+    // Row-disable precedence (EVAL-014): a case's own `disableRows` —
+    // including an explicit `[]` ("disable nothing") — overrides the
+    // config-level default; only an undeclared field inherits it.
+    const evalCase = rawCase.disableRows === undefined && config.disableRows !== undefined
+      ? { ...rawCase, disableRows: config.disableRows }
+      : rawCase
     const mode = evalCase.mode ?? 'real'
     const skip = skipReason(evalCase, modeFilter)
     if (skip !== undefined) {

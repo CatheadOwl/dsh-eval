@@ -17,6 +17,10 @@
  *     failOnSkip?: boolean,      // behavior CLI default
  *     report?: string,           // behavior CLI --report default (resolved
  *                                 // against the config file's dir)
+ *     disableRows?: string[],    // loader rows disabled in EVERY case's run
+ *                                 // unless the case itself declares
+ *                                 // `disableRows` (an explicit case-level
+ *                                 // `[]` re-enables everything)
  *   }
  * Unknown keys are rejected: a typo'd `profle` must fail loud, not silently
  * fall back to CLI-required mode.
@@ -29,7 +33,7 @@ import { pathToFileURL } from 'node:url'
 /** The config file name both CLIs look for. */
 export const CONFIG_FILE_NAME = 'dsh-eval.config.mjs'
 
-const ALLOWED_KEYS = new Set(['profile', 'repo', 'mode', 'failOnSkip', 'report'])
+const ALLOWED_KEYS = new Set(['profile', 'repo', 'mode', 'failOnSkip', 'report', 'disableRows'])
 
 /**
  * Walk up from `startDir` looking for the config file. Never crosses into
@@ -103,6 +107,13 @@ export async function loadEvalConfig(startDir) {
       throw new Error(`${file}: report must be a non-empty string (relative to the config file)`)
     }
     out.report = resolve(file, '..', config.report)
+  }
+  if (config.disableRows !== undefined) {
+    if (!Array.isArray(config.disableRows) || config.disableRows.length === 0
+      || config.disableRows.some(row => typeof row !== 'string' || row === '')) {
+      throw new Error(`${file}: disableRows must be a non-empty string[] of loader row ids (got '${JSON.stringify(config.disableRows)}')`)
+    }
+    out.disableRows = config.disableRows
   }
   return { file, config: out }
 }

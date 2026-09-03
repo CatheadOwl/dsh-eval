@@ -67,6 +67,28 @@ describe('loadEvalConfig', () => {
     }
   })
 
+  it('accepts a non-empty disableRows default and rejects malformed ones', async () => {
+    const root = tempTree(root => {
+      mkdirSync(join(root, 'rows'), { recursive: true })
+      writeFileSync(join(root, 'rows', CONFIG_FILE_NAME),
+        'export default { disableRows: ["gates", "other-row"] }')
+      mkdirSync(join(root, 'empty'), { recursive: true })
+      writeFileSync(join(root, 'empty', CONFIG_FILE_NAME), 'export default { disableRows: [] }')
+      mkdirSync(join(root, 'bad'), { recursive: true })
+      writeFileSync(join(root, 'bad', CONFIG_FILE_NAME), 'export default { disableRows: "gates" }')
+    })
+    try {
+      const { config } = await loadEvalConfig(join(root, 'rows'))
+      assert.deepEqual(config.disableRows, ['gates', 'other-row'])
+      // Unlike a case-level declaration, an empty config list has no meaning
+      // (there is nothing to override a config) and is rejected.
+      await assert.rejects(loadEvalConfig(join(root, 'empty')), /disableRows must be a non-empty string\[\]/)
+      await assert.rejects(loadEvalConfig(join(root, 'bad')), /disableRows must be a non-empty string\[\]/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('returns an empty config when no file exists', async () => {
     const root = tempTree(root => { mkdirSync(join(root, 'a'), { recursive: true }) })
     try {
