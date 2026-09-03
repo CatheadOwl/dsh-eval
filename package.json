@@ -2,6 +2,7 @@
   "name": "@catheadowl/dsh-eval",
   "description": "Agent eval framework over dsh headless runs: case runner, session-trace assertions, and a scripted mock-LLM layer for plugin intent tests.",
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "main": "src/index.mjs",
   "peerDependencies": {
@@ -11,9 +12,16 @@
     "dsh-eval": "./bin/dsh-eval.mjs",
     "dsh-review": "./bin/dsh-review.mjs"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "verify:publish": "node scripts/verify-publish-readiness.mjs",
     "verify:face": "node scripts/verify-package-face.mjs",
+    "prepack": "node scripts/verify-package-face.mjs && node scripts/verify-publish-readiness.mjs",
     "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-package-face.mjs"
   }
 }
