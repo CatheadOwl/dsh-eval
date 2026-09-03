@@ -208,7 +208,7 @@ export default {
 
 package scripts 于是收敛为 `dsh-eval run --mode mock eval/behavior/mock` 这类形态（profile/repo 来自 config）。未知 key 直接报错（拼写错误不静默退化）。消费者接入实例：`coggit/`、`subagent-at/`、`extras/` 各自的 `dsh-eval.config.mjs`。
 
-前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。本包自身需要 `node_modules/@deepseek-ai/dsh-llm` junction 指向宿主检出（模块级 junction 层同机制；缺失时 mock adapter 以 loader entry import 失败拒载）。real 层在 staged 临时 home 下存在 `REQUEST_EXTENSION` 已知问题（嫌疑 `plugin-package-inventory-deepseek` × staged 环境；框架侧可用的兜底是 `disableRows: ['plugin-package-inventory-deepseek']` 按行禁用该插件）。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
+前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。本包自身需要 `node_modules/@deepseek-ai/dsh-llm` junction 指向宿主检出（模块级 junction 层同机制；缺失时 mock adapter 以 loader entry import 失败拒载）——消费态（devDep 安装后）的解析契约、接线形态与失败自诊断见 dsh-eval 设计文档集中的 spec「consumer-host-borrow」（按名可检索）。real 层在 staged 临时 home 下存在 `REQUEST_EXTENSION` 已知问题（嫌疑 `plugin-package-inventory-deepseek` × staged 环境；框架侧可用的兜底是 `disableRows: ['plugin-package-inventory-deepseek']` 按行禁用该插件）。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
 
 `--fail-on-skip` 用于 CI 门禁：当选中 case > 0 但全部被 skip（无凭证或 `--mode` 过滤）时返回非零退出码，避免“根本没跑但成功”的误判。本地开发默认不启用，体验不变。
 
