@@ -95,3 +95,44 @@ export function reportExitCode(records, failOnSkip) {
   if (failOnSkip && summary.selected > 0 && summary.passed + summary.failed === 0) return 1
   return 0
 }
+
+/**
+ * Determinism diagnostic for failed MOCK runs (generic — no plugin named here
+ * is special to the framework).
+ *
+ * A mock run is deterministic only while the script owns every model call.
+ * Any non-host plugin injecting user-visible input after the script's
+ * terminal step (steer, turn-close gate feedback, ...) drives extra model
+ * calls: the script exhausts early and `finalText*` no longer means "the
+ * script's last step". When such injections are visible in the trace, name
+ * them so the failure explains itself instead of every consumer rediscovering
+ * the mechanism by reading raw traces.
+ *
+ * @param {object} parts
+ * @param {import('./trace.mjs').EvalTrace} [parts.trace] - the failed run's trace.
+ * @param {string[]} parts.failures - the recorded failure lines (heuristic:
+ *   the hint only fires when a terminal-text failure is among them).
+ * @returns {string | undefined} the hint line, or undefined when no non-host
+ *   plugin injection is visible.
+ */
+export function mockDeterminismHint(parts) {
+  const { trace, failures } = parts
+  if (trace === undefined) return undefined
+  if (!failures.some(f => f.includes('final text'))) return undefined
+  const injectors = new Set()
+  for (const message of trace.userMessages ?? []) {
+    const source = message.source
+    // Host injections (@deepseek-ai/* runtime context, skill catalogs) ride
+    // along every request and never drive extra script steps; only non-host
+    // plugin messages can splice between/after script steps.
+    if (source?.kind === 'plugin' && typeof source.plugin === 'string'
+      && !source.plugin.startsWith('@deepseek-ai/')) {
+      injectors.add(source.plugin)
+    }
+  }
+  if (injectors.size === 0) return undefined
+  const names = [...injectors].map(name => `'${name}'`).join(', ')
+  return `mock determinism broken: user messages injected by non-host plugin(s) ${names} drove model calls the script does not own`
+    + ` — if this case does not need that plugin, declare disableRows: [${names}];`
+    + ` otherwise account for the interaction in the script or assert with assistantTextIncludes`
+}

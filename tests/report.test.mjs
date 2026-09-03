@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { createCaseRecord, summarizeRecords, buildRunReport, reportExitCode } from '../src/report.mjs'
+import { createCaseRecord, summarizeRecords, buildRunReport, reportExitCode, mockDeterminismHint } from '../src/report.mjs'
 
 describe('createCaseRecord', () => {
   it('includes only the fields the outcome actually has', () => {
@@ -60,5 +60,37 @@ describe('reportExitCode', () => {
     // "never ran but reported success": skip + fail still fails via failed count.
     assert.equal(reportExitCode([{ status: 'skip' }, { status: 'fail' }], true), 1)
     assert.equal(reportExitCode([], true), 0)
+  })
+})
+
+describe('mockDeterminismHint', () => {
+  const finalTextFailure = ["final text includes: 'done': final text does not include 'done'; final text: \"eval-mock: script exhausted after 4 step(s)\""]
+  const traceWith = sources => ({ userMessages: sources.map((source, i) => ({ seq: i, source, text: 'x' })) })
+
+  it('names the non-host injector plugins and both framework-native exits', () => {
+    const hint = mockDeterminismHint({
+      trace: traceWith([
+        { kind: 'user' },
+        { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+        { kind: 'skill-catalog' },
+        { kind: 'plugin', plugin: 'gates' },
+        { kind: 'plugin', plugin: 'gates' },
+      ]),
+      failures: finalTextFailure,
+    })
+    assert.match(hint, /non-host plugin\(s\) 'gates'/)
+    assert.match(hint, /disableRows: \['gates'\]/)
+    assert.match(hint, /assistantTextIncludes/)
+  })
+
+  it('stays silent without a terminal-text failure or without non-host injections', () => {
+    const trace = traceWith([
+      { kind: 'user' },
+      { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+      { kind: 'plugin', plugin: 'gates' },
+    ])
+    assert.equal(mockDeterminismHint({ trace, failures: ['toolCalled: x'] }), undefined)
+    assert.equal(mockDeterminismHint({ trace: traceWith([{ kind: 'user' }, { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }]), failures: finalTextFailure }), undefined)
+    assert.equal(mockDeterminismHint({ trace: undefined, failures: finalTextFailure }), undefined)
   })
 })

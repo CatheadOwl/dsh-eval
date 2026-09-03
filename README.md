@@ -165,6 +165,11 @@ doc-link 报错现场等），splice 会驱动模型产生脚本之外的额外 
 - per-gate 白名单（如只关 gates 的某个 gate）暂不支持：per-gate disable 需要 gates 侧先
   提供 config 面。
 
+**失败自解释**：mock case 的 `finalText*` 失败若伴随 trace 里可见的**非宿主**插件注入
+user 消息（gate 反馈、steer 等任何形态），失败输出会点名注入插件并提示上述出口
+（`disableRows` 或把交互纳入脚本预期 / `assistantTextIncludes`）——确定性被打破时框架
+当场解释机制，无需读 raw trace 排查。
+
 matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
 
 ### real 意图 case 规约

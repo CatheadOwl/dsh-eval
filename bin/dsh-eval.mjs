@@ -29,7 +29,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
 import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
-import { createCaseRecord, buildRunReport, reportExitCode } from '../src/report.mjs'
+import { createCaseRecord, buildRunReport, reportExitCode, mockDeterminismHint } from '../src/report.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
 
 function usage(error) {
@@ -278,12 +278,19 @@ for (const file of files.sort()) {
       say(`PASS ${evalCase.id}`)
     } else {
       const artifactsDir = writeArtifacts(evalCase, result, mode)
+      // Self-explaining failure for broken mock determinism (EVAL-014
+      // alternative): when non-host plugin injections are visible in the
+      // trace, the failure names them and the two framework-native exits —
+      // consumers stop rediscovering the mechanism from raw traces.
+      let hint
+      if (mode === 'mock') hint = mockDeterminismHint({ trace: result.trace, failures })
       records.push(createCaseRecord({
-        id: evalCase.id, file, mode, status: 'fail', failures,
+        id: evalCase.id, file, mode, status: 'fail', failures: hint ? [...failures, hint] : failures,
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, artifactsDir,
       }))
       process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.map(f => `  - ${f}`).join('\n')}\n`)
+      if (hint !== undefined) process.stderr.write(`  ! ${hint}\n`)
       process.stderr.write(`     artifacts: ${artifactsDir}\n`)
     }
   }
