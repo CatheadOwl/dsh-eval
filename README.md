@@ -69,10 +69,7 @@ dsh-eval run --mode mock eval/behavior/mock
 dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 ```
 
-真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部
-flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见
-[docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析
-凭证），mock 与 dry-run 不需要任何凭证。
+真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。
 
 ## 规范目录
 
@@ -107,8 +104,7 @@ export default {
 }
 ```
 
-未知 key 直接报错（拼写错误不静默退化）。`disableRows` 的语义与 turn-close
-门禁边界契约见 [docs/disablerows.md](docs/disablerows.md)。
+未知 key 直接报错（拼写错误不静默退化）。`disableRows` 的语义与 turn-close 门禁边界契约见 [docs/disablerows.md](docs/disablerows.md)。
 
 ## Docs
 
@@ -124,9 +120,6 @@ export default {
 
 ## 运行保障
 
-runner 用 `try/finally` 保证临时目录与链接在任何路径（`prepare` 抛错、mock
-校验失败、spawn 错误）都被清理，不污染真实 profile store。behavior 与 review
-CLI 共享目录扫描（跳过 `.runs` 与 `node_modules`）；behavior CLI 在加载期做
-case shape 校验与跨文件重复 id 检测，尽早失败。
+runner 用 `try/finally` 保证临时目录与链接在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不污染真实 profile store。behavior 与 review CLI 共享目录扫描（跳过 `.runs` 与 `node_modules`）；behavior CLI 在加载期做 case shape 校验与跨文件重复 id 检测，尽早失败。
 
 License: MIT。框架自身的测试与发布自检由仓库 CI 承接，不随包发布。

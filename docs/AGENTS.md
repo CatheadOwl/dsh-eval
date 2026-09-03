@@ -4,9 +4,7 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 
 # dsh-plugin-dev/eval/docs — 维护规则
 
-本目录是 `@catheadowl/dsh-eval` 的**发布文档集**（随 `files` 进 tarball）。
-写作不变量在包根 `AGENTS.md`（≤2 屏主页约束、代码+文档同 commit、规范
-不外包）；本文件管**每篇的上游锚**与目录内约定。
+本目录是 `@catheadowl/dsh-eval` 的**发布文档集**（随 `files` 进 tarball）。写作不变量在包根 `AGENTS.md`（≤2 屏主页约束、代码+文档同 commit、规范不外包）；本文件管**每篇的上游锚**与目录内约定。
 
 ## 各篇的上游重查触发器（改对应上游时必查本表）
 
@@ -23,5 +21,4 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 
 - 新篇进 `README.md` 索引表；带 frontmatter description（md-metadata 门禁）。
 - 篇间互链用相对路径；发布闸拦一切越出包根的链接与路径 token。
-- 语义级"出处 vs 噪音"裁量不归机械闸（机械门只拦可分离形态）——拿不准时
-  跑包根 `AGENTS.md` 指向的主页评审协议（`.agents/homepage-review.md`）。
+- 语义级"出处 vs 噪音"裁量不归机械闸（机械门只拦可分离形态）——拿不准时跑包根 `AGENTS.md` 指向的主页评审协议（`.agents/homepage-review.md`）。

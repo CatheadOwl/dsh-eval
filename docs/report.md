@@ -4,9 +4,7 @@ description: 机器可读报告结构——--format json / --report 的字段语
 
 # 机器可读报告
 
-`--format json`：stdout 只输出一个 JSON 报告对象（过程与失败明细转 stderr），
-供 CI / 多插件聚合消费；`--report <file>`：在任一格式下额外把同一报告对象
-写入文件。报告构造在 `src/report.mjs`：
+`--format json`：stdout 只输出一个 JSON 报告对象（过程与失败明细转 stderr），供 CI / 多插件聚合消费；`--report <file>`：在任一格式下额外把同一报告对象写入文件。报告构造在 `src/report.mjs`：
 
 ```jsonc
 {
@@ -26,5 +24,4 @@ description: 机器可读报告结构——--format json / --report 的字段语
 }
 ```
 
-status 取值 `pass | fail | skip`；退出码与文本格式完全一致（同一
-`reportExitCode` 派生）。默认 `--format text` 输出为人类可读进度行 + 汇总行。
+status 取值 `pass | fail | skip`；退出码与文本格式完全一致（同一 `reportExitCode` 派生）。默认 `--format text` 输出为人类可读进度行 + 汇总行。
