@@ -164,15 +164,19 @@ export function buildOverlayYaml(parts) {
  * @param {object} evalCase - the case under test.
  * @param {object} options
  * @param {string} options.profile - the dsh profile booting the run (plugin installed there).
- * @param {string} options.dshRepoDir - the deepseek-harness checkout (CLI runs from it).
+ * @param {string} [options.dshRepoDir] - the deepseek-harness checkout (legacy CLI
+ *   location; ignored when cliPath is given).
+ * @param {string} [options.cliPath] - explicit compiled CLI entry (C6 chain result;
+ *   takes precedence over dshRepoDir).
  * @param {'real' | 'mock'} [options.mode] - force a mode over the case's own.
  * @param {string} [options.artifactsDir] - copy stdout/stderr/trace/session logs here (created).
  * @returns {Promise<EvalRunResult>}
  */
 export async function runEvalCase(evalCase, options) {
   const mode = options.mode ?? evalCase.mode ?? 'real'
-  const dshRepoDir = resolve(options.dshRepoDir)
-  const binPath = join(dshRepoDir, 'apps', 'cli', 'lib', 'bin.js')
+  const binPath = options.cliPath !== undefined
+    ? resolve(options.cliPath)
+    : join(resolve(options.dshRepoDir), 'apps', 'cli', 'lib', 'bin.js')
   const timeoutMs = evalCase.timeoutMs ?? 180_000
 
   const runDir = mkdtempSync(join(tmpdir(), 'dsh-eval-'))

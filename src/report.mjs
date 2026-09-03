@@ -62,7 +62,10 @@ export function summarizeRecords(records) {
  * Build the full invocation report object.
  * @param {object} parts
  * @param {string} parts.profile - the dsh profile that ran the cases.
- * @param {string} parts.repo - absolute deepseek-harness checkout path.
+ * @param {string} parts.repo - the dsh host location that ran the cases
+ *   (checkout dir, or the packaged CLI path when resolved via node_modules).
+ * @param {'flag' | 'node_modules' | 'config'} [parts.cliSource] - which C6
+ *   chain segment supplied the CLI (C6: host-checkout-resolution).
  * @param {'real' | 'mock' | 'all'} parts.modeFilter - the `--mode` selection.
  * @param {object[]} parts.records - per-case records, in execution order.
  * @param {string} parts.startedAt - ISO timestamp of the invocation start.
@@ -74,6 +77,7 @@ export function buildRunReport(parts) {
     tool: 'dsh-eval',
     profile: parts.profile,
     repo: parts.repo,
+    ...(parts.cliSource !== undefined ? { cliSource: parts.cliSource } : {}),
     mode: parts.modeFilter,
     failOnSkip: parts.failOnSkip,
     startedAt: parts.startedAt,

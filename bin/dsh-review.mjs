@@ -14,6 +14,7 @@ import { materializeReviewExperiment } from '../src/experiment/review.mjs'
 import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
 import { discoverFiles } from '../src/discovery.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
+import { resolveDshCliChain } from '../src/cli.mjs'
 import { renderReviewReport } from '../src/review-report.mjs'
 
 function usage(error) {
@@ -89,9 +90,16 @@ const { options, paths } = parseArgs(process.argv.slice(2))
 // upward from cwd; profile falls back to the sterile default `headless`.
 const { config } = await loadEvalConfig(process.cwd())
 const profile = options.profile ?? config.profile ?? 'headless'
-const repoDir = options.repo ?? config.repo
-if (!options.dryRun && repoDir === undefined) {
-  usage('error: --repo is required unless --dry-run is used (or set repo in dsh-eval.config.mjs)')
+// CLI resolution (C6): `--repo` flag > resolution layer (node_modules) >
+// config repo key (legacy). Dry-run never boots the CLI, so resolve lazily.
+let cli = { cliPath: undefined, repoDir: undefined }
+if (!options.dryRun) {
+  try {
+    const resolved = resolveDshCliChain({ repoFlag: options.repo, configRepo: config.repo })
+    cli = { cliPath: resolved.cli, repoDir: resolved.repo }
+  } catch (error) {
+    usage(`error: ${error.message}`)
+  }
 }
 
 for (const path of paths) {
@@ -115,7 +123,8 @@ for (const file of files) {
     process.stdout.write(`RUN  ${experiment.id} (${options.runs ?? experiment.defaultRuns} reviews)...\n`)
     const result = await runDshReviewExperiment(experiment, {
       profile,
-      dshRepoDir: repoDir,
+      cliPath: cli.cliPath,
+      dshRepoDir: cli.repoDir,
       runs: options.runs,
       timeoutMs: options.timeoutMs,
     })

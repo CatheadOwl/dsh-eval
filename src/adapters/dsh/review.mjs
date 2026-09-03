@@ -60,6 +60,15 @@ export function resolveDshCli(dshRepoDir) {
   return cli
 }
 
+/** The CLI entry for an executor: explicit cliPath (C6 chain result) wins;
+ * otherwise fall back to the legacy repo form. Neither being set is a caller
+ * bug the CLI bins already catch — this guard serves direct API consumers. */
+function executorCli(options) {
+  if (options.cliPath !== undefined) return resolve(options.cliPath)
+  if (options.dshRepoDir !== undefined) return resolveDshCli(options.dshRepoDir)
+  throw new Error('review adapter needs a CLI location: pass cliPath (C6 chain result) or dshRepoDir')
+}
+
 /**
  * Create an executor compatible with executeReviewExperiment.
  *
@@ -74,7 +83,7 @@ export function resolveDshCli(dshRepoDir) {
  * @param {Set<string>} [options.allowedTools] - tool names permitted in the reviewer's session (default: empty).
  */
 export function createDshHeadlessReviewExecutor(options) {
-  const cli = options.cliPath ? resolve(options.cliPath) : resolveDshCli(options.dshRepoDir)
+  const cli = executorCli(options)
   const profile = options.profile ?? 'headless'
   if (typeof profile !== 'string' || profile.length === 0) {
     throw new TypeError('dsh review adapter requires a profile')

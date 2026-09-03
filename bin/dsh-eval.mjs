@@ -27,10 +27,11 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
+import { runEvalCase } from '../src/runner.mjs'
 import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
 import { createCaseRecord, buildRunReport, reportExitCode, mockDeterminismHint } from '../src/report.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
+import { resolveDshCliChain } from '../src/cli.mjs'
 
 function usage(error) {
   const text = [
@@ -154,10 +155,14 @@ const profile = options.profile ?? config.profile
 const modeFilter = options.mode ?? config.mode ?? 'all'
 const failOnSkip = options.failOnSkip ?? config.failOnSkip ?? false
 if (profile === undefined) usage('error: --profile <name> is required (or set profile in dsh-eval.config.mjs)')
-const repoDir = resolve(options.repo ?? config.repo ?? '.')
-if (!looksLikeDshRepo(repoDir)) {
-  usage(`error: repo '${repoDir}' has no apps/cli/lib/bin.js — pass --repo, set repo in dsh-eval.config.mjs, or build the dsh CLI first (pnpm build)`)
-}
+// CLI resolution (C6, spec host-checkout-resolution): `--repo` flag >
+// resolution layer (node_modules/@deepseek-ai/dsh) > config repo key (legacy).
+// Committed files carry no real host-checkout path.
+const { cli: cliPath, repo: repoDir, source: cliSource } = resolveDshCliChain({
+  repoFlag: options.repo,
+  configRepo: config.repo,
+})
+const reportRepo = repoDir ?? cliPath
 
 const files = paths.flatMap(path => {
   const absolute = resolve(path)
@@ -228,7 +233,7 @@ for (const file of files.sort()) {
     const runStartedAt = Date.now()
     let result
     try {
-      result = await runEvalCase(evalCase, { profile, dshRepoDir: repoDir, mode })
+      result = await runEvalCase(evalCase, { profile, cliPath, dshRepoDir: repoDir, mode })
     } catch (error) {
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'fail',
@@ -299,7 +304,8 @@ for (const file of files.sort()) {
 const finishedAt = new Date().toISOString()
 const report = buildRunReport({
   profile,
-  repo: repoDir,
+  repo: reportRepo,
+  cliSource,
   modeFilter,
   failOnSkip,
   startedAt,
