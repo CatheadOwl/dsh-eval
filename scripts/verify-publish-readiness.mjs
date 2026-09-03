@@ -367,11 +367,19 @@ export async function hostClosureViolations(manifest, options = {}) {
   const hostPeers = Object.keys(manifest.peerDependencies ?? {}).filter(name => name.startsWith(HOST_SCOPE) && !CLIENT_FACE_PEER.test(name))
   if (hostPeers.length === 0) return []
   const registry = options.registry ?? REGISTRY
+  // Registry access must fail loud, never hang: a fetch without a timeout
+  // deadlocks offline/filtered environments until the caller's outer timeout
+  // kills the whole gate (observed in a sandboxed session). Abort per request;
+  // main() turns the abort into a visible violation with the DSH_SKIP escape.
+  const fetchTimeoutMs = options.fetchTimeoutMs ?? 10_000
   const packuments = new Map()
   const packument = async name => {
     if (!packuments.has(name)) {
       const url = new URL(name.replace('/', '%2F'), registry)
-      const response = await fetch(url, { headers: { accept: 'application/vnd.npm.install-v1+json' } })
+      const response = await fetch(url, {
+        headers: { accept: 'application/vnd.npm.install-v1+json' },
+        signal: AbortSignal.timeout(fetchTimeoutMs),
+      })
       if (!response.ok) throw new Error(`registry fetch failed: ${response.status} ${url}`)
       packuments.set(name, await response.json())
     }
