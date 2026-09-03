@@ -42,6 +42,7 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 
 ## 实例
 
-dsh 生态里的范本（兄弟插件包，按名可检索）：`coggit` 的意图集，以及
-`md-rename` 的 repair / discovery / no-evidence / oldpath-missing 四连——
-「同一意图 × 数据面分流」成对设计的范本。
+「同一意图 × 数据面分流」成对设计的可模仿形态：一组意图集检查（review
+通道断言理解）配一组同意图的行为四连——repair / discovery / no-evidence /
+oldpath-missing（behavior 通道断言执行）——同一意图在两个数据面上分流
+成对，互为回归网。

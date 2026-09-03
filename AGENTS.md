@@ -26,17 +26,7 @@ dry-run 不需要。沙箱拒绝 spawn 时在宿主侧终端跑，不绕测试�
 
 ## 不变量（违反即错，无论上下文）
 
-- **新读者 ≤2 屏到达可跑起点**——README 是独立 repo 主页，不是工作手册；
-  违反该约束的内容属于 `docs/`。
-- **代码与文档同 commit**——新增/变更公开导出必须同时落 `docs/`（闸门对
-  账，归类与写法归这里）。
-- **规范内容不外包给不发布的文档**——按名引用只承载出处（npm 可查的包
-  名、可模仿的 case 形态）；承载规范的引用要么内联，要么删。判据：读者
-  拿到名字后能否行动。
-- **发布物内无仓库外自我指涉**——流程阶段代号、内部工作流、其他仓库的
-  内部结构指认，都不进 README/docs。
-- **机器级接线不入库**——junction / 本地 `file:` 是部署前提，修法进
-  `docs/host-wiring.md`，接线本身 gitignore。
+rules SSOT seed 在 [.agent/rules/homepage-quality.md](.agent/rules/homepage-quality.md)（评审派遣时原样嵌入，finding 引用 rule id）。
 
 ## 随上游变动的重查
 

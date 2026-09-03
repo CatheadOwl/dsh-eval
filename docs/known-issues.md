@@ -16,5 +16,4 @@ description: 已知问题——real case 在 staged home 的 REQUEST_EXTENSION �
 `disableRows: ['plugin-package-inventory-deepseek']` 按行禁用该插件
 （机制见 [disablerows.md](disablerows.md)）。
 
-**追踪**：登记于本包源仓的 TODO「staged-home-request-extension」（按名可
-检索）。
+**追踪**：上游修复落地即删本条（不留僵尸条目）。
