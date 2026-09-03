@@ -73,13 +73,19 @@ describe('validateEvalCase', () => {
     }, file))
   })
 
-  it('accepts gates: off and rejects any other gates value', () => {
+  it('accepts disableRows and rejects malformed values plus the removed gates field', () => {
     assert.doesNotThrow(() => validateEvalCase({
-      id: 'gates-off-1', task: 'test', expect: [validMatcher], gates: 'off',
+      id: 'rows-1', task: 'test', expect: [validMatcher], disableRows: ['gates'],
     }, file))
     assert.throws(() => validateEvalCase({
-      id: 'gates-bad-1', task: 'test', expect: [validMatcher], gates: ['doc-link'],
-    }, file), /gates must be 'off' when present/)
+      id: 'rows-empty', task: 'test', expect: [validMatcher], disableRows: [],
+    }, file), /disableRows must be a non-empty string\[\]/)
+    assert.throws(() => validateEvalCase({
+      id: 'rows-bad', task: 'test', expect: [validMatcher], disableRows: 'gates',
+    }, file), /disableRows must be a non-empty string\[\]/)
+    assert.throws(() => validateEvalCase({
+      id: 'gates-legacy', task: 'test', expect: [validMatcher], gates: 'off',
+    }, file), /'gates' field was removed/)
   })
 
   it('rejects a non-object', () => {

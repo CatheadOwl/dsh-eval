@@ -46,8 +46,8 @@ export function discoverFiles(path, suffix, out = []) {
  * - `id` is a non-empty string.
  * - `task` is a string.
  * - `mode` (if present) is `'real'` or `'mock'`.
- * - `gates` (if present) is `'off'` — the eval × gates boundary declaration
- *   (per-gate whitelists are not yet a gates-side config surface).
+ * - `disableRows` (if present) is an array of non-empty strings (loader row
+ *   ids to disable in this run's overlay).
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
  * - mock mode requires a `script` with `steps` array.
  *
@@ -67,8 +67,14 @@ export function validateEvalCase(evalCase, file) {
   if (evalCase.mode !== undefined && evalCase.mode !== 'real' && evalCase.mode !== 'mock') {
     throw new Error(`${file}: case '${evalCase.id}': mode must be 'real' or 'mock' (got '${evalCase.mode}')`)
   }
-  if (evalCase.gates !== undefined && evalCase.gates !== 'off') {
-    throw new Error(`${file}: case '${evalCase.id}': gates must be 'off' when present (got '${JSON.stringify(evalCase.gates)}'; per-gate whitelists need a gates-side config surface first)`)
+  if (evalCase.gates !== undefined) {
+    throw new Error(`${file}: case '${evalCase.id}': the 'gates' field was removed — declare disableRows: ['gates'] instead`)
+  }
+  if (evalCase.disableRows !== undefined) {
+    if (!Array.isArray(evalCase.disableRows) || evalCase.disableRows.length === 0
+      || evalCase.disableRows.some(row => typeof row !== 'string' || row === '')) {
+      throw new Error(`${file}: case '${evalCase.id}': disableRows must be a non-empty string[] of loader row ids (got '${JSON.stringify(evalCase.disableRows)}')`)
+    }
   }
   if (!Array.isArray(evalCase.expect)) {
     throw new Error(`${file}: case '${evalCase.id}': expect must be a Matcher[]`)

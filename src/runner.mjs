@@ -8,9 +8,9 @@
  *   one-event-per-line layout (config override is whole-replace, so every
  *   field the backend needs is restated);
  * - optional case persona: `system-prompt` persona override;
- * - optional `gates: 'off'` case declaration: the `gates` plugin row is
- *   disabled, so turn-close blocking gates cannot splice feedback steps past
- *   the script's terminal step (the eval × gates boundary contract — see
+ * - optional `disableRows: ['<row-id>', ...]` case declaration: the listed
+ *   loader rows are disabled, so e.g. a turn-close blocking gate plugin
+ *   cannot splice feedback steps past the script's terminal step (see
  *   workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md);
  * - mock mode: `agent-default-model` re-pointed at the `eval-mock` provider
  *   plus an insert mounting the scripted adapter plugin by `file://` URL
@@ -32,14 +32,6 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 /** The scripted mock adapter plugin, referenced from generated overlays. */
 const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
-
-/**
- * Loader row id of the gates plugin. Authority: the id the gates bundle
- * itself inserts (`dsh-plugin-dev/extras/cordis.patch.yml`, `- id: gates`) —
- * an overlay `- id: gates / disabled: true` patch targets that row, the
- * same cross-layer disable mechanism as `session-title-llm`.
- */
-const GATES_PLUGIN_ROW_ID = 'gates'
 
 /** The profile-local module-fallback directory, rebuilt fresh by boot and never staged. */
 const MODULE_FALLBACK_DIR = '.dsh-module-fallback'
@@ -137,8 +129,11 @@ export function buildOverlayYaml(parts) {
     lines.push('  config:')
     lines.push(`    persona: ${yamlScalar(parts.persona)}`)
   }
-  if (parts.gates === 'off') {
-    lines.push(`- id: ${GATES_PLUGIN_ROW_ID}`)
+  for (const rowId of parts.disableRows ?? []) {
+    // Per-row disable uses the same cross-layer overlay mechanism as
+    // `session-title-llm`: an `- id: <row> / disabled: true` patch targets
+    // the row the plugin bundle itself inserts.
+    lines.push(`- id: ${yamlScalar(rowId)}`)
     lines.push('  disabled: true')
   }
   if (parts.mock) {
@@ -161,7 +156,7 @@ export function buildOverlayYaml(parts) {
  * Run one eval case end to end.
  *
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
- * script?: { steps: ChunkStep[] }, persona?: string, gates?: 'off',
+ * script?: { steps: ChunkStep[] }, persona?: string, disableRows?: string[],
  * prepare?: (workspace: string) => void | Promise<void>,
  * inspect?: (workspace: string, helpers: { trace }) => void | Promise<void>,
  * timeoutMs?: number }`
@@ -230,13 +225,15 @@ export async function runEvalCase(evalCase, options) {
     }
 
     const overlayPath = join(runDir, 'eval-overlay.yml')
-    if (evalCase.gates !== undefined && evalCase.gates !== 'off') {
-      throw new Error(`case '${evalCase.id}': gates must be 'off' when present (got '${evalCase.gates}')`)
+    if (evalCase.disableRows !== undefined
+      && (!Array.isArray(evalCase.disableRows)
+        || evalCase.disableRows.some(row => typeof row !== 'string' || row === ''))) {
+      throw new Error(`case '${evalCase.id}': disableRows must be a string[] of loader row ids`)
     }
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
       persona: evalCase.persona,
-      gates: evalCase.gates,
+      disableRows: evalCase.disableRows,
       mock: mode === 'mock',
     }))
 

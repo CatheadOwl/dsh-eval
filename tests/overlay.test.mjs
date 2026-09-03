@@ -28,10 +28,12 @@ describe('buildOverlayYaml', () => {
     assert.match(yaml, /name: "file:\/\/\/.+mock-adapter\.mjs"/)
   })
 
-  it('disables the gates plugin row only when the case declares gates off', () => {
-    const yaml = buildOverlayYaml({ sessionsRoot: 's', gates: 'off' })
-    assert.match(yaml, /- id: gates\n  disabled: true/)
-    assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('- id: gates'))
+  it('disables the declared loader rows only when the case supplies them', () => {
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', disableRows: ['gates'] })
+    assert.match(yaml, /- id: "gates"\n  disabled: true/)
+    const two = buildOverlayYaml({ sessionsRoot: 's', disableRows: ['gates', 'other-row'] })
+    assert.match(two, /- id: "other-row"\n  disabled: true/)
+    assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('disabled: true'))
   })
 })
 
