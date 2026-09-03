@@ -57,9 +57,24 @@ node -e "console.log(require('./node_modules/@deepseek-ai/dsh-llm/package.json')
 
 ## 运行面：构建好的 dsh CLI
 
-`--repo` 指向的 deepseek-harness 检出须已构建（`apps/cli/lib/bin.js` 存在；
-缺失时 CLI 以可读错误退出）。behavior 与 review 的真实运行都从这里 spawn
-dsh 本体。
+dsh CLI 的定位按以下顺序，先中先得：
+
+1. **显式 flag**：`--repo <host-checkout>`（检出须已构建，
+   `apps/cli/lib/bin.js` 存在）；
+2. **解析层**：`node_modules/@deepseek-ai/dsh/lib/bin.js`（开发态由
+   junction 指到宿主检出，可用 relink 脚本从机器级 `DSH_REPO` 锚点重建；
+   消费态由安装树提供）；
+3. **config `repo` 键**：legacy，已从各包入库 config 退役。
+
+三层全缺时 fail-loud（报错含占位符修法指引）。自诊断：
+
+```bash
+node -e "console.log(require('fs').existsSync('node_modules/@deepseek-ai/dsh/lib/bin.js'))"
+```
+
+`false` = 解析层缺 CLI：先跑 relink 重建 junction；仍 `false` 则宿主检出
+未构建（先构建宿主）。behavior 与 review 的真实运行都从定位到的 CLI
+spawn dsh 本体。
 
 ## 环境面：profile 与插件安装
 

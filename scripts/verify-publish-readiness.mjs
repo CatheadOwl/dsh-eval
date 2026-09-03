@@ -307,9 +307,14 @@ function commentText(text) {
 
 function metaLocality(root, cfg, extraSources = []) {
   const violations = []
+  // Per-package top-level config files ship with the repository and are a
+  // prime spot for control-plane narration creep — same rule set as sources.
+  const configFaces = ['dsh-eval.config.mjs', 'verify.config.mjs']
   const entries = [
-    ...contentRoots(root, cfg).flatMap(contentRoot =>
-      (cfg.srcDirs ?? ['src']).flatMap(srcDir => collectFiles(join(contentRoot, srcDir), ['.ts', '.tsx', '.js', '.mjs']))),
+    ...contentRoots(root, cfg).flatMap(contentRoot => [
+      ...(cfg.srcDirs ?? ['src']).flatMap(srcDir => collectFiles(join(contentRoot, srcDir), ['.ts', '.tsx', '.js', '.mjs'])),
+      ...configFaces.filter(face => existsSync(join(contentRoot, face))).map(face => join(contentRoot, face)),
+    ]),
     ...extraSources.map(extra => ({ path: join(root, extra.path), text: extra.text })),
   ]
   for (const entry of entries) {
