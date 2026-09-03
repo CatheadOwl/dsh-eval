@@ -139,10 +139,10 @@ export function createDshHeadlessReviewExecutor(options) {
         throw error
       }
 
-      // Post-run tool boundary check (ADR 0001 §4): parse the session
+      // Post-run tool boundary check: parse the session
       // trace, verify no unexpected tools were mounted in the reviewer's
       // session, fail the run on violation.  An absent session log skips
-      // the check gracefully (accepted fail-open; see ADR §后果).
+      // the check gracefully (accepted fail-open).
       // Validation inspects the main session only (buildTrace selects
       // non-subagent logs); plugin tools leaking in a subagent session
       // would not be caught — irrelevant in review where the overlay

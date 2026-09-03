@@ -10,8 +10,8 @@
  * - optional case persona: `system-prompt` persona override;
  * - optional `disableRows: ['<row-id>', ...]` case declaration: the listed
  *   loader rows are disabled, so e.g. a turn-close blocking gate plugin
- *   cannot splice feedback steps past the script's terminal step (see
- *   workunits/eval/TODO/20260901-turnclose-gate-eval-interaction.md);
+ *   cannot splice feedback steps past the script's terminal step (the
+ *   disableRows × turn-close gate boundary contract);
  * - mock mode: `agent-default-model` re-pointed at the `eval-mock` provider
  *   plus an insert mounting the scripted adapter plugin by `file://` URL
  *   (relative plugin names resolve against the PROFILE dir, not the overlay

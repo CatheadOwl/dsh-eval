@@ -3,7 +3,7 @@
  *
  * After a review run completes, this module inspects the session trace's
  * `request/header` events to verify that no unexpected tools were mounted
- * in the reviewer's session.  This is the detection half of the ADR 0001
+ * in the reviewer's session.  This is the detection half of the
  * sterile-profile strategy: the profile prevents plugin tools from being
  * installed, the overlay disables every host tool row, and this check
  * makes any residual drift (a bundle leaking tools through a patch, a host
