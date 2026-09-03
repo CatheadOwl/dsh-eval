@@ -6,8 +6,9 @@ description: eval 包维护规则——命令表、发布面不变量、发布/�
 
 `@catheadowl/dsh-eval` 是 dsh 插件评测框架。硬规则由
 `scripts/verify-manifest-face.mjs` / `verify-publish-readiness.mjs` 机械夹住
-（blueprint 推贯副本，包参数在 `scripts/verify.config.mjs`；改规则先改
-handbooks/verify-assets/gate-blueprint 再推贯，不直接改副本；随
+（两脚本是托管副本，跨消费者逐字节一致，包参数在
+`scripts/verify.config.mjs`；不直接改副本——仓级对账 gate
+`gate-blueprint-drift` 会拦截，规则变更在范本侧完成后推贯；随
 `pnpm test` 跑，回归即红）：H1=包名、Install/Quickstart 存在、示例
 import 不越包根、发布文档集覆盖全部 facade 导出、docs 链接自含、manifest
 规则。本文件只放闸门管不了的判断规则。

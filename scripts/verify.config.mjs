@@ -1,6 +1,7 @@
-// Per-package config for the blueprint-propagated verify entries (consumer-
-// owned; the entries themselves are byte-copies of the gate blueprint and are
-// never edited here — change the blueprint, re-propagate).
+// Per-package config for the verify entries in this directory (consumer-
+// owned). The entries are managed copies, byte-identical across every
+// consumer — never edited here; the workspace gate-blueprint-drift rejects
+// divergence. All per-package differences live in this file only.
 export default {
   ownName: '@catheadowl/dsh-eval',
   devDepNonRegistryScopes: ['@catheadowl/'],

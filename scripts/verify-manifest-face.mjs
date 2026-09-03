@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Manifest/homepage face gate for a single-package dev tool (parameterized;
-// config in scripts/verify.config.mjs `manifestFace` — byte-copy propagated
-// from the gate blueprint, never edited in place at the consumer).
+// config in scripts/verify.config.mjs `manifestFace`).
+//
+// Managed face file: byte-identical across every consumer, edits are made at
+// the single source and re-propagated — never edit this copy in place (the
+// workspace gate-blueprint-drift rejects divergence).
 //
 // Checks the manifest face matches the real package:
 //   - every `bin` entry points at an existing file inside the package;
@@ -26,12 +29,21 @@ import { dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export async function loadFaceConfig() {
-  const module = await import(pathToFileURL(resolve(fileURLToPath(new URL('./verify.config.mjs', import.meta.url)))).href)
+  const configUrl = new URL('./verify.config.mjs', import.meta.url)
+  if (!existsSync(configUrl)) {
+    throw new Error('missing scripts/verify.config.mjs beside this entry — the face gate is parameterized and will not run on defaults (create it with a manifestFace table)')
+  }
+  const module = await import(pathToFileURL(resolve(fileURLToPath(configUrl))).href)
   return module.default.manifestFace
 }
 
-export function check(root, cfg = {}) {
+export function check(root, cfg = undefined) {
   root = resolve(root)
+  if (cfg === undefined || cfg === null) {
+    // No weakened-default fallback — same rationale as verify-publish-
+    // readiness: a bare check(root) would silently run weaker rules.
+    throw new Error('check() requires the face config (second argument) — await loadFaceConfig() and pass its result; there is no default')
+  }
   const internalExports = new Set(cfg.internalExports ?? [])
   const docsRoots = cfg.docsRoots ?? ['docs']
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))

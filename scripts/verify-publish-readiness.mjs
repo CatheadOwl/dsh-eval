@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Publish-readiness clamp — parameterized engine (per-package config in
-// scripts/verify.config.mjs beside this entry; byte-copy propagated from the
-// gate blueprint, never edited in place at the consumer).
+// scripts/verify.config.mjs beside this entry).
+//
+// Managed face file: byte-identical across every consumer, edits are made at
+// the single source and re-propagated — never edit this copy in place (the
+// workspace gate-blueprint-drift rejects divergence).
 //
 // Rules (independently publishable = host provided at runtime, everything else
 // resolvable from a public registry, docs self-contained):
@@ -184,7 +187,12 @@ function scriptsLocality(root, declared, cfg, extraScripts = []) {
 // where the shell actually runs that segment).
 function npmScriptsLocality(manifest, root) {
   const violations = []
+  // Host-borrow exemption is existence-checked: the sibling checkout location
+  // is a machine fact, not an unconditional pass — when the host checkout is
+  // not wired at that location, host borrows are real violations and the gate
+  // goes red instead of blessing dead paths.
   const hostRoot = resolve(root, '../..', 'deepseek-harness')
+  const hostBorrowRoot = existsSync(hostRoot) ? hostRoot : null
   const inside = (target, base) => target === base || target.startsWith(base + '/') || target.startsWith(base + '\\')
   for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
     if (typeof command !== 'string') continue
@@ -198,8 +206,9 @@ function npmScriptsLocality(manifest, root) {
       for (const match of segment.matchAll(/(?:\.\.[/\\])+[^\s'"&|;]+/gu)) {
         const token = match[0]
         const target = resolve(base, token)
-        if (!inside(target, root) && !inside(target, hostRoot)) {
-          violations.push(`PKG-2: scripts.${name} references ${token} which resolves outside the package root (and is not a documented L0 host borrow) — keep dev-repo-only commands out of the shipped manifest`)
+        const hostOk = hostBorrowRoot !== null && inside(target, hostBorrowRoot)
+        if (!inside(target, root) && !hostOk) {
+          violations.push(`PKG-2: scripts.${name} references ${token} which resolves outside the package root (and is not a wired L0 host borrow — the deepseek-harness checkout must exist at the sibling location for borrows to pass) — keep dev-repo-only commands out of the shipped manifest`)
         }
       }
     }
@@ -416,7 +425,13 @@ function rulesSeedLocality(root, cfg) {
 
 export function check(root, options = {}, cfg = undefined) {
   root = resolve(root)
-  if (cfg === undefined) cfg = defaultConfig()
+  if (cfg === undefined || cfg === null) {
+    // No weakened-default fallback: a caller that skips the config (e.g. a
+    // unit test importing check directly) would silently run weaker rules —
+    // a green test would then vouch for a gate that never ran. Load the
+    // config with loadConfig() and pass it in.
+    throw new Error('check() requires the package config (third argument) — await loadConfig() and pass its result; there is no default')
+  }
   const manifest = options.manifestOverride ?? JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const declared = new Set([
     ...Object.keys(manifest.dependencies ?? {}),
@@ -439,21 +454,6 @@ export function check(root, options = {}, cfg = undefined) {
       guidance: 'Keep the package independently publishable: host packages as peerDependencies, registry ranges elsewhere, docs self-contained (cite out-of-repo evidence as plain text, not links).',
     },
   }))
-}
-
-// Sync fallback config so `check()` stays callable without awaiting
-// loadConfig() in unit tests that exercise the generic engine; production
-// entry points always pass the loaded config.
-export function defaultConfig() {
-  return {
-    ownName: undefined,
-    devDepNonRegistryScopes: ['@deepseek-ai/', '@catheadowl/'],
-    layout: 'root',
-    srcDirs: ['src'],
-    docsRoots: ['docs'],
-    hostClosureCheck: false,
-    rulesSeed: null,
-  }
 }
 
 export async function main() {
