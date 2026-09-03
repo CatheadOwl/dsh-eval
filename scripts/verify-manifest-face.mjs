@@ -1,31 +1,39 @@
 #!/usr/bin/env node
-// Package-face gate for @catheadowl/dsh-eval (release-plan C4 — copied and
-// tailored from the extras gate; no TypeScript layer here, the face is plain
-// .mjs).
+// Manifest/homepage face gate for a single-package dev tool (parameterized;
+// config in scripts/verify.config.mjs `manifestFace` — byte-copy propagated
+// from the gate blueprint, never edited in place at the consumer).
 //
 // Checks the manifest face matches the real package:
 //   - every `bin` entry points at an existing file inside the package;
-//   - `main` (the case/matcher import facade) exists;
+//   - `main` (the import facade) exists;
 //   - if `exports` is declared, it covers `.` and every bin file, and every
 //     exports target exists;
 //   - the facade src/index.mjs re-exports only in-package modules (no new
 //     deep surface may silently grow).
 //
-// Homepage/docs face (github-homepage-review blockers, mechanized so they
-// can never regress):
+// Homepage/docs face:
 //   - README's H1 is the package name;
 //   - README has ## Install and ## Quickstart sections;
 //   - code blocks in README/docs never import via relative paths that
 //     escape the package root (published examples must use the package
 //     name);
-//   - docs/matchers.md mentions every named export of the facade (docs
-//     drift guard: a new matcher without documentation fails the gate).
+//   - the shipped docs set mentions every named export of the facade
+//     (docs drift guard: a new public symbol without documentation fails
+//     the gate; config `internalExports` exempts consumed-via-CLI
+//     internals).
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-export function check(root) {
+export async function loadFaceConfig() {
+  const module = await import(pathToFileURL(resolve(fileURLToPath(new URL('./verify.config.mjs', import.meta.url)))).href)
+  return module.default.manifestFace
+}
+
+export function check(root, cfg = {}) {
   root = resolve(root)
+  const internalExports = new Set(cfg.internalExports ?? [])
+  const docsRoots = cfg.docsRoots ?? ['docs']
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const violations = []
   const inside = target => target === root || target.startsWith(root + '/') || target.startsWith(root + '\\')
@@ -89,7 +97,7 @@ export function check(root) {
     }
   }
 
-  // ---- Homepage/docs face (github-homepage-review round 1 blockers) ----
+  // ---- Homepage/docs face ----
   const readmePath = join(root, 'README.md')
   if (existsSync(readmePath)) {
     const readme = readFileSync(readmePath, 'utf8')
@@ -105,9 +113,8 @@ export function check(root) {
   }
 
   // Published examples must import the package name, never relative paths
-  // escaping the package root (round-1 blocker: dev-repo relative imports
-  // that cannot work for consumers).
-  const markdownFiles = [readmePath, ...collectMarkdown(join(root, 'docs'))]
+  // escaping the package root.
+  const markdownFiles = [readmePath, ...docsRoots.flatMap(docsRoot => collectMarkdown(join(root, docsRoot)))]
   for (const file of markdownFiles) {
     if (!existsSync(file)) continue
     const text = readFileSync(file, 'utf8')
@@ -122,17 +129,8 @@ export function check(root) {
   }
 
   // Docs drift guard: every facade export must appear somewhere in the
-  // shipped docs set (README + docs/**). Runner/trace internals are exempt
-  // (documented as internals; consumers write cases, not runners).
+  // shipped docs set, unless config-exempted as an internal.
   const docsSet = markdownFiles.filter(existsSync).map(file => readFileSync(file, 'utf8')).join('\n')
-  const internalExports = new Set([
-    // runner/trace internals: consumers write cases, not runners
-    'runEvalCase', 'buildOverlayYaml', 'looksLikeDshRepo', 'stageProfileStore', 'FRAMEWORK_ROOT',
-    'parseSessionLog', 'buildTrace', 'loadTraceDir',
-    // dsh adapter / tool-validation internals: consumed via the CLIs
-    'createDshHeadlessReviewExecutor', 'resolveDshCli', 'runDshReviewExperiment',
-    'validateToolBoundary', 'renderToolBoundaryEvidence',
-  ])
   if (docsSet.length > 0 && facadeExports.size > 0) {
     for (const name of facadeExports) {
       if (internalExports.has(name)) continue
@@ -151,15 +149,19 @@ export function check(root) {
 function collectMarkdown(dir, result = []) {
   if (!existsSync(dir)) return result
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) collectMarkdown(join(dir, entry.name), result)
+    if (entry.isDirectory()) collectMarkdown(join(dir, entry), result)
     else if (extname(entry.name) === '.md') result.push(join(dir, entry.name))
   }
   return result
 }
 
-if (process.argv[1] !== undefined && process.argv[1].endsWith('verify-package-face.mjs')) {
+if (process.argv[1] !== undefined && process.argv[1].endsWith('verify-manifest-face.mjs')) {
   const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
-  const violations = check(root)
-  for (const violation of violations) console.error(violation.reason)
-  process.exitCode = violations.length === 0 ? 0 : 1
+  loadFaceConfig().then(cfg => check(root, cfg)).then((violations) => {
+    for (const violation of violations) console.error(violation.reason)
+    process.exitCode = violations.length === 0 ? 0 : 1
+  }, (error) => {
+    console.error(error.message)
+    process.exitCode = 2
+  })
 }
