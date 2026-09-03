@@ -5,7 +5,9 @@ description: GitHub 主页评审协议——dispatch prompt 模板（README 作�
 # GitHub-homepage review 协议（README.md）
 
 **问题**：README 是本包独立 repo 的主页（npm 页正文同步），不是工作手册。
-结构性改动后按本协议派遣一轮评审。
+结构性改动后按本协议派遣一轮评审。通用形态（骨架清单、噪音标准、模块页
+变体、机械预扫）见族技能 homepage-review（skills/review-evals，名称引用）；
+本文件是其在 eval 包的专属实例。
 
 ## Dispatch prompt 模板
 
