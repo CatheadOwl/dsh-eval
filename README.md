@@ -4,6 +4,10 @@ description: dsh-plugin eval 框架：模型无关的试验设计层 + dsh headl
 
 # dsh-plugin eval 框架
 
+**dsh-eval is a dsh-native agent evaluation layer for plugin authors**: behavior cases run against real headless dsh traces, while review experiments test whether fresh models understand plugin outputs.
+
+它评测的是**装配后的 agent harness**（插件 + profile + patch + 工具注册表在真实 dsh headless 里接成的那张图），不是孤立函数；判定走 dsh 原生的 session trace 投影与 matcher（契约断言），不是 metric 分数。它不是通用 agent eval 平台（无 dashboard / dataset hosting / metric catalog，也不做 benchmark 排名），也不是 DeepEval / OpenAI Evals 的替代品——那些项目证明了这个问题空间成立，本包选择 dsh-native 的垂直解法。产品承诺四层：行为契约、模型可见面契约、理解契约、发布契约。
+
 本包把 **试验是什么** 与 **通过什么 agent runtime 执行** 分开：
 
 ```text
