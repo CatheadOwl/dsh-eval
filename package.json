@@ -8,9 +8,12 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
-    "dsh-eval": "./bin/dsh-eval.mjs",
-    "dsh-review": "./bin/dsh-review.mjs"
+    "dsh-eval": "bin/dsh-eval.mjs",
+    "dsh-review": "bin/dsh-review.mjs"
   },
   "files": [
     "bin/",
