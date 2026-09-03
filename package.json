@@ -10,6 +10,6 @@
     "dsh-review": "./bin/dsh-review.mjs"
   },
   "scripts": {
-    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs"
+    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs"
   }
 }

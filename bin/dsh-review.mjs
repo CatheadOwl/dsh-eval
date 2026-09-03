@@ -13,16 +13,20 @@ import { pathToFileURL } from 'node:url'
 import { materializeReviewExperiment } from '../src/experiment/review.mjs'
 import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
 import { discoverFiles } from '../src/discovery.mjs'
+import { loadEvalConfig } from '../src/config.mjs'
 
 function usage(error) {
-  const message = 'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] <*.review.mjs or directories...>'
+  const message = [
+    'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] <*.review.mjs or directories...>',
+    '       --profile/--repo may come from a dsh-eval.config.mjs found upward from cwd; flags override it.',
+  ].join('\n')
   if (error) process.stderr.write(`${error}\n${message}\n`)
   else process.stdout.write(`${message}\n`)
   process.exit(error ? 2 : 0)
 }
 
 function parseArgs(argv) {
-  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: 'headless', repo: undefined }
+  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined }
   const paths = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -37,7 +41,6 @@ function parseArgs(argv) {
   if (paths.length === 0) usage('error: at least one review experiment path is required')
   if (options.runs !== undefined && (!Number.isInteger(options.runs) || options.runs < 1)) usage('error: --runs must be a positive integer')
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)) usage('error: --timeout must be a positive integer')
-  if (!options.dryRun && !options.repo) usage('error: --repo is required unless --dry-run is used')
   return { options, paths }
 }
 
@@ -73,6 +76,16 @@ function writeMaterialized(experiment, materialized, extra = {}) {
 }
 
 const { options, paths } = parseArgs(process.argv.slice(2))
+
+// Config merge (EVAL-008): flags win over a `dsh-eval.config.mjs` found
+// upward from cwd; profile falls back to the sterile default `headless`.
+const { config } = await loadEvalConfig(process.cwd())
+const profile = options.profile ?? config.profile ?? 'headless'
+const repoDir = options.repo ?? config.repo
+if (!options.dryRun && repoDir === undefined) {
+  usage('error: --repo is required unless --dry-run is used (or set repo in dsh-eval.config.mjs)')
+}
+
 for (const path of paths) {
   if (!existsSync(resolve(path))) usage(`error: no such experiment path: ${path}`)
 }
@@ -93,14 +106,14 @@ for (const file of files) {
 
     process.stdout.write(`RUN  ${experiment.id} (${options.runs ?? experiment.defaultRuns} reviews)...\n`)
     const result = await runDshReviewExperiment(experiment, {
-      profile: options.profile,
-      dshRepoDir: options.repo,
+      profile,
+      dshRepoDir: repoDir,
       runs: options.runs,
       timeoutMs: options.timeoutMs,
     })
     const output = writeMaterialized(experiment, result, {
       adapter: 'dsh-headless',
-      profile: options.profile,
+      profile,
       runs: result.runs,
     })
     for (const attempt of result.attempts) {

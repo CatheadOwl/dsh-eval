@@ -30,10 +30,12 @@ import { pathToFileURL } from 'node:url'
 import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
 import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
 import { createCaseRecord, buildRunReport, reportExitCode } from '../src/report.mjs'
+import { loadEvalConfig } from '../src/config.mjs'
 
 function usage(error) {
   const text = [
-    'usage: dsh-eval run --profile <name> --repo <deepseek-harness> [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] [--format text|json] [--report <file>] <case paths...>',
+    'usage: dsh-eval run [--profile <name>] [--repo <deepseek-harness>] [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] [--format text|json] [--report <file>] <case paths...>',
+    '       --profile/--repo/--mode/--fail-on-skip/--report may come from a dsh-eval.config.mjs found upward from cwd; flags override it.',
   ].join('\n')
   if (error === undefined) {
     process.stdout.write(`${text}\n`)
@@ -43,11 +45,13 @@ function usage(error) {
   process.exit(2)
 }
 
-/** Parse argv: known flags, then case paths. */
+/** Parse argv: known flags, then case paths. Profile/repo/mode/failOnSkip
+ * may come from a `dsh-eval.config.mjs` instead of flags (flags win);
+ * required-ness is checked after config merging, not here. */
 function parseArgs(argv) {
   const options = {
-    profile: undefined, repo: undefined, mode: 'all',
-    keepArtifacts: false, failOnSkip: false, format: 'text', report: undefined,
+    profile: undefined, repo: undefined, mode: undefined,
+    keepArtifacts: false, failOnSkip: undefined, format: 'text', report: undefined,
   }
   const paths = []
   for (let i = 0; i < argv.length; i += 1) {
@@ -63,9 +67,7 @@ function parseArgs(argv) {
     if (arg === '-h' || arg === '--help') usage()
     paths.push(arg)
   }
-  if (options.profile === undefined) usage('error: --profile <name> is required')
-  if (options.repo === undefined) usage('error: --repo <deepseek-harness dir> is required')
-  if (!['real', 'mock', 'all'].includes(options.mode)) usage(`error: --mode must be real, mock, or all (got '${options.mode}')`)
+  if (!['real', 'mock', 'all'].includes(options.mode ?? 'all')) usage(`error: --mode must be real, mock, or all (got '${options.mode}')`)
   if (!['text', 'json'].includes(options.format)) usage(`error: --format must be text or json (got '${options.format}')`)
   if (paths.length === 0) usage('error: at least one case file or directory is required')
   return { options, paths }
@@ -143,9 +145,18 @@ function writeArtifacts(evalCase, result, mode) {
 const startedAt = new Date().toISOString()
 const { options, paths } = parseArgs(process.argv.slice(2))
 const jsonFormat = options.format === 'json'
-const repoDir = isAbsolute(options.repo) ? options.repo : resolve(process.cwd(), options.repo)
+
+// Config merge (EVAL-008): a `dsh-eval.config.mjs` reachable from cwd
+// supplies defaults; explicit flags always win. Required-ness is only
+// decided after the merge, so config-only invocations work.
+const { config } = await loadEvalConfig(process.cwd())
+const profile = options.profile ?? config.profile
+const modeFilter = options.mode ?? config.mode ?? 'all'
+const failOnSkip = options.failOnSkip ?? config.failOnSkip ?? false
+if (profile === undefined) usage('error: --profile <name> is required (or set profile in dsh-eval.config.mjs)')
+const repoDir = resolve(options.repo ?? config.repo ?? '.')
 if (!looksLikeDshRepo(repoDir)) {
-  usage(`error: --repo '${repoDir}' has no apps/cli/lib/bin.js — build the dsh CLI first (pnpm build) or pass the deepseek-harness checkout`)
+  usage(`error: repo '${repoDir}' has no apps/cli/lib/bin.js — pass --repo, set repo in dsh-eval.config.mjs, or build the dsh CLI first (pnpm build)`)
 }
 
 const files = paths.flatMap(path => {
@@ -199,7 +210,7 @@ for (const file of files.sort()) {
   for (const c of cases) seenIds.set(c.id, file)
   for (const evalCase of cases) {
     const mode = evalCase.mode ?? 'real'
-    const skip = skipReason(evalCase, options.mode)
+    const skip = skipReason(evalCase, modeFilter)
     if (skip !== undefined) {
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'skip', skipReason: skip,
@@ -211,7 +222,7 @@ for (const file of files.sort()) {
     const runStartedAt = Date.now()
     let result
     try {
-      result = await runEvalCase(evalCase, { profile: options.profile, dshRepoDir: repoDir, mode })
+      result = await runEvalCase(evalCase, { profile, dshRepoDir: repoDir, mode })
     } catch (error) {
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'fail',
@@ -274,17 +285,18 @@ for (const file of files.sort()) {
 
 const finishedAt = new Date().toISOString()
 const report = buildRunReport({
-  profile: options.profile,
+  profile,
   repo: repoDir,
-  modeFilter: options.mode,
-  failOnSkip: options.failOnSkip,
+  modeFilter,
+  failOnSkip,
   startedAt,
   finishedAt,
   records,
 })
 
-if (options.report !== undefined) {
-  const reportPath = isAbsolute(options.report) ? options.report : resolve(process.cwd(), options.report)
+const reportTarget = options.report ?? config.report
+if (reportTarget !== undefined) {
+  const reportPath = isAbsolute(reportTarget) ? reportTarget : resolve(process.cwd(), reportTarget)
   try {
     mkdirSync(dirname(reportPath), { recursive: true })
     writeFileSync(reportPath, JSON.stringify(report, undefined, 2))
@@ -301,4 +313,4 @@ if (options.format === 'json') {
   const { summary } = report
   process.stdout.write(`\n${summary.selected} selected, ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped\n`)
 }
-process.exit(reportExitCode(records, options.failOnSkip))
+process.exit(reportExitCode(records, failOnSkip))
