@@ -14,6 +14,7 @@ import { materializeReviewExperiment } from '../src/experiment/review.mjs'
 import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
 import { discoverFiles } from '../src/discovery.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
+import { renderReviewReport } from '../src/review-report.mjs'
 
 function usage(error) {
   const message = [
@@ -61,7 +62,7 @@ function artifactDir(experiment) {
   return join(dirname(experiment.__file), '.runs', experiment.id)
 }
 
-function writeMaterialized(experiment, materialized, extra = {}) {
+function writeMaterialized(experiment, materialized, extra = {}, reviewResult = undefined) {
   const output = artifactDir(experiment)
   mkdirSync(output, { recursive: true })
   writeFileSync(join(output, 'task.txt'), materialized.task, 'utf8')
@@ -72,6 +73,13 @@ function writeMaterialized(experiment, materialized, extra = {}) {
     rubric: String(experiment.rubric),
     ...extra,
   }, null, 2), 'utf8')
+  writeFileSync(join(output, 'review-report.md'), renderReviewReport({
+    experiment,
+    result: reviewResult,
+    observations: materialized.observations,
+    adapter: extra.adapter,
+    profile: extra.profile,
+  }), 'utf8')
   return output
 }
 
@@ -115,7 +123,7 @@ for (const file of files) {
       adapter: 'dsh-headless',
       profile,
       runs: result.runs,
-    })
+    }, result)
     for (const attempt of result.attempts) {
       const payload = attempt.result ?? {}
       if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.stdout, 'utf8')

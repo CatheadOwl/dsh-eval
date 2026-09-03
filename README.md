@@ -111,7 +111,8 @@ node bin/dsh-review.mjs \
 - `observations.md`：本次实时物化的可见证据；
 - `task.txt`：实际发给每位 reviewer 的完整任务；
 - `run-N.txt` / stderr / error：各次独立运行；
-- `run.json`：experiment、rubric、adapter、profile 与 run 数。
+- `run.json`：experiment、rubric、adapter、profile 与 run 数；
+- `review-report.md`：判读报告骨架（product-review P4）——机器字段自动填（experiment/adapter/profile/runs、observations 指纹、rubric 位置、每轮 reviewer 原文），三个**人工判读栏目**留白待填：intentional design 命中项、新 red flag、下一步（改输出 / 改 rubric / 改 behavior case / 不处理）。刻意不做自动评分——review 层的价值在人工判断，报告只把判断物化成可归档、可对比的工程证据（dry-run 也会生成，runs 记 0）。
 
 ## Behavior case
 
