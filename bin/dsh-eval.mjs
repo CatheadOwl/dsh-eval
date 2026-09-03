@@ -5,6 +5,7 @@
  * Usage:
  *   dsh-eval run --profile <name> --repo <deepseek-harness dir>
  *                [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip]
+ *                [--format text|json] [--report <file>]
  *                <case paths...>
  *
  * A case path is a `*.eval.mjs` file or a directory scanned recursively for
@@ -13,6 +14,13 @@
  * prepare?, timeoutMs? }`. Real cases skip when DEEPSEEK_API_KEY is absent;
  * the exit code is 1 when any run fails. Failures keep their artifacts under
  * `<case file dir>/.runs/<case id>/`.
+ *
+ * Output formats (EVAL-007):
+ * - `--format text` (default): unchanged human output on stdout/stderr.
+ * - `--format json`: all progress and failure chatter moves to stderr;
+ *   stdout receives exactly one JSON report object (see src/report.mjs).
+ * - `--report <file>`: additionally write that report object to a file,
+ *   in either format — the aggregation/CI consumption path.
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -21,10 +29,11 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runEvalCase, looksLikeDshRepo } from '../src/runner.mjs'
 import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
+import { createCaseRecord, buildRunReport, reportExitCode } from '../src/report.mjs'
 
 function usage(error) {
   const text = [
-    'usage: dsh-eval run --profile <name> --repo <deepseek-harness> [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] <case paths...>',
+    'usage: dsh-eval run --profile <name> --repo <deepseek-harness> [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] [--format text|json] [--report <file>] <case paths...>',
   ].join('\n')
   if (error === undefined) {
     process.stdout.write(`${text}\n`)
@@ -36,7 +45,10 @@ function usage(error) {
 
 /** Parse argv: known flags, then case paths. */
 function parseArgs(argv) {
-  const options = { profile: undefined, repo: undefined, mode: 'all', keepArtifacts: false, failOnSkip: false }
+  const options = {
+    profile: undefined, repo: undefined, mode: 'all',
+    keepArtifacts: false, failOnSkip: false, format: 'text', report: undefined,
+  }
   const paths = []
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -46,14 +58,26 @@ function parseArgs(argv) {
     if (arg === '--mode') { options.mode = argv[++i]; continue }
     if (arg === '--keep-artifacts') { options.keepArtifacts = true; continue }
     if (arg === '--fail-on-skip') { options.failOnSkip = true; continue }
+    if (arg === '--format') { options.format = argv[++i]; continue }
+    if (arg === '--report') { options.report = argv[++i]; continue }
     if (arg === '-h' || arg === '--help') usage()
     paths.push(arg)
   }
   if (options.profile === undefined) usage('error: --profile <name> is required')
   if (options.repo === undefined) usage('error: --repo <deepseek-harness dir> is required')
   if (!['real', 'mock', 'all'].includes(options.mode)) usage(`error: --mode must be real, mock, or all (got '${options.mode}')`)
+  if (!['text', 'json'].includes(options.format)) usage(`error: --format must be text or json (got '${options.format}')`)
   if (paths.length === 0) usage('error: at least one case file or directory is required')
   return { options, paths }
+}
+
+/**
+ * Line output that respects the format: in `json` mode stdout is reserved
+ * for the single report object, so progress lines go to stderr instead.
+ */
+function say(line) {
+  if (jsonFormat) process.stderr.write(`${line}\n`)
+  else process.stdout.write(`${line}\n`)
 }
 
 /** Recursively collect `*.eval.mjs` files from one file or directory path. */
@@ -116,7 +140,9 @@ function writeArtifacts(evalCase, result, mode) {
   return artifactsDir
 }
 
+const startedAt = new Date().toISOString()
 const { options, paths } = parseArgs(process.argv.slice(2))
+const jsonFormat = options.format === 'json'
 const repoDir = isAbsolute(options.repo) ? options.repo : resolve(process.cwd(), options.repo)
 if (!looksLikeDshRepo(repoDir)) {
   usage(`error: --repo '${repoDir}' has no apps/cli/lib/bin.js — build the dsh CLI first (pnpm build) or pass the deepseek-harness checkout`)
@@ -129,10 +155,7 @@ const files = paths.flatMap(path => {
 })
 if (files.length === 0) usage('error: no *.eval.mjs case files found')
 
-let passed = 0
-let failed = 0
-let skipped = 0
-let selected = 0
+const records = []
 const seenIds = new Map()
 
 for (const file of files.sort()) {
@@ -140,7 +163,10 @@ for (const file of files.sort()) {
   try {
     cases = await loadCases(file)
   } catch (error) {
-    failed += 1
+    records.push(createCaseRecord({
+      id: file, file, status: 'fail',
+      failures: [`failed to load cases: ${error.message}`],
+    }))
     process.stderr.write(`FAIL ${file}: failed to load cases: ${error.message}\n`)
     continue
   }
@@ -148,7 +174,10 @@ for (const file of files.sort()) {
   try {
     detectDuplicateIds(cases)
   } catch (error) {
-    failed += 1
+    records.push(createCaseRecord({
+      id: file, file, status: 'fail',
+      failures: [error.message],
+    }))
     process.stderr.write(`FAIL ${file}: ${error.message}\n`)
     continue
   }
@@ -156,8 +185,12 @@ for (const file of files.sort()) {
   let hasDuplicate = false
   for (const c of cases) {
     if (seenIds.has(c.id)) {
-      failed += 1
-      process.stderr.write(`FAIL ${file}: duplicate case id '${c.id}' (also in ${seenIds.get(c.id)})\n`)
+      const message = `duplicate case id '${c.id}' (also in ${seenIds.get(c.id)})`
+      records.push(createCaseRecord({
+        id: c.id, file, mode: c.mode ?? 'real', status: 'fail',
+        failures: [message],
+      }))
+      process.stderr.write(`FAIL ${file}: ${message}\n`)
       hasDuplicate = true
       break
     }
@@ -165,27 +198,39 @@ for (const file of files.sort()) {
   if (hasDuplicate) continue
   for (const c of cases) seenIds.set(c.id, file)
   for (const evalCase of cases) {
-    selected += 1
+    const mode = evalCase.mode ?? 'real'
     const skip = skipReason(evalCase, options.mode)
     if (skip !== undefined) {
-      skipped += 1
-      process.stdout.write(`SKIP ${evalCase.id}: ${skip}\n`)
+      records.push(createCaseRecord({
+        id: evalCase.id, file, mode, status: 'skip', skipReason: skip,
+      }))
+      say(`SKIP ${evalCase.id}: ${skip}`)
       continue
     }
-    const mode = evalCase.mode ?? 'real'
-    process.stdout.write(`RUN  ${evalCase.id} (${mode})...\n`)
+    say(`RUN  ${evalCase.id} (${mode})...`)
+    const runStartedAt = Date.now()
     let result
     try {
       result = await runEvalCase(evalCase, { profile: options.profile, dshRepoDir: repoDir, mode })
     } catch (error) {
-      failed += 1
+      records.push(createCaseRecord({
+        id: evalCase.id, file, mode, status: 'fail',
+        failures: [`runner error: ${error.message}`],
+        durationMs: Date.now() - runStartedAt,
+      }))
       process.stderr.write(`FAIL ${evalCase.id}: runner error: ${error.message}\n`)
       continue
     }
+    const durationMs = Date.now() - runStartedAt
 
     if (result.trace === undefined) {
-      failed += 1
       const artifactsDir = writeArtifacts(evalCase, result, mode)
+      records.push(createCaseRecord({
+        id: evalCase.id, file, mode, status: 'fail',
+        failures: [`no session trace materialized (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})`],
+        exitCode: result.exitCode, timedOut: result.timedOut,
+        durationMs, artifactsDir,
+      }))
       process.stderr.write(
         `FAIL ${evalCase.id}: no session trace materialized (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})\n`
         + `     artifacts: ${artifactsDir}\n--- stderr ---\n${result.stderr}\n`,
@@ -197,28 +242,63 @@ for (const file of files.sort()) {
     if (result.exitCode !== 0) {
       // Headless SSOT: exit 0 iff the turn completed. A run that errored out
       // must not pass on coincidentally satisfied matchers.
-      failures.push(`  - dsh CLI exited with code ${result.exitCode} (the turn did not complete)`)
+      failures.push(`dsh CLI exited with code ${result.exitCode} (the turn did not complete)`)
     }
     for (const matcher of evalCase.expect) {
       const outcome = matcher.check(result.trace)
-      if (!outcome.ok) failures.push(`  - ${matcher.describe}: ${outcome.message}`)
+      if (!outcome.ok) failures.push(`${matcher.describe}: ${outcome.message}`)
     }
-    if (result.timedOut) failures.push('  - run timed out')
-    if (result.inspectError !== undefined) failures.push(`  - workspace inspect failed: ${result.inspectError}`)
+    if (result.timedOut) failures.push('run timed out')
+    if (result.inspectError !== undefined) failures.push(`workspace inspect failed: ${result.inspectError}`)
 
     if (failures.length === 0) {
-      passed += 1
-      process.stdout.write(`PASS ${evalCase.id}\n`)
-      if (options.keepArtifacts) writeArtifacts(evalCase, result, mode)
+      const artifactsDir = options.keepArtifacts ? writeArtifacts(evalCase, result, mode) : undefined
+      records.push(createCaseRecord({
+        id: evalCase.id, file, mode, status: 'pass',
+        exitCode: result.exitCode, timedOut: result.timedOut,
+        durationMs, ...(artifactsDir !== undefined ? { artifactsDir } : {}),
+      }))
+      say(`PASS ${evalCase.id}`)
     } else {
-      failed += 1
       const artifactsDir = writeArtifacts(evalCase, result, mode)
-      process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.join('\n')}\n`)
+      records.push(createCaseRecord({
+        id: evalCase.id, file, mode, status: 'fail', failures,
+        exitCode: result.exitCode, timedOut: result.timedOut,
+        durationMs, artifactsDir,
+      }))
+      process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.map(f => `  - ${f}`).join('\n')}\n`)
       process.stderr.write(`     artifacts: ${artifactsDir}\n`)
     }
   }
 }
 
-process.stdout.write(`\n${selected} selected, ${passed} passed, ${failed} failed, ${skipped} skipped\n`)
-const exitFail = failed > 0 || (options.failOnSkip && selected > 0 && passed + failed === 0)
-process.exit(exitFail ? 1 : 0)
+const finishedAt = new Date().toISOString()
+const report = buildRunReport({
+  profile: options.profile,
+  repo: repoDir,
+  modeFilter: options.mode,
+  failOnSkip: options.failOnSkip,
+  startedAt,
+  finishedAt,
+  records,
+})
+
+if (options.report !== undefined) {
+  const reportPath = isAbsolute(options.report) ? options.report : resolve(process.cwd(), options.report)
+  try {
+    mkdirSync(dirname(reportPath), { recursive: true })
+    writeFileSync(reportPath, JSON.stringify(report, undefined, 2))
+    process.stderr.write(`report: ${reportPath}\n`)
+  } catch (error) {
+    process.stderr.write(`error: failed to write report '${reportPath}': ${error.message}\n`)
+    process.exit(2)
+  }
+}
+
+if (options.format === 'json') {
+  process.stdout.write(`${JSON.stringify(report, undefined, 2)}\n`)
+} else {
+  const { summary } = report
+  process.stdout.write(`\n${summary.selected} selected, ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped\n`)
+}
+process.exit(reportExitCode(records, options.failOnSkip))

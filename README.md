@@ -175,12 +175,37 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 # 工作目录：本目录（dsh-plugin-dev/eval/）
 node bin/dsh-eval.mjs run --profile <profile> --repo <deepseek-harness> \
   [--mode real|mock|all] [--keep-artifacts] [--fail-on-skip] \
+  [--format text|json] [--report <file>] \
   <case file or directory...>
 ```
 
 前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。本包自身需要 `node_modules/@deepseek-ai/dsh-llm` junction 指向宿主检出（模块级 junction 层同机制；缺失时 mock adapter 以 loader entry import 失败拒载）。real 层在 staged 临时 home 下存在 `REQUEST_EXTENSION` 已知问题（嫌疑 `plugin-package-inventory-deepseek` × staged 环境），处置方向见 [`workunits/eval/TODO/20260901-staged-home-request-extension.md`](../../workunits/eval/TODO/20260901-staged-home-request-extension.md)。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
 
 `--fail-on-skip` 用于 CI 门禁：当选中 case > 0 但全部被 skip（无凭证或 `--mode` 过滤）时返回非零退出码，避免“根本没跑但成功”的误判。本地开发默认不启用，体验不变。
+
+### 机器可读报告
+
+`--format json`：stdout 只输出一个 JSON 报告对象（过程与失败明细转 stderr），供 CI / 多插件聚合消费；`--report <file>`：在任一格式下额外把同一报告对象写入文件。报告结构（构造在 `src/report.mjs`）：
+
+```jsonc
+{
+  "tool": "dsh-eval",
+  "profile": "headless", "repo": "<absolute harness checkout>",
+  "mode": "mock", "failOnSkip": false,
+  "startedAt": "…", "finishedAt": "…",
+  "summary": { "selected": 1, "passed": 1, "failed": 0, "skipped": 0 },
+  "results": [
+    {
+      "id": "…", "file": "…", "mode": "mock", "status": "pass",
+      "exitCode": 0, "timedOut": false, "durationMs": 5000
+      // fail 时另有 failures[]、artifactsDir；skip 时另有 skipReason；
+      // case 文件加载失败/重复 id 这类文件级失败也进 results（无 mode 字段）
+    }
+  ]
+}
+```
+
+status 取值 `pass | fail | skip`；退出码与文本格式完全一致（同一 `reportExitCode` 派生）。默认 `--format text` 输出逐字节不变。
 
 runner 用 `try/finally` 保证临时目录与 junction 在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不会残留临时文件或泄漏到真实 profile store。
 
