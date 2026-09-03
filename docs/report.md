@@ -1,3 +1,7 @@
+---
+description: 机器可读报告结构——--format json / --report 的字段语义（环境锚点、per-case 三态 status、派生 summary 与退出码）
+---
+
 # 机器可读报告
 
 `--format json`：stdout 只输出一个 JSON 报告对象（过程与失败明细转 stderr），

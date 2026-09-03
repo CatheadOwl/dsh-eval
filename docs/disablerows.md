@@ -1,3 +1,7 @@
+---
+description: disableRows 边界契约——按 loader 行 id 禁用插件行的通用机制、turn-close 门禁 splice 与 finalText 失效的交互根因、case/config 取值优先级
+---
+
 # `disableRows` 与 turn-close 门禁边界契约
 
 `disableRows: string[]` 是通用机制：按 loader 行 id 在本次 run 的 overlay 里

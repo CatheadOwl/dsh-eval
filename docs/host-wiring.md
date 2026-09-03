@@ -1,3 +1,7 @@
+---
+description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置
+---
+
 # 安装与宿主接线
 
 `@catheadowl/dsh-eval` 是 dsh 生态的开发期工具：它驱动真实 dsh headless

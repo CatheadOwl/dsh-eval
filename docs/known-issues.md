@@ -1,3 +1,7 @@
+---
+description: 已知问题——real case 在 staged home 的 REQUEST_EXTENSION 失败（嫌疑 plugin-package-inventory-deepseek）及 disableRows 兜底
+---
+
 # 已知问题
 
 ## real case 在 staged home 下 `REQUEST_EXTENSION` 失败（未解）

@@ -1,3 +1,7 @@
+---
+description: comprehension review 指南——defineReviewExperiment 实验定义、sterile profile 盲评运行、.runs 产物与 review-report 判读模板、六条固化规则
+---
+
 # Comprehension review
 
 理解评审回答 behavior matcher 无法回答的问题：**一个 fresh model 能否从插件
@@ -34,8 +38,10 @@ export default defineReviewExperiment({
 ```
 
 抽象层公开 `defineReviewExperiment`、`materializeReviewExperiment`、
-`executeReviewExperiment` 与标准 observation renderer。自定义 executor 只需
-实现 `(task, context) => result`；接入其他 agent runtime 不需要改试验定义。
+`executeReviewExperiment` 与标准 observation renderer
+（`renderObservationSections`；prompt 里的观测占位符常量是
+`OBSERVATIONS_PLACEHOLDER`，必须恰好出现一次）。自定义 executor 只需实现
+`(task, context) => result`；接入其他 agent runtime 不需要改试验定义。
 
 ## CLI
 

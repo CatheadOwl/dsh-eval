@@ -1,3 +1,7 @@
+---
+description: dsh-eval 文档索引——安装与宿主接线、review、matcher 全集、disableRows 契约、intent case 规约、报告结构与已知问题七篇的路由表
+---
+
 # dsh-eval · docs index
 
 | 文档 | 主题 |

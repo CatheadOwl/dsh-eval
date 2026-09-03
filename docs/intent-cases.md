@@ -1,3 +1,7 @@
+---
+description: real 意图 case 规约——何时写的触发表、断言面最小化（toolCalled/toolCallArgs/inspect 守卫）、fixture 与门禁交互规避、凭证 auto-skip 与 CI 语义
+---
+
 # Real 意图 case 规约
 
 behavior real 断言「自然语言意图 → 工具选择与参数路由」，mock 断言「工具

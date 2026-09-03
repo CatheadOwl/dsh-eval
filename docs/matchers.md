@@ -1,3 +1,7 @@
+---
+description: trace matcher 与 mock helper 全集——工具面/文本面/输入面断言语义（toolCalled 到 userMessageTextIncludes）与 toolCallStep/textStep 脚本构件
+---
+
 # Trace matchers 与 mock helpers
 
 全部从包根导入：`import { toolCalled, … } from '@catheadowl/dsh-eval'`。
