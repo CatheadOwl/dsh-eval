@@ -63,7 +63,7 @@ behavior *.eval.mjs ───────────────────►
     rubric.md
 ```
 
-当前迁移实例：extras 包 `modules/routes/eval/`（any_routes）与 coggit 包的 `eval/` 目录（开发仓内路径，按包名定位）。
+消费实例：any_routes（extras 的 routes 模块）与 coggit 各自的 `eval/` 目录。
 
 ## 理解实验定义
 
@@ -163,13 +163,13 @@ doc-link 报错现场等），splice 会驱动模型产生脚本之外的额外 
 - 不依赖插件开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终
   文本）。终态干净时仍应优先 `finalText*`。
 - per-gate 白名单（如只关 gates 的某个 gate）暂不支持：per-gate disable 需要 gates 侧先
-  提供 config 面；需要时先在开发仓 workunits/eval 登记。
+  提供 config 面。
 
-matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口，结构性问题的登记条目为开发仓 workunits/eval 的 TODO「turnclose-gate-eval-interaction」）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
+matcher：`toolCalled`、`toolNotCalled`、`firstTool`、`toolSequence`、`toolCallArgs`、`toolResultFor`、`toolResultIsError`（匹配的工具调用结果 `isError === true`）、`toolResultSucceeded`（匹配的工具调用结果 `isError` 不为 true）、`toolResultTextIncludes`（匹配的工具调用结果文本含指定子串）、`finalTextIncludes`、`finalTextMatches`、`assistantTextIncludes`（任一 assistant 文本含指定子串——turn-close 门禁 splice 反馈步骤、`finalText*` 被截走时的 case 级出口）、`systemPromptIncludes`（组装后的 system prompt 含指定子串）、`toolMounted`（工具出现在某个 request/header 的挂载列表）、`userMessageTextIncludes` / `userMessageTextExcludes`（按 `source` 过滤的 `user/message` 文本含/不含指定子串——`source` 用字符串/RegExp 匹配 `plugin` 名，或谓词取整个 `source`）。mock helper：`toolCallStep`、`textStep`。
 
 ### real 意图 case 规约
 
-behavior real 断言「自然语言意图 → 工具选择与参数路由」，mock 断言「工具管线与写入 round-trip」：两层互补，不互相替代。宿主无关的**方法论上游**——为什么、触发表及其依据、case 设计规则、失败启发集——在开发仓手册 `handbooks/agent-tools-dev` 的「01-意图面-e2e」（按名定位）；本节是它在 dsh 的承载面（触发速查 + matcher 落地 + CI 语义）。
+behavior real 断言「自然语言意图 → 工具选择与参数路由」，mock 断言「工具管线与写入 round-trip」：两层互补，不互相替代。宿主无关的**方法论上游**——为什么、触发表及其依据、case 设计规则、失败启发集——见上游手册 `agent-tools-dev`「01-意图面-e2e」（按名引用）；本节是它在 dsh 的承载面（触发速查 + matcher 落地 + CI 语义）。
 
 **何时写**（上游触发表的 dsh 速查，依据与展开见上游 §2）：注册了模型可见工具（happy path ≥1）／目标存在等价手工路径／描述 steering 变更／分支由数据面状态分流（成对 case）／拒绝路径面向模型消费（remedy 委派边界）／有误触发风险（负向 `toolNotCalled`，先例 coggit `intent-unrelated`）。
 
@@ -177,7 +177,7 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 
 - 断言面最小：`toolCalled`（不是 `firstTool`，探索在前合法）+ `toolCallArgs` 子集（路由 payoff 在参数对）+ 语义关键时 `toolResultTextIncludes` 状态锚（如 `"status": "repaired"`）；不约束措辞与中间步骤。
 - `inspect` 守结果面 + 反捏造（不重建旧路径、不凭空造文件），不管模型走什么中间路径。
-- fixture 可区分性与门禁交互规避等通用规则见上游 §3/§4。dsh 侧已知交互：turn-close 阻塞门禁会 splice 反馈步骤污染判读——契约与 `disableRows: ['gates']` 出口见上方「disableRows 与 turn-close 门禁边界契约」（结构性问题登记在开发仓 workunits/eval 的 TODO「turnclose-gate-eval-interaction」，case 级出口为 `assistantTextIncludes`）。
+- fixture 可区分性与门禁交互规避等通用规则见上游 §3/§4。dsh 侧已知交互：turn-close 阻塞门禁会 splice 反馈步骤污染判读——契约与 `disableRows: ['gates']` 出口见上方「disableRows 与 turn-close 门禁边界契约」（case 级出口为 `assistantTextIncludes`；splice 步骤与脚本本体的区分尚无框架级方案）。
 - 无凭证 auto-skip；CI 门禁用 `--fail-on-skip` 防「根本没跑但成功」。
 
 实例：`coggit/eval/behavior/real/`、`md-rename/eval/behavior/real/`（后者的 repair / discovery / no-evidence / oldpath-missing 四连是「同一意图 × 数据面分流」成对设计的范本）。
@@ -208,7 +208,7 @@ export default {
 
 package scripts 于是收敛为 `dsh-eval run --mode mock eval/behavior/mock` 这类形态（profile/repo 来自 config）。未知 key 直接报错（拼写错误不静默退化）。消费者接入实例：`coggit/`、`subagent-at/`、`extras/` 各自的 `dsh-eval.config.mjs`。
 
-前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。本包自身需要 `node_modules/@deepseek-ai/dsh-llm` junction 指向宿主检出（模块级 junction 层同机制；缺失时 mock adapter 以 loader entry import 失败拒载）。real 层在 staged 临时 home 下存在 `REQUEST_EXTENSION` 已知问题（嫌疑 `plugin-package-inventory-deepseek` × staged 环境），处置方向登记在开发仓 workunits/eval 的 TODO「staged-home-request-extension」。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
+前置：被测插件须已装进所选 profile（`dsh plugin --profile <profile> add <插件目录>`，各插件 eval README 的「前置」节有实例）；`--repo` 指向的 harness 检出须已构建（`apps/cli/lib/bin.js`，缺失时 CLI 会以可读错误退出）。本包自身需要 `node_modules/@deepseek-ai/dsh-llm` junction 指向宿主检出（模块级 junction 层同机制；缺失时 mock adapter 以 loader entry import 失败拒载）。real 层在 staged 临时 home 下存在 `REQUEST_EXTENSION` 已知问题（嫌疑 `plugin-package-inventory-deepseek` × staged 环境；框架侧可用的兜底是 `disableRows: ['plugin-package-inventory-deepseek']` 按行禁用该插件）。每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run，随后解析 `tool/call`、`tool/result` 与最终文本。mock 会插入脚本化 `eval-mock` adapter，但工具执行仍走真实 Cordis/tool 管线。失败产物位于 case 旁 `.runs/<case id>/`。
 
 `--fail-on-skip` 用于 CI 门禁：当选中 case > 0 但全部被 skip（无凭证或 `--mode` 过滤）时返回非零退出码，避免“根本没跑但成功”的误判。本地开发默认不启用，体验不变。
 
@@ -246,6 +246,8 @@ behavior 与 review CLI 共享 `src/discovery.mjs` 目录扫描，均跳过 `.ru
 pnpm test
 ```
 
-宿主 seam 的源溯登记在开发仓 explorer 层的「eval-seams」证据集（summary / evidence）。dsh runner 依赖已构建的 `deepseek-harness/apps/cli/lib/bin.js`；real 层需要 `DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`，mock 与 review dry-run 不需要。
+宿主 seam（headless 退出语义、session JSONL 布局、overlay 应用顺序、DSH_HOME 解析）以宿主源码为权威。dsh runner 依赖已构建的 `deepseek-harness/apps/cli/lib/bin.js`。
+
+real 层的**模型凭证由 dsh 自行解析**——spawn 的是 dsh 本体，env 原样透传，真实 home 的托管凭证文档（`.credentials.yaml`）会被复制进暂存 home；**你的 dsh 能正常跑，real case 就能跑**。eval 自身不做任何凭证配置，只在启动前做存在性探测（env 或托管文档任一可见）以决定 real case 是否 auto-skip，CI 用 `--fail-on-skip` 防「没跑但成功」。mock 与 review dry-run 完全不需要凭证。
 
 real 层还会以管道 stdio spawn 子 dsh CLI（headless 会话、子代理子运行时），因此需要一个能 spawn 子进程的运行面：受限文件沙箱内该 spawn 会被拒（`spawn EPERM`，凭证在也不够）——在 agent 会话内跑需要以更宽 sandbox 权限（升级 + 审批），或直接在宿主侧终端/CI 跑；提权是 real eval 的正常前置，不是异常（delegated subagent scope 无审批通道时不可升级，只能宿主侧或由父级升级执行）。mock 与 review dry-run 不 spawn 子 CLI，无此约束。

@@ -158,6 +158,13 @@ function devRepoPathCitations(markdown, base, displayed, root, violations) {
   }
 }
 
+// Self-reference markers that have no legitimate use in PUBLISHED docs: the
+// reader of the npm package cannot reach the development repository, so both
+// naming it ("开发仓") and citing its control-plane namespaces ("workunits/")
+// are meta leaks. (In code comments the META_TERMS pass covers the same idea;
+// here the tokens are unambiguous enough to ban outright.)
+const DOC_META_MARKERS = [/开发仓/u, /\bworkunits\//u, /\bexplorer\/eval-seams\b/u]
+
 function docsLocality(root) {
   const violations = []
   const targets = [
@@ -167,6 +174,12 @@ function docsLocality(root) {
   for (const file of targets) {
     if (!existsSync(file)) continue
     const text = readFileSync(file, 'utf8')
+    for (const marker of DOC_META_MARKERS) {
+      marker.lastIndex = 0
+      if (marker.test(text)) {
+        violations.push(`${relative(root, file).replaceAll('\\', '/')} contains dev-repo self-reference ${marker} — published docs must state behavior functionally, not cite an unreachable registry`)
+      }
+    }
     for (const link of markdownLinks(text)) {
       if (/^[a-z][a-z0-9+.-]*:/iu.test(link) || link.startsWith('#')) continue
       const pathPart = link.split('#', 1)[0]
