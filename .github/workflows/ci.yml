@@ -6,9 +6,7 @@
 # (`--repo` flag > node_modules resolution layer > legacy config repo key,
 # see docs/host-wiring.md), and wiring a dsh CLI into CI is deferred until the
 # host dev surface has a published artifact (upstream proposal "host dev
-# surface publication"; see the dsh-extra control repo's
-# workunits/github-release note "CI 分层与暂缓决策"). Until then the full
-# suite is verified locally:
+# surface publication"). Until then the full suite is verified locally:
 #   - run: pnpm test
 name: CI
 
