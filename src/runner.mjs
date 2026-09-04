@@ -12,6 +12,12 @@
  *   loader rows are disabled, so e.g. a turn-close blocking gate plugin
  *   cannot splice feedback steps past the script's terminal step (the
  *   disableRows × turn-close gate boundary contract);
+ * - optional `rowConfig: { '<row-id>': { key: value } }` case declaration:
+ *   per-row config overrides in this run's overlay. The overlay REPLACES
+ *   the row's whole config (cordis patch semantics), so restate any keys
+ *   the row still needs — the arm-style A/B use case disables one
+ *   provider via `disabledProviders` while restating the row's other
+ *   config keys explicitly;
  * - mock mode: `agent-default-model` re-pointed at the `eval-mock` provider
  *   plus an insert mounting the scripted adapter plugin by `file://` URL
  *   (relative plugin names resolve against the PROFILE dir, not the overlay
@@ -26,6 +32,7 @@ import { tmpdir, homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { loadTraceDir } from './trace.mjs'
+import { validateRowConfig } from './discovery.mjs'
 
 /** This framework's root directory (the eval package dir). */
 const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -113,6 +120,16 @@ function yamlScalar(value) {
 }
 
 /**
+ * One rowConfig leaf: a scalar, or an array of scalars emitted as a YAML flow
+ * sequence (a JSON array is valid YAML flow syntax, and keeps quoting rules
+ * identical to `yamlScalar`).
+ */
+function yamlConfigValue(value) {
+  if (Array.isArray(value)) return JSON.stringify(value.map(item => typeof item === 'string' ? item : String(item)))
+  return yamlScalar(value)
+}
+
+/**
  * Serialize the per-run overlay patch list to YAML.
  * @param {object} parts - overlay ingredients (see runEvalCase).
  * @returns {string} the overlay file text.
@@ -136,6 +153,16 @@ export function buildOverlayYaml(parts) {
     lines.push(`- id: ${yamlScalar(rowId)}`)
     lines.push('  disabled: true')
   }
+  for (const [rowId, config] of Object.entries(parts.rowConfig ?? {})) {
+    // Whole-replace semantics: these config keys REPLACE the row's config
+    // (cordis patch layer), so the emitter adds to a fresh `- id:` entry —
+    // restating keys is the declaring case's responsibility.
+    lines.push(`- id: ${yamlScalar(rowId)}`)
+    lines.push('  config:')
+    for (const [key, value] of Object.entries(config)) {
+      lines.push(`    ${key}: ${yamlConfigValue(value)}`)
+    }
+  }
   if (parts.mock) {
     lines.push('- id: agent-default-model')
     lines.push('  config:')
@@ -157,6 +184,7 @@ export function buildOverlayYaml(parts) {
  *
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
  * script?: { steps: ChunkStep[] }, persona?: string, disableRows?: string[],
+ * rowConfig?: Record<string, Record<string, unknown>>,
  * prepare?: (workspace: string) => void | Promise<void>,
  * inspect?: (workspace: string, helpers: { trace }) => void | Promise<void>,
  * timeoutMs?: number }`
@@ -234,10 +262,14 @@ export async function runEvalCase(evalCase, options) {
         || evalCase.disableRows.some(row => typeof row !== 'string' || row === ''))) {
       throw new Error(`case '${evalCase.id}': disableRows must be a string[] of loader row ids`)
     }
+    if (evalCase.rowConfig !== undefined) {
+      validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)
+    }
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
       persona: evalCase.persona,
       disableRows: evalCase.disableRows,
+      rowConfig: evalCase.rowConfig,
       mock: mode === 'mock',
     }))
 

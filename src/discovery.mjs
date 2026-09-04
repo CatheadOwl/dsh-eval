@@ -51,6 +51,10 @@ export function discoverFiles(path, suffix, out = []) {
  *   "disable nothing, explicitly" — it overrides a `disableRows` default
  *   from `dsh-eval.config.mjs`, which is how gate-interaction cases opt
  *   back in inside a package that disables the gate row by default.
+ * - `rowConfig` (if present) maps loader row ids to config objects whose
+ *   leaf values are scalars or arrays of scalars (see `validateRowConfig`).
+ *   The overlay REPLACES the row's whole config — restate any keys the row
+ *   needs, not just the ones being changed.
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
  * - mock mode requires a `script` with `steps` array.
  *
@@ -79,6 +83,9 @@ export function validateEvalCase(evalCase, file) {
       throw new Error(`${file}: case '${evalCase.id}': disableRows must be a string[] of loader row ids (empty = explicit none, overriding config; got '${JSON.stringify(evalCase.disableRows)}')`)
     }
   }
+  if (evalCase.rowConfig !== undefined) {
+    validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)
+  }
   if (!Array.isArray(evalCase.expect)) {
     throw new Error(`${file}: case '${evalCase.id}': expect must be a Matcher[]`)
   }
@@ -91,6 +98,36 @@ export function validateEvalCase(evalCase, file) {
   if (evalCase.mode === 'mock') {
     if (evalCase.script === undefined || !Array.isArray(evalCase.script?.steps)) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)
+    }
+  }
+}
+
+/**
+ * Validate a `rowConfig` mapping (case-level or ad-hoc): keys are loader row
+ * ids, values are config objects whose leaf values must be scalars (string /
+ * number / boolean) or arrays of scalars. Nested objects are rejected — the
+ * overlay emitter only handles flat config keys. Throws with `label` context.
+ * @param {unknown} rowConfig - the value to validate.
+ * @param {string} label - error-message context (e.g. `case '<id>'`).
+ */
+export function validateRowConfig(rowConfig, label) {
+  if (rowConfig === null || typeof rowConfig !== 'object' || Array.isArray(rowConfig)) {
+    throw new Error(`${label}: rowConfig must be an object mapping row ids to config objects (got '${JSON.stringify(rowConfig)}')`)
+  }
+  for (const [rowId, config] of Object.entries(rowConfig)) {
+    if (rowId === '') throw new Error(`${label}: rowConfig row id must be a non-empty string`)
+    if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+      throw new Error(`${label}: rowConfig['${rowId}'] must be a config object (got '${JSON.stringify(config)}')`)
+    }
+    for (const [key, value] of Object.entries(config)) {
+      if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
+      if (Array.isArray(value)) {
+        if (value.some(item => item === null || typeof item === 'object')) {
+          throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be an array of scalars`)
+        }
+      } else if (value === null || typeof value === 'object') {
+        throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be a scalar or scalar array (nested objects are not supported)`)
+      }
     }
   }
 }

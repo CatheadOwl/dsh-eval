@@ -35,6 +35,21 @@ describe('buildOverlayYaml', () => {
     assert.match(two, /- id: "other-row"\n  disabled: true/)
     assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('disabled: true'))
   })
+
+  it('emits rowConfig overrides as per-row config blocks only when supplied', () => {
+    const yaml = buildOverlayYaml({
+      sessionsRoot: 's',
+      rowConfig: { prompt: { disabledProviders: ['breadcrumb-description-enricher'], totalTimeoutMs: 5000 } },
+    })
+    assert.match(yaml, /- id: "prompt"\n  config:\n    disabledProviders: \["breadcrumb-description-enricher"\]\n    totalTimeoutMs: 5000/)
+    assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('disabledProviders'))
+  })
+
+  it('emits boolean and string rowConfig leaves with YAML-native scalars', () => {
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', rowConfig: { demo: { flag: true, name: 'x y' } } })
+    assert.match(yaml, /flag: true/)
+    assert.match(yaml, /name: "x y"/)
+  })
 })
 
 describe('mock script builders', () => {

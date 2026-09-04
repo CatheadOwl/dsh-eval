@@ -93,6 +93,25 @@ describe('validateEvalCase', () => {
     }, file), /'gates' field was removed/)
   })
 
+  it('accepts rowConfig with scalar / scalar-array leaves and rejects nested shapes', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'rowconfig-ok', task: 'test', expect: [validMatcher],
+      rowConfig: { prompt: { disabledProviders: ['a-enricher'], totalTimeoutMs: 5000, flag: false } },
+    }, file))
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-not-object', task: 'test', expect: [validMatcher], rowConfig: ['prompt'],
+    }, file), /rowConfig must be an object/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-not-config', task: 'test', expect: [validMatcher], rowConfig: { prompt: 'off' },
+    }, file), /must be a config object/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-nested', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: { b: 1 } } },
+    }, file), /scalar or scalar array/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: [{}] } },
+    }, file), /array of scalars/)
+  })
+
   it('rejects a non-object', () => {
     assert.throws(() => validateEvalCase(null, file), /case must be an object/)
     assert.throws(() => validateEvalCase('string', file), /case must be an object/)

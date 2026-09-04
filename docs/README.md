@@ -1,5 +1,5 @@
 ---
-description: dsh-eval 文档索引——安装与宿主接线、review、matcher 全集、disableRows 契约、intent case 规约、报告结构与已知问题七篇的路由表
+description: dsh-eval 文档索引——安装与宿主接线、review、matcher 全集、disableRows/rowConfig 契约、intent case 规约、报告结构与已知问题的路由表
 ---
 
 # dsh-eval · docs index
@@ -10,6 +10,7 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 | [review.md](review.md) | comprehension review：实验定义、sterile profile、产物清单、六条固化规则 |
 | [matchers.md](matchers.md) | trace matcher 与 mock helper 全集 |
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
+| [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
 | [intent-cases.md](intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report.md](report.md) | 机器可读报告（`--format json` / `--report`）结构 |
 | [known-issues.md](known-issues.md) | 已知问题与规避 |

@@ -114,6 +114,7 @@ export default {
 | [review](docs/review.md) | comprehension review：实验定义、sterile profile、产物、六条固化规则 |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
+| [rowconfig](docs/rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换、重述所需键） |
 | [intent-cases](docs/intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report](docs/report.md) | 机器可读报告（`--format json` / `--report`）结构 |
 | [known-issues](docs/known-issues.md) | 已知问题与规避（如 staged home 的 REQUEST_EXTENSION） |
