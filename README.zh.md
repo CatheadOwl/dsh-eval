@@ -1,7 +1,3 @@
----
-description: '@catheadowl/dsh-eval 中文主页——dsh-native agent 评测层：behavior case 跑真实 headless dsh trace，review experiment 测 fresh model 能否理解插件输出'
----
-
 # @catheadowl/dsh-eval
 
 [English](README.md) | 中文

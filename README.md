@@ -1,7 +1,3 @@
----
-description: '@catheadowl/dsh-eval — a dsh-native agent evaluation layer for plugin authors: behavior cases run against real headless dsh traces, review experiments test whether fresh models understand plugin outputs'
----
-
 # @catheadowl/dsh-eval
 
 English | [中文](README.zh.md)
