@@ -13,6 +13,8 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 | `host-wiring.md` | dsh CLI 依赖闭包、`@deepseek-ai/dsh-llm` registry dist-tags | 宿主发新版 / peer 集变更 / 新 dist-tag → 重跑闭包预检，更新三形结局与古董版本号 |
 | `known-issues.md` | 本包问题跟踪中的对应条目（按名对齐） | 上游修复落地 → 删条不留僵尸；新增已知问题先登记再入篇 |
 | `matchers.md` | `src/index.mjs` facade | 加导出即改（package-face 闸强制）；语义变更即改描述与分类（工具面/文本面/输入面） |
+| `runner-api.md` | `src/runner.mjs`（`runEvalCase` options / `EvalRunResult`）、`src/cli.mjs`（跨档取 `cliPath` 一节） | options/result 字段或 CLI 解析链变更同 commit 更新；`dshRepoDir` 删除（0.3.0）时删表中该行 |
+| `experimental.md` | `src/experimental.mjs`、`scripts/verify-experimental-face.mjs` | experimental 门面加/撤符号即改清单（verify-experimental-face 闸强制符号级对账）；档位语义变更查警告横幅措辞 |
 | `intent-cases.md` | 意图面 e2e 方法论（上游手册，按名引用） | 触发表/失败启发集演进 → 同步内联表——本篇的表是**规范版**，不是摘要 |
 | `review.md` / `disablerows.md` / `report.md` | 本包框架源码 | 契约变更同 commit 更新（闸门对账 facade 导出；CLI flags 变更查 review/report 两篇） |
 | 全篇涉及的宿主 seam 断言（退出语义 / JSONL 布局 / overlay 顺序） | dsh 宿主源码（vendored 检出） | 宿主 seam 源码演进 → 先对宿主源码重新验证断言，再动引用它的文档 |

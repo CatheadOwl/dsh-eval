@@ -10,10 +10,12 @@ description: eval 包维护规则——命令表、发布面不变量、发布/�
 
 ```sh
 pnpm install            # node ≥22
-pnpm test               # 套件 + 两道发布闸
+pnpm test               # 套件 + 四道发布闸
 pnpm verify:publish     # 单跑发布自检闸
-pnpm verify:face        # 单跑包面闸（含 docs 防漂移对账）
-npm pack --pack-destination <隔离目录>   # 发布演练；prepack 自动过双闸
+pnpm verify:face        # 单跑包面闸（SDK 档 docs 防漂移对账）
+pnpm verify:experimental # 单跑 experimental 档闸（包自有：警告横幅+清单页对账）
+pnpm verify:readme-i18n # 单跑 README 双语配对闸
+npm pack --pack-destination <隔离目录>   # 发布演练；prepack 自动过四闸
 dsh-eval run <case>     # 消费者形态运行（配置见根 README）
 ```
 
