@@ -38,6 +38,13 @@
 //   9. rules seed locality (opt-in via `rulesSeed` path): the package's
 //      AGENTS.md must carry the pointer to its rules seed, and the seed must
 //      exist.
+//  10. docs meta locality: published docs (README.md + configured docsRoots)
+//      must not cite dev-repo control-plane ids or lineage verbs —
+//      ADR/RFC/PRD ids, workline (W-number) ids, workunit references, and
+//      promotion/migration lineage verbs (升格 / 已归档 / 原仓库级 / 薄 shim).
+//      Plain-text by-name provenance ("original design record, by name")
+//      stays the accepted citation form; fenced code blocks and inline code
+//      spans are exempt (fixture / identifier usage).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -418,6 +425,46 @@ export async function hostClosureViolations(manifest, options = {}) {
   return closureReasons(hostPeers, closuresByTag)
 }
 
+// Dev-repo control-plane vocabulary must not appear in published docs
+// (README.md + configured docsRoots) either: unlike sources — where comments
+// carry functional semantics only — docs MAY cite dev-repo evidence, but only
+// via the accepted by-name provenance form. The un-actionable forms are
+// rejected mechanically: decision-record ids (ADR/RFC/PRD + number), workline
+// ids (W-number), workunit references, and promotion/migration lineage verbs.
+// Fenced code blocks and inline code spans are stripped before matching
+// (fixture strings and identifiers live there).
+const DOC_META_TERMS = [
+  { rule: 'PKG-6', pattern: /\b(?:ADR|RFC|PRD)[ -]?\d{2,}\b/u },
+  { rule: 'PKG-6', pattern: /\bW\d{1,2}\b/u },
+  { rule: 'PKG-6', pattern: /\bworkunits?\b/u },
+  { rule: 'PKG-9', pattern: /已归档|原仓库级|薄\s?shim|升格/u },
+]
+
+function docsMetaLocality(root, cfg, extraMarkdown = []) {
+  const violations = []
+  const targets = [
+    ...contentRoots(root, cfg).flatMap(contentRoot => [
+      join(contentRoot, 'README.md'),
+      ...(cfg.docsRoots ?? ['docs']).flatMap(docsRoot => collectFiles(join(contentRoot, docsRoot), ['.md'])),
+    ]),
+    ...extraMarkdown.map(entry => ({ path: join(root, entry.path), text: entry.text })),
+  ]
+  for (const file of targets) {
+    const text = typeof file === 'string' ? readFileSync(file, 'utf8') : file.text
+    const displayed = typeof file === 'string' ? file : file.path
+    const haystack = text
+      .replace(/```[\s\S]*?```/gu, '')
+      .replace(/`[^`\n]*`/gu, '')
+    for (const term of DOC_META_TERMS) {
+      term.pattern.lastIndex = 0
+      if (term.pattern.test(haystack)) {
+        violations.push(`${term.rule}: ${relative(root, displayed).replaceAll('\\', '/')} cites control-plane term ${term.pattern} in published docs — cite dev-repo evidence by name (original design record) without ids or lineage verbs`)
+      }
+    }
+  }
+  return violations
+}
+
 // PKG seed locality (config `rulesSeed`): the package's AGENTS.md must carry
 // the pointer to its rules seed, and the seed must exist (AGENTS never carries
 // rule bodies — the pointer is the only discovery path for the dot-dir seed).
@@ -457,6 +504,7 @@ export function check(root, options = {}, cfg = undefined) {
     ...importCoverage(root, declared, cfg),
     ...scriptsLocality(root, declared, cfg, options.extraScripts),
     ...docsLocality(root, cfg, options.extraMarkdown),
+    ...docsMetaLocality(root, cfg, options.extraMarkdown),
     ...metaLocality(root, cfg, options.extraSources),
     ...rulesSeedLocality(root, cfg),
   ]
