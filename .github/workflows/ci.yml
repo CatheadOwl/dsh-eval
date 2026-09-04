@@ -1,11 +1,15 @@
 # CI for @catheadowl/dsh-eval
 #
-# Runs the full suite (unit tests + the two release gates + bilingual README
-# pairing). The four review-adapter tests spawn the dsh CLI through the
-# resolution chain (`--repo` flag > node_modules resolution layer > legacy
-# config repo key, see docs/host-wiring.md); until a dsh CLI is wired into CI
-# they fail loud — wire the CLI (or pass --repo via config in CI) to green the
-# full suite. Everything else must stay green on every push.
+# Tier-A pipeline: the two release gates + bilingual README pairing, green on
+# a clean clone with `pnpm i`. The full suite is deferred (Tier C): its four
+# review-adapter tests spawn the dsh CLI through the resolution chain
+# (`--repo` flag > node_modules resolution layer > legacy config repo key,
+# see docs/host-wiring.md), and wiring a dsh CLI into CI is deferred until the
+# host dev surface has a published artifact (upstream proposal "host dev
+# surface publication"; see the dsh-extra control repo's
+# workunits/github-release note "CI 分层与暂缓决策"). Until then the full
+# suite is verified locally:
+#   - run: pnpm test
 name: CI
 
 on:
@@ -26,5 +30,3 @@ jobs:
       - run: pnpm verify:publish
       - run: pnpm verify:face
       - run: pnpm verify:readme-i18n
-      # Full suite (needs the dsh CLI wired — see header):
-      # - run: pnpm test
