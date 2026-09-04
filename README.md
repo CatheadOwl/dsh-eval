@@ -122,6 +122,8 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 | [intent-cases](docs/intent-cases.md) | real intent-case spec: when to write one, assertion face, guards, CI semantics |
 | [report](docs/report.md) | machine-readable report structure (`--format json` / `--report`) |
 | [known-issues](docs/known-issues.md) | known issues and workarounds (e.g. REQUEST_EXTENSION in staged homes) |
+| [runner-api](docs/runner-api.md) | programmatic runner API: `runEvalCase` options contract, EvalRunResult fields, crossing tiers for `cliPath` |
+| [experimental](docs/experimental.md) | `experimental` subpath symbol list (escape hatch, no compatibility promise) |
 
 ## Runtime guarantees
 

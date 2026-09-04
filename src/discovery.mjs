@@ -40,6 +40,23 @@ export function discoverFiles(path, suffix, out = []) {
 }
 
 /**
+ * Validate a `disableRows` declaration (case-level or ad-hoc): an array of
+ * non-empty loader row id strings. An EMPTY array is legal and means
+ * "disable nothing, explicitly" — it overrides a `disableRows` default
+ * from `dsh-eval.config.mjs`. Throws with `label` context. Shared by
+ * `validateEvalCase` (load time) and `runEvalCase` (execution time) so both
+ * report the identical message.
+ * @param {unknown} disableRows - the value to validate.
+ * @param {string} label - error-message context (e.g. `case '<id>'`).
+ */
+export function validateDisableRows(disableRows, label) {
+  if (!Array.isArray(disableRows)
+    || disableRows.some(row => typeof row !== 'string' || row === '')) {
+    throw new Error(`${label}: disableRows must be a string[] of loader row ids (empty = explicit none, overriding config; got '${JSON.stringify(disableRows)}')`)
+  }
+}
+
+/**
  * Validate one eval case's shape. Throws with a descriptive message on
  * the first violation found. Checks:
  *
@@ -78,10 +95,7 @@ export function validateEvalCase(evalCase, file) {
     throw new Error(`${file}: case '${evalCase.id}': the 'gates' field was removed — declare disableRows: ['gates'] instead`)
   }
   if (evalCase.disableRows !== undefined) {
-    if (!Array.isArray(evalCase.disableRows)
-      || evalCase.disableRows.some(row => typeof row !== 'string' || row === '')) {
-      throw new Error(`${file}: case '${evalCase.id}': disableRows must be a string[] of loader row ids (empty = explicit none, overriding config; got '${JSON.stringify(evalCase.disableRows)}')`)
-    }
+    validateDisableRows(evalCase.disableRows, `${file}: case '${evalCase.id}'`)
   }
   if (evalCase.rowConfig !== undefined) {
     validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)

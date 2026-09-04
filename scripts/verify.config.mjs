@@ -12,14 +12,10 @@ export default {
   rulesSeed: null,
   manifestFace: {
     docsRoots: ['docs'],
-    // Facade exports consumed via the CLIs or as runner internals: consumers
-    // write cases and matchers, not runners — exempt from the docs drift
-    // guard.
-    internalExports: [
-      'runEvalCase', 'buildOverlayYaml', 'looksLikeDshRepo', 'stageProfileStore', 'FRAMEWORK_ROOT',
-      'parseSessionLog', 'buildTrace', 'loadTraceDir',
-      'createDshHeadlessReviewExecutor', 'resolveDshCli', 'runDshReviewExperiment',
-      'validateToolBoundary', 'renderToolBoundaryEvidence',
-    ],
+    // The root facade is the stable SDK tier (matchers, step builders,
+    // defineReviewExperiment, runEvalCase) — every export must be
+    // documented, no exemptions. Mechanism primitives live behind
+    // ./experimental with their own (package-owned) face gate.
+    internalExports: [],
   },
 }

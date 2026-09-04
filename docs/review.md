@@ -34,7 +34,7 @@ export default defineReviewExperiment({
 })
 ```
 
-抽象层公开 `defineReviewExperiment`、`materializeReviewExperiment`、`executeReviewExperiment` 与标准 observation renderer（`renderObservationSections`；prompt 里的观测占位符常量是 `OBSERVATIONS_PLACEHOLDER`，必须恰好出现一次）。自定义 executor 只需实现 `(task, context) => result`；接入其他 agent runtime 不需要改试验定义。
+抽象层公开 `defineReviewExperiment`（稳定根入口）。实验执行与渲染原语——`materializeReviewExperiment`、`executeReviewExperiment`、标准 observation renderer（`renderObservationSections`；prompt 里的观测占位符常量是 `OBSERVATIONS_PLACEHOLDER`，必须恰好出现一次）——在 `@catheadowl/dsh-eval/experimental` 逃生面（见 [experimental.md](experimental.md)，无兼容承诺）。自定义 executor 只需实现 `(task, context) => result`；接入其他 agent runtime 不需要改试验定义。
 
 ## CLI
 

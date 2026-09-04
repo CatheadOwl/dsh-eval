@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { stageProfileStore } from '../src/runner.mjs'
+import { stageProfileStore } from '../src/sandbox.mjs'
 
 let realHome
 let tmpHome

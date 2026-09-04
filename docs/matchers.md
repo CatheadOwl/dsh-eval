@@ -6,7 +6,21 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 全部从包根导入：`import { toolCalled, … } from '@catheadowl/dsh-eval'`。
 
-断言对象是 dsh session 事件投影（`src/trace.mjs` 的 `EvalTrace`），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具与 system prompt（输入面），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
+断言对象是 dsh session 事件投影（`EvalTrace`），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具与 system prompt（输入面），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
+
+## EvalTrace 形状（谓词与 `result.trace` 共用）
+
+| 字段 | 形状 |
+|---|---|
+| `toolCalls` | `{ seq, turn, step, callId, name, arguments, parsedArguments }[]`（`arguments` 原文，`parsedArguments` 已 JSON 解析） |
+| `toolResults` | `{ seq, turn, step, callId, text, error?, isError? }[]`（与 `toolCalls` 按 `callId` 配对） |
+| `assistantTexts` | `string[]` 非空组装 assistant 文本，按日志序 |
+| `finalText` | 最后一个组装 assistant 文本（无则 `''`） |
+| `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
+| `requestHeaders` | `{ seq, reason, system, toolNames }[]`（组装后 system prompt + 挂载工具名） |
+| `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
+
+`runEvalCase` 返回的 `result.trace` 即此形状（无 session 日志时为 `undefined`；字段语义见 [runner-api.md](runner-api.md)）。
 
 ## 工具面
 

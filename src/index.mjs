@@ -1,7 +1,11 @@
 /**
- * @catheadowl/dsh-eval public surface — what plugin eval cases import:
- * matchers for the `expect` list and mock-script step builders. The runner
- * and trace parser are bin/runner internals, also exported for ad-hoc use.
+ * @catheadowl/dsh-eval stable SDK surface — what eval/review case authors
+ * import: assertion matchers, mock-script step builders, the review
+ * experiment DSL, and the programmatic case runner.
+ *
+ * Mechanism primitives (sandbox/overlay/trace, review executors, CLI chain)
+ * live behind the `./experimental` subpath with no compatibility promise;
+ * everything else is bin-internal.
  */
 
 export {
@@ -25,25 +29,6 @@ export {
 
 export { toolCallStep, textStep } from './mock/script.mjs'
 
-export { runEvalCase, buildOverlayYaml, looksLikeDshRepo, stageProfileStore, FRAMEWORK_ROOT } from './runner.mjs'
+export { runEvalCase } from './runner.mjs'
 
-export { parseSessionLog, buildTrace, loadTraceDir } from './trace.mjs'
-
-export {
-  defineReviewExperiment,
-  executeReviewExperiment,
-  materializeReviewExperiment,
-  renderObservationSections,
-  OBSERVATIONS_PLACEHOLDER,
-} from './experiment/review.mjs'
-
-export {
-  createDshHeadlessReviewExecutor,
-  resolveDshCli,
-  runDshReviewExperiment,
-} from './adapters/dsh/review.mjs'
-
-export {
-  validateToolBoundary,
-  renderToolBoundaryEvidence,
-} from './tool-validation.mjs'
+export { defineReviewExperiment } from './experiment/review.mjs'

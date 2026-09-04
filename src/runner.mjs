@@ -2,7 +2,8 @@
  * The eval run driver. One eval case = one `dsh --profile <p> --patch
  * <generated-overlay> "<task>"` headless run in an isolated `DSH_HOME`, so
  * the session JSONL trace lands alone under a per-run persistence root and
- * needs no teardown of shared state. The overlay is generated per run:
+ * needs no teardown of shared state. The overlay is generated per run
+ * (see overlay.mjs):
  *
  * - always: `session-persistence-jsonl` re-rooted to the run dir, plaintext
  *   one-event-per-line layout (config override is whole-replace, so every
@@ -22,162 +23,24 @@
  *   plus an insert mounting the scripted adapter plugin by `file://` URL
  *   (relative plugin names resolve against the PROFILE dir, not the overlay
  *   file, so an absolute URL is the portable reference).
+ *
+ * Isolation mechanics (home staging, junction-safe teardown, spawn/timeout)
+ * live in sandbox.mjs; overlay serialization lives in overlay.mjs. This
+ * module is the orchestration only.
  */
 
-import { spawn } from 'node:child_process'
-import {
-  chmodSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
-} from 'node:fs'
-import { tmpdir, homedir } from 'node:os'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, cpSync, readdirSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { loadTraceDir } from './trace.mjs'
-import { validateRowConfig } from './discovery.mjs'
+import { validateRowConfig, validateDisableRows } from './discovery.mjs'
+import { CLI_RELATIVE_PATH } from './cli.mjs'
+import { buildOverlayYaml } from './overlay.mjs'
+import { resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh } from './sandbox.mjs'
 
 /** This framework's root directory (the eval package dir). */
 const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
-
-/** The scripted mock adapter plugin, referenced from generated overlays. */
-const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
-
-/** The profile-local module-fallback directory, rebuilt fresh by boot and never staged. */
-const MODULE_FALLBACK_DIR = '.dsh-module-fallback'
-
-/**
- * Stage the profile store into a temporary DSH_HOME. The BOOTED profile's
- * directory is COPIED (sans its own `node_modules` and `.dsh-module-fallback`):
- * `prepareProfile` unconditionally rewrites the profile's root cordis.yml on
- * every boot, and copying keeps that write inside the temporary home instead
- * of leaking through a junction into the real store. Only the profile's own
- * `node_modules` stays junctioned — out-of-tree plugin resolution needs it,
- * and a task boot never writes it. The module-fallback directories (the
- * store-level shared `profiles/node_modules` and the profile-local
- * `.dsh-module-fallback`) are deliberately NOT staged: `healProfilesModuleFallback`
- * rebuilds both fresh in the temporary home on every boot, and `.dsh-module-fallback`
- * in particular is full of junctions that a naive recursive copy would follow
- * into the real store. The copy is junction-aware — links are recreated as
- * links, never descended (see `copyProfileEntry`). An absent profile copies
- * nothing: boot initializes shipped templates inside the temporary home.
- * @param {string} realHome - the real Harness home holding `profiles/`.
- * @param {string} tmpHome - the temporary home (created up to `profiles/`).
- * @param {string} profileName - the profile this run boots.
- * @returns {string[]} every created junction path (unlink before rmSync).
- */
-export function stageProfileStore(realHome, tmpHome, profileName) {
-  const junctions = []
-  const tmpProfiles = join(tmpHome, 'profiles')
-  mkdirSync(tmpProfiles, { recursive: true })
-  const realProfiles = join(realHome, 'profiles')
-  if (!existsSync(realProfiles)) return junctions
-  const realProfileDir = join(realProfiles, profileName)
-  if (!existsSync(join(realProfileDir, 'package.json'))) return junctions
-  const tmpProfileDir = join(tmpProfiles, profileName)
-  mkdirSync(tmpProfileDir, { recursive: true })
-  for (const entry of readdirSync(realProfileDir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === MODULE_FALLBACK_DIR) continue
-    copyProfileEntry(join(realProfileDir, entry.name), join(tmpProfileDir, entry.name), junctions)
-  }
-  const profileModules = join(realProfileDir, 'node_modules')
-  if (existsSync(profileModules)) {
-    const target = join(tmpProfileDir, 'node_modules')
-    symlinkSync(profileModules, target, 'junction')
-    junctions.push(target)
-  }
-  return junctions
-}
-
-/**
- * Copy one profile entry (file, directory, or link) into the staged profile.
- * A link is recreated as a link (`'junction'` on Windows) instead of being
- * followed: Node's `cpSync` dereferences Windows junctions in recursive mode
- * (no cycle guard), so a junction-bearing tree would recurse into the real
- * store and overflow the native stack. Recreated junctions are appended to
- * `junctions` so callers can unlink them before `rmSync` (which would
- * otherwise descend through them into the real store).
- */
-function copyProfileEntry(from, to, junctions) {
-  const stat = lstatSync(from)
-  if (stat.isSymbolicLink()) {
-    const target = readlinkSync(from)
-    symlinkSync(target, to, 'junction')
-    junctions.push(to)
-    return
-  }
-  if (stat.isDirectory()) {
-    mkdirSync(to, { recursive: true })
-    for (const child of readdirSync(from)) {
-      copyProfileEntry(join(from, child), join(to, child), junctions)
-    }
-    return
-  }
-  copyFileSync(from, to)
-}
-
-/** JSON double-quoted strings are valid YAML scalars — enough for this emitter. */
-function yamlScalar(value) {
-  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
-  return JSON.stringify(String(value))
-}
-
-/**
- * One rowConfig leaf: a scalar, or an array of scalars emitted as a YAML flow
- * sequence (a JSON array is valid YAML flow syntax, and keeps quoting rules
- * identical to `yamlScalar`).
- */
-function yamlConfigValue(value) {
-  if (Array.isArray(value)) return JSON.stringify(value.map(item => typeof item === 'string' ? item : String(item)))
-  return yamlScalar(value)
-}
-
-/**
- * Serialize the per-run overlay patch list to YAML.
- * @param {object} parts - overlay ingredients (see runEvalCase).
- * @returns {string} the overlay file text.
- */
-export function buildOverlayYaml(parts) {
-  const lines = []
-  lines.push('- id: session-persistence-jsonl')
-  lines.push('  config:')
-  lines.push(`    root: ${yamlScalar(parts.sessionsRoot)}`)
-  lines.push('    packChunks: false')
-  lines.push('    compression: none')
-  if (parts.persona !== undefined) {
-    lines.push('- id: system-prompt')
-    lines.push('  config:')
-    lines.push(`    persona: ${yamlScalar(parts.persona)}`)
-  }
-  for (const rowId of parts.disableRows ?? []) {
-    // Per-row disable uses the same cross-layer overlay mechanism as
-    // `session-title-llm`: an `- id: <row> / disabled: true` patch targets
-    // the row the plugin bundle itself inserts.
-    lines.push(`- id: ${yamlScalar(rowId)}`)
-    lines.push('  disabled: true')
-  }
-  for (const [rowId, config] of Object.entries(parts.rowConfig ?? {})) {
-    // Whole-replace semantics: these config keys REPLACE the row's config
-    // (cordis patch layer), so the emitter adds to a fresh `- id:` entry —
-    // restating keys is the declaring case's responsibility.
-    lines.push(`- id: ${yamlScalar(rowId)}`)
-    lines.push('  config:')
-    for (const [key, value] of Object.entries(config)) {
-      lines.push(`    ${key}: ${yamlConfigValue(value)}`)
-    }
-  }
-  if (parts.mock) {
-    lines.push('- id: agent-default-model')
-    lines.push('  config:')
-    lines.push('    provider: eval-mock')
-    lines.push('    model: eval-mock')
-    // The title generator also calls the default provider and would consume
-    // script steps; deterministic runs own every model call themselves.
-    lines.push('- id: session-title-llm')
-    lines.push('  disabled: true')
-    lines.push('- insert:')
-    lines.push('    - id: eval-mock-llm')
-    lines.push(`      name: ${yamlScalar(pathToFileURL(MOCK_ADAPTER_PATH).href)}`)
-  }
-  return `${lines.join('\n')}\n`
-}
 
 /**
  * Run one eval case end to end.
@@ -194,6 +57,8 @@ export function buildOverlayYaml(parts) {
  * @param {string} options.profile - the dsh profile booting the run (plugin installed there).
  * @param {string} [options.dshRepoDir] - the deepseek-harness checkout (legacy CLI
  *   location; ignored when cliPath is given).
+ * @deprecated options.dshRepoDir — pass the C6 chain result via cliPath
+ *   instead; this legacy option is removed in the next minor release.
  * @param {string} [options.cliPath] - explicit compiled CLI entry (C6 chain result;
  *   takes precedence over dshRepoDir).
  * @param {'real' | 'mock'} [options.mode] - force a mode over the case's own.
@@ -204,7 +69,7 @@ export async function runEvalCase(evalCase, options) {
   const mode = options.mode ?? evalCase.mode ?? 'real'
   const binPath = options.cliPath !== undefined
     ? resolve(options.cliPath)
-    : join(resolve(options.dshRepoDir), 'apps', 'cli', 'lib', 'bin.js')
+    : join(resolve(options.dshRepoDir), ...CLI_RELATIVE_PATH.split(/[\\/]/))
   const timeoutMs = evalCase.timeoutMs ?? 180_000
 
   const runDir = mkdtempSync(join(tmpdir(), 'dsh-eval-'))
@@ -220,27 +85,13 @@ export async function runEvalCase(evalCase, options) {
     await evalCase.prepare?.(workspace)
 
     // Profiles resolve under $DSH_HOME/profiles, and eval overwrites DSH_HOME
-    // for session/settings isolation: stage the profile store (see
-    // stageProfileStore — the booted profile is copied, so boot's unconditional
+    // for session/settings isolation (staging + teardown mechanics in
+    // sandbox.mjs — the booted profile is copied so boot's unconditional
     // cordis.yml rewrite stays inside the temporary home; only the profile's
     // read-only node_modules stays linked, and the shared fallback is rebuilt
-    // by boot inside the temporary home). The managed credential
-    // document is copied in because `dsh-credentials-local` resolves it per
-    // request. Falls back to the default `~/.dsh` when the ambient environment
-    // sets no home of its own.
-    const realHome = (process.env.DSH_HOME ?? '').trim() !== '' ? process.env.DSH_HOME : join(homedir(), '.dsh')
-    mkdirSync(dshHome, { recursive: true })
-    stageProfileStore(realHome, dshHome, options.profile)
-    const realCredentials = join(realHome, '.credentials.yaml')
-    if (existsSync(realCredentials)) {
-      const credentialsCopy = join(dshHome, '.credentials.yaml')
-      copyFileSync(realCredentials, credentialsCopy)
-      try {
-        // Best-effort owner-only on POSIX (the harness's own e2e uses 0o600);
-        // a no-op beyond the read-only bit on Windows.
-        chmodSync(credentialsCopy, 0o600)
-      } catch { /* permission tightening is best-effort */ }
-    }
+    // by boot inside the temporary home).
+    const realHome = resolveRealDshHome()
+    stageSandboxHome(realHome, dshHome, options.profile)
 
     const env = {
       ...process.env,
@@ -256,15 +107,13 @@ export async function runEvalCase(evalCase, options) {
       env.DSH_EVAL_MOCK_SCRIPT = scriptPath
     }
 
-    const overlayPath = join(runDir, 'eval-overlay.yml')
-    if (evalCase.disableRows !== undefined
-      && (!Array.isArray(evalCase.disableRows)
-        || evalCase.disableRows.some(row => typeof row !== 'string' || row === ''))) {
-      throw new Error(`case '${evalCase.id}': disableRows must be a string[] of loader row ids`)
+    if (evalCase.disableRows !== undefined) {
+      validateDisableRows(evalCase.disableRows, `case '${evalCase.id}'`)
     }
     if (evalCase.rowConfig !== undefined) {
       validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)
     }
+    const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
       persona: evalCase.persona,
@@ -273,30 +122,13 @@ export async function runEvalCase(evalCase, options) {
       mock: mode === 'mock',
     }))
 
-    const cliArgs = [
-      binPath,
-      '--profile', options.profile,
-      '--patch', overlayPath,
-      evalCase.task,
-    ]
-    const child = spawn(process.execPath, cliArgs, { cwd: workspace, env })
-
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', chunk => { stdout += chunk })
-    child.stderr.on('data', chunk => { stderr += chunk })
-
-    let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      child.kill('SIGTERM')
-    }, timeoutMs)
-
-    const exitCode = await new Promise(resolveExit => {
-      child.on('error', error => { stderr += `\ndsh-eval: failed to spawn dsh CLI: ${error.message}\n`; resolveExit(127) })
-      child.on('exit', code => resolveExit(code ?? 1))
+    const { stdout, stderr, exitCode, timedOut } = await spawnHeadlessDsh({
+      cli: binPath,
+      cliArgs: ['--profile', options.profile, '--patch', overlayPath, evalCase.task],
+      cwd: workspace,
+      env,
+      timeoutMs,
     })
-    clearTimeout(timer)
 
     const trace = loadTraceDir(sessionsRoot)
     const sessionLogs = collectSessionLogTexts(sessionsRoot)
@@ -335,28 +167,7 @@ export async function runEvalCase(evalCase, options) {
       stdout, stderr, trace, sessionLogs, inspectError, runDir,
     }
   } finally {
-    if (process.env.DSH_EVAL_KEEP_TMP !== '1') {
-      // Drop every junction first so cleanup can never descend into the
-      // real profile store. Junctions may not exist when the error
-      // happened before stageProfileStore ran — readdirSync catches that.
-      try {
-        const profileJunctions = []
-        const walk = (dir) => {
-          let entries
-          try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
-          for (const entry of entries) {
-            const full = join(dir, entry.name)
-            if (entry.isSymbolicLink()) profileJunctions.push(full)
-            else if (entry.isDirectory()) walk(full)
-          }
-        }
-        walk(join(runDir, 'dsh-home'))
-        for (const junction of profileJunctions) {
-          try { unlinkSync(junction) } catch { /* junction absent — nothing to drop */ }
-        }
-      } catch { /* dsh-home not created yet */ }
-      rmSync(runDir, { recursive: true, force: true })
-    }
+    teardownSandbox(runDir, { keep: process.env.DSH_EVAL_KEEP_TMP === '1' })
   }
 }
 
@@ -401,5 +212,5 @@ export { FRAMEWORK_ROOT }
 /** Whether a candidate dsh repo dir looks like one (the CLI artifact exists). */
 export function looksLikeDshRepo(dir) {
   if (!isAbsolute(dir)) return false
-  return existsSync(join(dir, 'apps', 'cli', 'lib', 'bin.js'))
+  return existsSync(join(dir, ...CLI_RELATIVE_PATH.split(/[\\/]/)))
 }

@@ -13,4 +13,6 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 | [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
 | [intent-cases.md](intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report.md](report.md) | 机器可读报告（`--format json` / `--report`）结构 |
+| [runner-api.md](runner-api.md) | 程序化 runner API：`runEvalCase` options 契约、EvalRunResult 字段、跨档取 `cliPath` |
 | [known-issues.md](known-issues.md) | 已知问题与规避 |
+| [experimental.md](experimental.md) | `experimental` 子路径符号清单（逃生面，无兼容承诺） |

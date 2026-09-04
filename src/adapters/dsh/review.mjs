@@ -1,20 +1,14 @@
 /** dsh-headless execution adapter for model-independent review experiments. */
 
-import { spawn } from 'node:child_process'
-import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { executeReviewExperiment } from '../../experiment/review.mjs'
-import { stageProfileStore } from '../../runner.mjs'
+import { CLI_RELATIVE_PATH } from '../../cli.mjs'
+import { overlayDisableRows } from '../../overlay.mjs'
+import {
+  resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh,
+} from '../../sandbox.mjs'
 import { loadTraceDir } from '../../trace.mjs'
 import { validateToolBoundary, renderToolBoundaryEvidence } from '../../tool-validation.mjs'
 
@@ -47,13 +41,13 @@ const REVIEW_DISABLED_TOOL_ROWS = [
 
 /** Serialize the tool-less overlay: disable every host model-facing tool row. */
 function buildReviewOverlayYaml() {
-  return REVIEW_DISABLED_TOOL_ROWS.map((id) => `- id: ${id}\n  disabled: true\n`).join('\n')
+  return overlayDisableRows(REVIEW_DISABLED_TOOL_ROWS)
 }
 
 /** Resolve and validate the compiled dsh CLI entry point. */
 export function resolveDshCli(dshRepoDir) {
   const repoDir = resolve(dshRepoDir)
-  const cli = join(repoDir, 'apps', 'cli', 'lib', 'bin.js')
+  const cli = join(repoDir, ...CLI_RELATIVE_PATH.split(/[\\/]/))
   if (!existsSync(cli)) {
     throw new Error(`no compiled dsh CLI at '${cli}' (build deepseek-harness first)`)
   }
@@ -74,7 +68,8 @@ function executorCli(options) {
  *
  * The executor boots a sterile review profile (default: the host's
  * `headless` template, bundles = dsh-base + dsh-headless, no out-of-tree
- * plugins) in an isolated DSH_HOME, disables every host tool row via
+ * plugins) in an isolated DSH_HOME (staging/teardown mechanics shared with
+ * the behavior runner via sandbox.mjs), disables every host tool row via
  * overlay, and validates the tool boundary after the run.  `options.profile`
  * must name a profile whose installed plugin set is empty or review-safe.
  *
@@ -93,26 +88,19 @@ export function createDshHeadlessReviewExecutor(options) {
 
   return async function executeWithDsh(task) {
     // A fresh process alone is not enough: dsh also stores settings, titles,
-    // and sessions below DSH_HOME. Reuse the behavior harness's proven profile
-    // staging strategy so every reviewer receives an isolated runtime state
+    // and sessions below DSH_HOME. Reuse the behavior harness's sandbox
+    // (sandbox.mjs) so every reviewer receives an isolated runtime state
     // while retaining the selected profile's model config and plugin links.
     const runDir = mkdtempSync(join(tmpdir(), 'dsh-review-'))
     const dshHome = join(runDir, 'dsh-home')
     const overlayPath = join(runDir, 'review-overlay.yml')
     writeFileSync(overlayPath, buildReviewOverlayYaml(), 'utf8')
-    const realHome = options.dshHome
-      ?? ((process.env.DSH_HOME ?? '').trim() !== '' ? process.env.DSH_HOME : join(homedir(), '.dsh'))
-    mkdirSync(dshHome, { recursive: true })
-    const junctions = stageProfileStore(realHome, dshHome, profile)
-    const realCredentials = join(realHome, '.credentials.yaml')
-    if (existsSync(realCredentials)) {
-      const credentialsCopy = join(dshHome, '.credentials.yaml')
-      copyFileSync(realCredentials, credentialsCopy)
-      try { chmodSync(credentialsCopy, 0o600) } catch { /* best-effort */ }
-    }
+    stageSandboxHome(options.dshHome ?? resolveRealDshHome(), dshHome, profile)
 
     try {
-      const child = spawn(process.execPath, [cli, '--profile', profile, '--patch', overlayPath, task], {
+      const { stdout, stderr, exitCode, timedOut } = await spawnHeadlessDsh({
+        cli,
+        cliArgs: ['--profile', profile, '--patch', overlayPath, task],
         cwd: options.cwd ?? runDir,
         env: {
           ...process.env,
@@ -120,26 +108,8 @@ export function createDshHeadlessReviewExecutor(options) {
           DSH_HOME: dshHome,
           DSH_TELEMETRY_DISABLED: '1',
         },
+        timeoutMs,
       })
-      let stdout = ''
-      let stderr = ''
-      child.stdout.on('data', chunk => { stdout += chunk })
-      child.stderr.on('data', chunk => { stderr += chunk })
-
-      let timedOut = false
-      const timer = setTimeout(() => {
-        timedOut = true
-        child.kill('SIGTERM')
-      }, timeoutMs)
-      let exitCode
-      try {
-        exitCode = await new Promise((resolveExit, reject) => {
-          child.on('error', reject)
-          child.on('exit', code => resolveExit(code ?? 1))
-        })
-      } finally {
-        clearTimeout(timer)
-      }
 
       const result = { stdout, stderr, exitCode, timedOut, profile, cli, runDir }
       if (exitCode !== 0 || timedOut) {
@@ -175,12 +145,7 @@ export function createDshHeadlessReviewExecutor(options) {
 
       return result
     } finally {
-      if (process.env.DSH_REVIEW_KEEP_TMP !== '1') {
-        for (const junction of junctions) {
-          try { unlinkSync(junction) } catch { /* already absent */ }
-        }
-        rmSync(runDir, { recursive: true, force: true })
-      }
+      teardownSandbox(runDir, { keep: process.env.DSH_REVIEW_KEEP_TMP === '1' })
     }
   }
 }

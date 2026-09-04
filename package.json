@@ -5,6 +5,13 @@
   "license": "MIT",
   "type": "module",
   "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./experimental": "./src/experimental.mjs",
+    "./bin/dsh-eval": "./bin/dsh-eval.mjs",
+    "./bin/dsh-review": "./bin/dsh-review.mjs",
+    "./package.json": "./package.json"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"
   },
@@ -26,8 +33,9 @@
   "scripts": {
     "verify:publish": "node scripts/verify-publish-readiness.mjs",
     "verify:face": "node scripts/verify-manifest-face.mjs",
+    "verify:experimental": "node scripts/verify-experimental-face.mjs",
     "verify:readme-i18n": "node scripts/verify-readme-i18n.mjs",
-    "prepack": "node scripts/verify-manifest-face.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-readme-i18n.mjs",
-    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs && node scripts/verify-readme-i18n.mjs"
+    "prepack": "node scripts/verify-manifest-face.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-readme-i18n.mjs && node scripts/verify-experimental-face.mjs",
+    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs && node scripts/verify-readme-i18n.mjs && node scripts/verify-experimental-face.mjs"
   }
 }

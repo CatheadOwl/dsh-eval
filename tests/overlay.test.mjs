@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOverlayYaml } from '../src/runner.mjs'
+import { buildOverlayYaml } from '../src/overlay.mjs'
 import { toolCallStep, textStep } from '../src/mock/script.mjs'
 
 describe('buildOverlayYaml', () => {

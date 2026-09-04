@@ -1,16 +1,15 @@
 /**
- * Host CLI resolution chain (release-plan C6 / spec host-checkout-resolution).
+ * Host CLI resolution chain.
  *
  * Locating the compiled dsh CLI follows the same two-layer model as package
  * imports: committed files carry no real host-checkout path — the machine's
- * resolution layer (node_modules, junction-built by the relink anchor tool)
- * absorbs it. Precedence, first hit wins:
+ * resolution layer (node_modules) absorbs it. Precedence, first hit wins:
  *
  *   1. explicit `--repo <dir>` flag — the documented escape hatch;
  *   2. resolution layer — `node_modules/@deepseek-ai/dsh/lib/bin.js`
  *      (the CLI package's own bin target) reachable upward from startDir;
  *   3. config `repo` key (legacy) — kept working for existing checked-in
- *      `dsh-eval.config.mjs` files until the repo split retires them.
+ *      `dsh-eval.config.mjs` files.
  *
  * Every miss fails loud with a fingerprint and placeholder-only guidance —
  * no machine-specific example paths, no silent fallback to guessing.
@@ -29,10 +28,11 @@ const PACKAGED_CLI_PATH = join('node_modules', '@deepseek-ai', 'dsh', 'lib', 'bi
 export const NO_CLI_GUIDANCE = [
   'no dsh CLI found. In order:',
   "  1) pass --repo <host-checkout> explicitly;",
-  '  2) or make the resolution layer provide it: node_modules/@deepseek-ai/dsh/lib/bin.js',
-  '     (run the repo relink script to (re)build the junction tree from DSH_REPO,',
-  '     then build the host checkout if lib/ is missing);',
-  '  3) or set repo in dsh-eval.config.mjs (legacy, retired at repo split).',
+  '  2) or provide the CLI through the resolution layer:',
+  '     node_modules/@deepseek-ai/dsh/lib/bin.js — install the @deepseek-ai/dsh',
+  '     package (or link a built deepseek-harness checkout into node_modules',
+  '     and build it so lib/bin.js exists);',
+  '  3) or set repo in dsh-eval.config.mjs (legacy).',
 ].join('\n')
 
 /** Validate a repo-style candidate: return the CLI path or undefined. */
