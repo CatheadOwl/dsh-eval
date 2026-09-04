@@ -1,7 +1,7 @@
 {
   "name": "@catheadowl/dsh-eval",
   "description": "Agent eval framework over dsh headless runs: case runner, session-trace assertions, and a scripted mock-LLM layer for plugin intent tests.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "main": "src/index.mjs",
