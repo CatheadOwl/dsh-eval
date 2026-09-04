@@ -1,0 +1,6 @@
+# Bilingual README pairing record (adapted from deepseek-harness docs/i18n): the sha256 of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority; after
+# editing either side, bring the other along and re-record with:
+#   node scripts/verify-readme-i18n.mjs --write
+README.md: c449d153c92f41c850253f1363433e1fe907b5f0082224db479ac923421afdd9
+README.zh.md: 355a9a355111384c59550c0d02e3427ac095777c2cd56728ec8bf60d78295550

@@ -15,7 +15,7 @@ eval 的临时工作区通常**不是 git 仓库**——doc-link 类 gate 在其
 ## 契约
 
 - 默认**不声明** = 所选 profile 装载的插件照常运行（gate 交互 case——如断言 gate steer 的 `userMessageTextIncludes`——依赖此默认）。
-- 声明 `disableRows: ['gates']`（case 级或 config 级）= 本次 run 禁用 gates 插件行（行 id 权威：`@catheadowl/dsh-extras` 包的 `cordis.patch.yml` `- id: gates`——兄弟 dsh 插件包），终态违规不再触发 splice，`finalText` 保持「脚本终步文本」的确定性语义。禁用其他插件行同理，行 id 以该插件包的 patch 声明为准。
+- 声明 `disableRows: ['gates']`（case 级或 config 级）= 本次 run 禁用 gates 插件行（行 id 权威：`@catheadowl/dsh-extras` 包的 `cordis.patch.yml` `- id: gates`——其他 dsh 插件包），终态违规不再触发 splice，`finalText` 保持「脚本终步文本」的确定性语义。禁用其他插件行同理，行 id 以该插件包的 patch 声明为准。
 - gate 交互 case 在默认禁用的包里声明 `disableRows: []` 显式恢复装载。
 - 不依赖插件开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终文本）。终态干净时仍应优先 `finalText*`。
 - per-gate 白名单（如只关某个 gate）暂不支持：per-gate disable 需要 gate 框架侧先提供 config 面。

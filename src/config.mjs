@@ -1,5 +1,5 @@
 /**
- * Shared `dsh-eval.config.mjs` discovery and loading (EVAL-008).
+ * Shared `dsh-eval.config.mjs` discovery and loading.
  *
  * Both CLIs (`dsh-eval`, `dsh-review`) repeat `--profile/--repo` wiring in
  * every consumer's package scripts. A per-package config file removes that

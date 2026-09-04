@@ -15,7 +15,7 @@
  * the exit code is 1 when any run fails. Failures keep their artifacts under
  * `<case file dir>/.runs/<case id>/`.
  *
- * Output formats (EVAL-007):
+ * Output formats:
  * - `--format text` (default): unchanged human output on stdout/stderr.
  * - `--format json`: all progress and failure chatter moves to stderr;
  *   stdout receives exactly one JSON report object (see src/report.mjs).
@@ -147,7 +147,7 @@ const startedAt = new Date().toISOString()
 const { options, paths } = parseArgs(process.argv.slice(2))
 const jsonFormat = options.format === 'json'
 
-// Config merge (EVAL-008): a `dsh-eval.config.mjs` reachable from cwd
+// Config merge: a `dsh-eval.config.mjs` reachable from cwd
 // supplies defaults; explicit flags always win. Required-ness is only
 // decided after the merge, so config-only invocations work.
 const { config } = await loadEvalConfig(process.cwd())
@@ -214,7 +214,7 @@ for (const file of files.sort()) {
   if (hasDuplicate) continue
   for (const c of cases) seenIds.set(c.id, file)
   for (const rawCase of cases) {
-    // Row-disable precedence (EVAL-014): a case's own `disableRows` —
+    // Row-disable precedence: a case's own `disableRows` —
     // including an explicit `[]` ("disable nothing") — overrides the
     // config-level default; only an undeclared field inherits it.
     const evalCase = rawCase.disableRows === undefined && config.disableRows !== undefined
@@ -283,8 +283,8 @@ for (const file of files.sort()) {
       say(`PASS ${evalCase.id}`)
     } else {
       const artifactsDir = writeArtifacts(evalCase, result, mode)
-      // Self-explaining failure for broken mock determinism (EVAL-014
-      // alternative): when non-host plugin injections are visible in the
+      // Self-explaining failure for broken mock determinism: when non-host
+      // plugin injections are visible in the
       // trace, the failure names them and the two framework-native exits —
       // consumers stop rediscovering the mechanism from raw traces.
       let hint

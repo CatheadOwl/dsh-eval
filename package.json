@@ -20,12 +20,14 @@
     "src/",
     "docs/",
     "README.md",
+    "README.zh.md",
     "LICENSE"
   ],
   "scripts": {
     "verify:publish": "node scripts/verify-publish-readiness.mjs",
     "verify:face": "node scripts/verify-manifest-face.mjs",
-    "prepack": "node scripts/verify-manifest-face.mjs && node scripts/verify-publish-readiness.mjs",
-    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs"
+    "verify:readme-i18n": "node scripts/verify-readme-i18n.mjs",
+    "prepack": "node scripts/verify-manifest-face.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-readme-i18n.mjs",
+    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs && node scripts/verify-readme-i18n.mjs"
   }
 }

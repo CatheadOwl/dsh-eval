@@ -1,0 +1,30 @@
+# CI for @catheadowl/dsh-eval
+#
+# Runs the full suite (unit tests + the two release gates + bilingual README
+# pairing). The four review-adapter tests spawn the dsh CLI through the
+# resolution chain (`--repo` flag > node_modules resolution layer > legacy
+# config repo key, see docs/host-wiring.md); until a dsh CLI is wired into CI
+# they fail loud — wire the CLI (or pass --repo via config in CI) to green the
+# full suite. Everything else must stay green on every push.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --no-frozen-lockfile
+      # Deterministic subset: release gates + README pairing (no dsh CLI needed):
+      - run: pnpm verify:publish
+      - run: pnpm verify:face
+      - run: pnpm verify:readme-i18n
+      # Full suite (needs the dsh CLI wired — see header):
+      # - run: pnpm test

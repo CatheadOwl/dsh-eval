@@ -86,7 +86,7 @@ function writeMaterialized(experiment, materialized, extra = {}, reviewResult = 
 
 const { options, paths } = parseArgs(process.argv.slice(2))
 
-// Config merge (EVAL-008): flags win over a `dsh-eval.config.mjs` found
+// Config merge: flags win over a `dsh-eval.config.mjs` found
 // upward from cwd; profile falls back to the sterile default `headless`.
 const { config } = await loadEvalConfig(process.cwd())
 const profile = options.profile ?? config.profile ?? 'headless'

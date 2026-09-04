@@ -1,5 +1,5 @@
 /**
- * Machine-readable run reports for the behavior CLI (EVAL-007).
+ * Machine-readable run reports for the behavior CLI.
  *
  * One report covers ONE `dsh-eval run` invocation: the selection summary,
  * per-case outcomes, and the invocation's environment anchors (profile /

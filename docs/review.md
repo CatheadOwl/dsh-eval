@@ -1,5 +1,5 @@
 ---
-description: comprehension review 指南——defineReviewExperiment 实验定义、sterile profile 盲评运行、.runs 产物与 review-report 判读模板、六条固化规则
+description: comprehension review 指南——defineReviewExperiment 实验定义、sterile profile 盲评运行、.runs 产物与 review-report 判读模板、六条评审规则
 ---
 
 # Comprehension review
@@ -67,7 +67,7 @@ dsh-review \
 - `run.json`：experiment、rubric、adapter、profile 与 run 数；
 - `review-report.md`：判读报告骨架——机器字段自动填（experiment/adapter/ profile/runs、observations 指纹、rubric 位置、每轮 reviewer 原文），三个 **人工判读栏目**留白待填：intentional design 命中项、新 red flag、下一步（改输出 / 改 rubric / 改 behavior case / 不处理）。刻意不做自动评分——review 层的价值在人工判断，报告只把判断物化成可归档、可对比的工程证据（dry-run 也会生成，runs 记 0）。
 
-## 从早期 eval 固化下来的六条规则
+## 六条评审规则
 
 1. **冻结输入，实时投影输出。** fixture 保存 raw SDK result、合成知识库或调用参数；`observe()` 必须调用当前构建产物。不要提交一份会随实现漂移的 projected-output 快照。
 2. **盲 prompt 与隐藏 rubric 分离。** `prompt.md` 只能含问题和 `{{EVAL_OBSERVATIONS}}`；答案键、预期 next action、intentional design 只在 `rubric.md`。
