@@ -45,9 +45,18 @@
 //      Plain-text by-name provenance ("original design record, by name")
 //      stays the accepted citation form; fenced code blocks and inline code
 //      spans are exempt (fixture / identifier usage).
+//  11. host-borrow locality (opt-in via `hostBorrow` config: hostToken +
+//      anchorConsumers): a host-checkout-escaping path token in a checked-in
+//      code/config file must live in a declared anchor consumer, and tsconfig
+//      paths/typeRoots entries must never resolve outside the package root.
+//      The gate judges form only (exception confinement); whether a borrow
+//      deserves to exist (no npm exit, must pair with host source) stays
+//      review-side — declaring the anchor consumer is that judgment.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { hostBorrowLocality } from './lib/host-borrow-locality.mjs'
 
 const HOST_SCOPE = '@deepseek-ai/'
 const NON_REGISTRY_SPECIFIER = /^(link|file|workspace|portal|cat|patch|git\+|https?:\/\/|[A-Za-z]:\\|\/|\.\/|\.\.\/)/u
@@ -55,7 +64,7 @@ const NON_REGISTRY_SPECIFIER = /^(link|file|workspace|portal|cat|patch|git\+|htt
 // Per-package config: scripts/verify.config.mjs beside this entry (consumer-
 // owned, not part of the propagated face). Keys used here: ownName,
 // devDepNonRegistryScopes, layout ('modules'|'root'), srcDirs, docsRoots,
-// hostClosureCheck, rulesSeed.
+// hostClosureCheck, rulesSeed, hostBorrow ({ hostToken, anchorConsumers }).
 const CONFIG_PATH = new URL('./verify.config.mjs', import.meta.url)
 
 export async function loadConfig() {
@@ -509,6 +518,7 @@ export async function check(workspaceRoot, options = {}, cfg) {
     ...docsMetaLocality(root, cfg, options.extraMarkdown),
     ...metaLocality(root, cfg, options.extraSources),
     ...rulesSeedLocality(root, cfg),
+    ...hostBorrowLocality(root, cfg),
   ]
   return reasons.map(reason => ({
     reason,
