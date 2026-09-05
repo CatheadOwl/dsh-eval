@@ -483,14 +483,16 @@ function rulesSeedLocality(root, cfg) {
   return violations
 }
 
-export function check(root, options = {}, cfg = undefined) {
-  root = resolve(root)
+export async function check(workspaceRoot, options = {}, cfg) {
+  const root = resolve(workspaceRoot)
   if (cfg === undefined || cfg === null) {
-    // No weakened-default fallback: a caller that skips the config (e.g. a
-    // unit test importing check directly) would silently run weaker rules —
-    // a green test would then vouch for a gate that never ran. Load the
-    // config with loadConfig() and pass it in.
-    throw new Error('check() requires the package config (third argument) — await loadConfig() and pass its result; there is no default')
+    // Module-gate convention calls check(root, changes, options): the second
+    // argument is the session change set (its keys never collide with the
+    // option keys below) and the package config arrives as nothing. Loading
+    // the authoritative config here is not a weakened default — it is the
+    // same loadConfig() the CLI face uses; tests inject cfg only to control
+    // it, never to weaken it.
+    cfg = await loadConfig()
   }
   const manifest = options.manifestOverride ?? JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const declared = new Set([
@@ -521,7 +523,7 @@ export async function main() {
   const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
   const cfg = await loadConfig()
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-  const violations = check(root, {}, cfg)
+  const violations = await check(root, {}, cfg)
   if (cfg.hostClosureCheck === true && process.env.DSH_SKIP_HOST_CLOSURE !== '1') {
     try {
       violations.push(...await hostClosureViolations(manifest))
