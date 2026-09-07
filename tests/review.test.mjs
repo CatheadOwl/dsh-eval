@@ -120,6 +120,99 @@ test('defaults to the headless sterile profile when no profile is specified', as
   }
 })
 
+test('blank environment by default: staged plugin rows are disabled, wiring rows kept', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-blank-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    const profileDir = join(realHome, 'profiles', 'test-profile')
+    const bundleDir = join(profileDir, 'node_modules', '@catheadowl', 'dsh-extras')
+    mkdirSync(bundleDir, { recursive: true })
+    // Real composition shape: empty root list, plugins via profile patch
+    // rows and via out-of-tree bundles in package.json dsh.profile.bundles.
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-test-profile',
+      private: true,
+      dependencies: { '@catheadowl/dsh-extras': 'link:../../extras' },
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@catheadowl/dsh-extras'] } },
+    }, null, 2))
+    writeFileSync(join(profileDir, 'cordis.yml'), '[]\n')
+    writeFileSync(join(profileDir, 'cordis.patch.yml'), [
+      '- id: subagent-at',
+      '  config:',
+      '    profile: sdk',
+    ].join('\n'))
+    writeFileSync(join(bundleDir, 'cordis.patch.yml'), [
+      '- insert:',
+      '    - id: gates',
+      "      name: '@catheadowl/dsh-extras/gates'",
+      '    - id: markdown',
+      "      name: '@catheadowl/dsh-extras/markdown'",
+      // An out-of-tree patch may also override a base wiring row — the
+      // whitelist must keep it enabled (reviewer needs its model call).
+      '- id: agent-default-model',
+      '  config:',
+      '    provider: something-else',
+    ].join('\n'))
+    // Fake CLI prints the overlay it was handed (--patch is argv[4]).
+    const cli = join(root, 'fake-cli.mjs')
+    writeFileSync(cli, [
+      "import { readFileSync } from 'node:fs'",
+      "console.log(readFileSync(process.argv[5], 'utf8'))",
+      '',
+    ].join('\n'))
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      profile: 'test-profile',
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    const overlay = await execute('task')
+
+    assert.match(overlay.stdout, /- id: "subagent-at"\n  disabled: true/)
+    assert.match(overlay.stdout, /- id: "gates"\n  disabled: true/)
+    assert.match(overlay.stdout, /- id: "markdown"\n  disabled: true/)
+    assert.match(overlay.stdout, /- id: "tool-fs"\n  disabled: true/)
+    assert.doesNotMatch(overlay.stdout, /- id: "agent-default-model"\n  disabled: true/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('keepPluginRows opts back into the host plugin face', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-keepprofiles-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    const profileDir = join(realHome, 'profiles', 'test-profile')
+    const bundleDir = join(profileDir, 'node_modules', '@catheadowl', 'dsh-extras')
+    mkdirSync(bundleDir, { recursive: true })
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@catheadowl/dsh-extras'] } },
+    }))
+    writeFileSync(join(bundleDir, 'cordis.patch.yml'), "- insert:\n    - id: gates\n      name: '@catheadowl/dsh-extras/gates'\n")
+    const cli = join(root, 'fake-cli.mjs')
+    writeFileSync(cli, [
+      "import { readFileSync } from 'node:fs'",
+      "console.log(readFileSync(process.argv[5], 'utf8'))",
+      '',
+    ].join('\n'))
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      profile: 'test-profile',
+      dshHome: realHome,
+      timeoutMs: 10_000,
+      keepPluginRows: true,
+    })
+    const overlay = await execute('task')
+
+    assert.doesNotMatch(overlay.stdout, /- id: "gates"/)
+    assert.match(overlay.stdout, /- id: "tool-fs"\n  disabled: true/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('fails on tool boundary violation when session trace shows unexpected tools', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-review-boundary-test-'))
   try {

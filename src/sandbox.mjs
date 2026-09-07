@@ -17,7 +17,7 @@
 
 import { spawn } from 'node:child_process'
 import {
-  chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, rmSync, symlinkSync, unlinkSync,
+  chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, unlinkSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -102,6 +102,67 @@ function copyProfileEntry(from, to, junctions) {
     return
   }
   copyFileSync(from, to)
+}
+
+/**
+ * Enumerate every loader row id the STAGED profile composes BEYOND the host
+ * templates (`@deepseek-ai/*` bundles) — the data source for the review
+ * adapter's default blank environment (blank = dsh-base/dsh-headless only,
+ * no out-of-tree plugin face regardless of what the host profile carries).
+ *
+ * Composition-aware, per the host's ordered-layer model: the profile root
+ * `cordis.yml` ships as an EMPTY entry list — plugins enter either through
+ * the profile's own `cordis.patch.yml` rows or through out-of-tree bundles
+ * listed in `package.json`'s `dsh.profile.bundles`, each bundle contributing
+ * rows from its own `cordis.patch.yml`/`cordis.yml` under the profile's
+ * (junctioned) `node_modules`. All three sources live inside the staged home.
+ *
+ * A minimal token scan (`- id: <token>` at any indentation, which also
+ * covers rows nested under `- insert:`), not a YAML parse (same precedent as
+ * the file-history minimal session-log decoder). Entries without an `id` are
+ * invisible to id-targeted disables by construction and thus not collected.
+ * Unreadable sources contribute nothing — callers keep their static
+ * fallback rows.
+ * @param {string} tmpHome - the staged temporary home.
+ * @param {string} profileName - the staged profile name.
+ * @returns {string[]} deduplicated loader row ids beyond the host templates.
+ */
+export function stagedPluginRows(tmpHome, profileName) {
+  const profileDir = join(tmpHome, 'profiles', profileName)
+  const rows = []
+  const collectIds = (text) => {
+    for (const match of text.matchAll(/^[ \t]*-[ \t]+id:[ \t]*"?'?([^\s"']+)/gm)) {
+      if (!rows.includes(match[1])) rows.push(match[1])
+    }
+  }
+  const readText = (file) => {
+    try {
+      return readFileSync(file, 'utf8')
+    } catch {
+      return undefined
+    }
+  }
+  // Source 1+2: the profile's own composition files (root list is normally
+  // the shipped empty `[]`, but a non-empty one is scanned all the same).
+  for (const name of ['cordis.patch.yml', 'cordis.yml']) {
+    const text = readText(join(profileDir, name))
+    if (text !== undefined) collectIds(text)
+  }
+  // Source 3: every NON-host bundle in dsh.profile.bundles — host template
+  // bundles (`@deepseek-ai/*`) define the sterile baseline and stay.
+  let bundles
+  try {
+    bundles = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))?.dsh?.profile?.bundles
+  } catch { /* no package.json → no bundle rows to collect */ }
+  for (const bundle of Array.isArray(bundles) ? bundles : []) {
+    if (typeof bundle !== 'string' || bundle.startsWith('@deepseek-ai/')) continue
+    const bundleDir = join(profileDir, 'node_modules', ...bundle.split('/'))
+    for (const name of ['cordis.patch.yml', 'cordis.yml']) {
+      const text = readText(join(bundleDir, name))
+      if (text !== undefined) collectIds(text)
+    }
+  }
+  return rows
 }
 
 /**

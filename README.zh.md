@@ -111,7 +111,7 @@ export default {
 | 文档 | 主题 |
 |---|---|
 | [host-wiring](docs/host-wiring.md) | peer 接线（含 npm 古董 peer 坑）、构建 CLI、profile、凭证、spawn 要求 |
-| [review](docs/review.md) | comprehension review：实验定义、sterile profile、产物、六条评审规则 |
+| [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则 |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig](docs/rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换、重述所需键） |

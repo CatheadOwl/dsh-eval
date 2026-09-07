@@ -111,7 +111,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 | Doc | Topic |
 |---|---|
 | [host-wiring](docs/host-wiring.md) | peer wiring (incl. the npm antique-peer trap), building the CLI, profiles, credentials, spawn requirements |
-| [review](docs/review.md) | comprehension review: experiment definition, sterile profile, artifacts, the six review rules |
+| [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules |
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
 | [disablerows](docs/disablerows.md) | `disableRows` and the turn-close gate boundary contract |
 | [rowconfig](docs/rowconfig.md) | the `rowConfig` per-row config override contract (whole-segment replacement, restate needed keys) |

@@ -8,6 +8,19 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Changed
+
+- `dsh-review` reviewer sessions now boot a **blank environment by default**:
+  every out-of-tree plugin row the staged profile composes (out-of-tree
+  bundles in `dsh.profile.bundles` plus the profile's own patch rows) is
+  disabled via overlay, so host-profile gates/plugins can no longer steer or
+  crash a reviewer. Model/session wiring rows are always kept. Pass
+  `--keep-plugin-rows` (or executor option `keepPluginRows`) to opt back
+  into the host plugin face deliberately (e.g. reviewing a plugin's own
+  gates).
+
 ## [0.2.0] — 2026-09-06
 
 ### Changed

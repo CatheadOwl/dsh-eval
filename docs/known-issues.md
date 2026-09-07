@@ -1,5 +1,5 @@
 ---
-description: 已知问题——real case 在 staged home 的 REQUEST_EXTENSION 失败（嫌疑 plugin-package-inventory-deepseek）及 disableRows 兜底
+description: 已知问题——real case 在 staged home 的 REQUEST_EXTENSION 失败（嫌疑 plugin-package-inventory-deepseek）、DSH file sandbox 下 dsh-review spawn EPERM 及 disableRows 兜底
 ---
 
 # 已知问题
@@ -13,3 +13,11 @@ description: 已知问题——real case 在 staged home 的 REQUEST_EXTENSION �
 **框架侧兜底**：case 或 config 声明 `disableRows: ['plugin-package-inventory-deepseek']` 按行禁用该插件（机制见 [disablerows.md](disablerows.md)）。
 
 **追踪**：上游修复落地即删本条（不留僵尸条目）。
+
+## DSH file sandbox 下 `dsh-review` spawn headless 子进程 `EPERM`（未解）
+
+**症状**：在 DSH file sandbox（受限运行面）内运行 `dsh-review`，首次 spawn headless 子进程即报 `spawn EPERM`，escalated retry 后可运行。
+
+**定性**：沙箱运行面约束，非框架缺陷——沙箱拒绝 spawn 时换宿主侧终端或升级运行面即可（与本包维护规则「沙箱拒绝 spawn 时在宿主侧终端跑，不绕测试」同族）。登记供沙箱内调用方知晓。
+
+**追踪**：开发侧状态板按名登记为「2026-09-06 · dsh-review 沙箱 spawn EPERM 已知约束」（按名对齐）；运行面行为变化时同删。

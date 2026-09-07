@@ -19,8 +19,10 @@ import { renderReviewReport } from '../src/review-report.mjs'
 
 function usage(error) {
   const message = [
-    'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] <*.review.mjs or directories...>',
+    'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] [--keep-plugin-rows] <*.review.mjs or directories...>',
     '       --profile/--repo may come from a dsh-eval.config.mjs found upward from cwd; flags override it.',
+    '       blank environment by default: every out-of-tree plugin row in the staged profile is disabled;',
+    '       --keep-plugin-rows opts back into the host profile plugin face (e.g. reviewing a plugin\'s own gates).',
   ].join('\n')
   if (error) process.stderr.write(`${error}\n${message}\n`)
   else process.stdout.write(`${message}\n`)
@@ -28,7 +30,7 @@ function usage(error) {
 }
 
 function parseArgs(argv) {
-  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined }
+  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined, keepPluginRows: false }
   const paths = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -37,6 +39,7 @@ function parseArgs(argv) {
     if (arg === '--profile') { options.profile = argv[++index]; continue }
     if (arg === '--repo') { options.repo = argv[++index]; continue }
     if (arg === '--timeout') { options.timeoutMs = Number(argv[++index]); continue }
+    if (arg === '--keep-plugin-rows') { options.keepPluginRows = true; continue }
     if (arg === '-h' || arg === '--help') usage()
     paths.push(arg)
   }
@@ -127,6 +130,7 @@ for (const file of files) {
       dshRepoDir: cli.repoDir,
       runs: options.runs,
       timeoutMs: options.timeoutMs,
+      keepPluginRows: options.keepPluginRows,
     })
     const output = writeMaterialized(experiment, result, {
       adapter: 'dsh-headless',

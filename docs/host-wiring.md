@@ -60,7 +60,7 @@ node -e "console.log(require('fs').existsSync('node_modules/@deepseek-ai/dsh/lib
 
 - 被测插件须已装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`；
 - 每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run——不污染真实 profile store；
-- review 使用专用 sterile profile（详见 [review.md](review.md)）。
+- review 默认空白环境：任意 profile 均可，树外插件行由 overlay 枚举禁用（详见 [review.md](review.md)）。
 
 ## 凭证
 

@@ -1,5 +1,5 @@
 ---
-description: comprehension review 指南——defineReviewExperiment 实验定义、sterile profile 盲评运行、.runs 产物与 review-report 判读模板、六条评审规则
+description: comprehension review 指南——defineReviewExperiment 实验定义、空白环境（默认禁树外插件行）盲评运行、.runs 产物与 review-report 判读模板、六条评审规则
 ---
 
 # Comprehension review
@@ -43,19 +43,21 @@ export default defineReviewExperiment({
 dsh-review --dry-run <experiment file or directory>
 
 dsh-review \
-  --profile <sterile-profile> \
+  --profile <profile> \
   --repo <deepseek-harness checkout> \
-  [--runs 5] [--timeout 300000] \
+  [--runs 5] [--timeout 300000] [--keep-plugin-rows] \
   <experiment file or directory>
 ```
 
 `--profile`/`--repo` 可来自 `dsh-eval.config.mjs`（见 README），flags 覆盖 config。
 
-## sterile profile 与工具边界
+## 空白环境（默认）与工具边界
 
-真实运行使用**专用 sterile profile**（默认 `headless`，即宿主模板 `dsh-base` + `dsh-headless`，无树外插件）：适配器生成一份 `--patch` 覆盖层禁用所有宿主模型可见工具（`tool-fs`、`tool-fs-search`、shell、web、subagent 等），并把 cwd 指向空临时目录——reviewer 只能从物化的观测文本推理。运行后解析 session trace 的 `request/header` 事件做**工具边界校验**：发现任何非预期工具即视为 adapter failure（证据写入 `.runs/<id>/run-N.tool-boundary-evidence.json`）。
+真实运行的 reviewer 会话默认在**空白环境**启动：适配器先照常暂存所选 profile，再枚举它组合出的**全部树外插件行**（`package.json` 的 `dsh.profile.bundles` 中非 `@deepseek-ai/*` 的 bundle 各自 patch 文件里的行，加上 profile 自有 `cordis.patch.yml` 的行），在 `--patch` overlay 里逐行禁用——宿主 profile 装了什么 gates/插件都与 reviewer 无关，可复现性不再依赖「本机 profile 恰好干净」。白名单保留 reviewer 起不来就无测可言的接线行（`agent-default-model`、`session-title-llm`、`system-prompt`、`session-persistence-jsonl`）；宿主模板工具行（`tool-fs`、shell、web、subagent 等）由静态清单继续禁用，cwd 指向空临时目录——reviewer 只能从物化的观测文本推理。运行后解析 session trace 的 `request/header` 事件做**工具边界校验**：发现任何非预期工具即视为 adapter failure（证据写入 `.runs/<id>/run-N.tool-boundary-evidence.json`）。
 
-> **运维前提**：profile staging 在真实 home 已有同名 profile 时**原样复制**（含已安装插件与 patch 层）。若本机 `headless` profile 装过树外插件，暂存后的 profile **不是无菌的**——工具边界校验会当场 fail-loud（这是设计的正确行为）。保持无菌：删掉本机 `headless` profile 让 boot 重建出厂模板，或指定一个确认无插件的 profile。
+**刻意复用宿主插件面**（例如要评审某插件自己的 gate 行为）：加 `--keep-plugin-rows`——跳过树外行枚举，仅保留静态工具禁用，宿主 gates 恢复运行。
+
+> 注意：无 `id` 的组合条目对 id 定位的禁用天然不可见（宿主 loader 语义），本包的树外 bundle 生态均为带 id 行形态；发现无 id 树外行时以工具边界校验 fail-loud 兜底。白名单是**按行名**无条件保留——若某树外 bundle 刻意以白名单名（如 `system-prompt`）insert 自己的行，该行不会被禁（威胁模型是本机自己的 profile，非对抗面）；此类泄漏同样由工具边界校验兜底。
 
 ## 产物
 
