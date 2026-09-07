@@ -23,6 +23,8 @@ import {
   userMessageTextExcludes,
   subagentDispatched,
   subagentCompleted,
+  subagentDispatchCount,
+  subagentCompletedCount,
 } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
@@ -323,5 +325,45 @@ describe('subagentCompleted', () => {
     const outcome = subagentCompleted('never-dispatched').check(subagentTrace)
     assert.equal(outcome.ok, false)
     assert.match(outcome.message, /expected a dispatched subagent/)
+  })
+})
+
+describe('subagentDispatchCount', () => {
+  it('asserts the exact count of matching children', () => {
+    assert.equal(subagentDispatchCount(/^gates:fix:/, 2).check(subagentTrace).ok, true)
+    assert.equal(subagentDispatchCount('gates:fix:doc-link', 1).check(subagentTrace).ok, true)
+    assert.equal(subagentDispatchCount(/^gates:fix:/, 1).check(subagentTrace).ok, false)
+  })
+
+  it('reports the observed count and labels on failure', () => {
+    const outcome = subagentDispatchCount(/^gates:fix:/, 5).check(subagentTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /saw 2/)
+    assert.match(outcome.message, /gates:fix:doc-link/)
+  })
+
+  it('counts zero children on a trace without subagents', () => {
+    assert.equal(subagentDispatchCount(/^gates:/, 0).check(trace).ok, true)
+  })
+})
+
+describe('subagentCompletedCount', () => {
+  it('pins every matching child outcome, not just one', () => {
+    // subagentTrace has exactly ONE completed matching child (doc-link) —
+    // `some`-style would pass at 1, the count form must not.
+    assert.equal(subagentCompletedCount(/^gates:fix:doc-link$/, 1).check(subagentTrace).ok, true)
+    assert.equal(subagentCompletedCount(/^gates:fix:doc-link$/, 2).check(subagentTrace).ok, false)
+  })
+
+  it('fails when a dispatched child stayed silent even with a completed sibling', () => {
+    // Both children match the prefix; only doc-link completed.
+    const outcome = subagentCompletedCount(/^gates:fix:/, 2).check(subagentTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /saw 1 of 2 dispatched/)
+    assert.match(outcome.message, /gates:fix:coggit-misplaced:silent/)
+  })
+
+  it('passes at zero on a trace without subagents', () => {
+    assert.equal(subagentCompletedCount(/^gates:/, 0).check(trace).ok, true)
   })
 })

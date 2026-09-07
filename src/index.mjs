@@ -27,6 +27,8 @@ export {
   userMessageTextExcludes,
   subagentDispatched,
   subagentCompleted,
+  subagentDispatchCount,
+  subagentCompletedCount,
 } from './assertions.mjs'
 
 export { toolCallStep, textStep } from './mock/script.mjs'

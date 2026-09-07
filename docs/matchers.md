@@ -1,5 +1,5 @@
 ---
-description: trace matcher 与 mock helper 全集——工具面/文本面/输入面/派发面断言语义（toolCalled 到 subagentCompleted）与 toolCallStep/textStep 脚本构件
+description: trace matcher 与 mock helper 全集——工具面/文本面/输入面/派发面断言语义（toolCalled 到 subagentCompletedCount）与 toolCallStep/textStep 脚本构件
 ---
 
 # Trace matchers 与 mock helpers
@@ -50,6 +50,8 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 - `subagentDispatched(label)`：至少一个子 agent 以匹配的 label 派发。`label` 用字符串/RegExp 匹配子会话的 `subagent/descriptor` label（如 `gates:fix:<gate>`、前缀 `/^gates:fix:/`），或谓词取整个子记录（可按 `mode`/`provider`/`delegationDepth` 匹配）；
 - `subagentCompleted(label)`：匹配的子 agent 产出了答案——其自身日志含至少一条非空 assistant 文本（不区分中止/正常收束：日志层无 subagent 完成事件，产出过文本即算）。只派发未应答（子日志存在但无产出）不通过。
+- `subagentDispatchCount(label, expected)`：匹配 label 的派发**总数**恰为 `expected`——有界重派节律断言（「每轮恰一次、不更多」），配合跨轮驱动（[cross-turn.md](cross-turn.md)）。
+- `subagentCompletedCount(label, expected)`：匹配 label 且**跑完**（产出非空 assistant 文本）的子 agent 恰为 `expected` 个。`subagentCompleted` 任一跑完即过；本 matcher 钉死每个派发的结局——「已派发 ⇒ 可观测结局」的跨轮 case 里，任一被截断的子 agent 都判负。
 
 边界：子会话产物（独立 JSONL）经 `subagentChildren` 记录进入断言面（身份 + 子自身文本）；子会话内部的工具调用**不**并入主投影的 `toolCalls`/`toolResults`（那属于主会话行为面），需要时经 `sessions` 原始日志自行投影。
 

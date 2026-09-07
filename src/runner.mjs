@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadTraceDir } from './trace.mjs'
-import { validateRowConfig, validateDisableRows } from './discovery.mjs'
+import { validateRowConfig, validateDisableRows, validateFollowups } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
 import { resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh } from './sandbox.mjs'
@@ -48,9 +48,16 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
  * script?: { steps: ChunkStep[] }, persona?: string, disableRows?: string[],
  * rowConfig?: Record<string, Record<string, unknown>>,
+ * followups?: string[], settleTimeoutMs?: number,
  * prepare?: (workspace: string) => void | Promise<void>,
  * inspect?: (workspace: string, helpers: { trace }) => void | Promise<void>,
  * timeoutMs?: number }`
+ *
+ * `followups` opts into cross-turn driving: the overlay swaps the one-shot
+ * `headless-runner` row for the eval multi-turn driver, which — before each
+ * followup — waits for background subagent children to settle (bounded by
+ * `settleTimeoutMs`), keeping the process alive so fire-and-forget children
+ * (turn-close defer fixers) can run to completion between turns.
  *
  * @param {object} evalCase - the case under test.
  * @param {object} options
@@ -106,12 +113,24 @@ export async function runEvalCase(evalCase, options) {
       writeFileSync(scriptPath, JSON.stringify(evalCase.script))
       env.DSH_EVAL_MOCK_SCRIPT = scriptPath
     }
+    if (evalCase.followups !== undefined) {
+      const planPath = join(runDir, 'driver-plan.json')
+      writeFileSync(planPath, JSON.stringify({
+        task: evalCase.task,
+        followups: evalCase.followups,
+        ...(evalCase.settleTimeoutMs === undefined ? {} : { settleTimeoutMs: evalCase.settleTimeoutMs }),
+      }))
+      env.DSH_EVAL_DRIVER_PLAN = planPath
+    }
 
     if (evalCase.disableRows !== undefined) {
       validateDisableRows(evalCase.disableRows, `case '${evalCase.id}'`)
     }
     if (evalCase.rowConfig !== undefined) {
       validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)
+    }
+    if (evalCase.followups !== undefined) {
+      validateFollowups(evalCase.followups, `case '${evalCase.id}'`)
     }
     const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({
@@ -120,6 +139,7 @@ export async function runEvalCase(evalCase, options) {
       disableRows: evalCase.disableRows,
       rowConfig: evalCase.rowConfig,
       mock: mode === 'mock',
+      ...(evalCase.followups === undefined ? {} : { followups: evalCase.followups }),
     }))
 
     const { stdout, stderr, exitCode, timedOut } = await spawnHeadlessDsh({

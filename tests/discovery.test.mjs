@@ -112,6 +112,22 @@ describe('validateEvalCase', () => {
     }, file), /array of scalars/)
   })
 
+  it('accepts followups with optional settleTimeoutMs and rejects malformed values', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'followups-ok', task: 'test', expect: [validMatcher],
+      followups: ['rescan now'], settleTimeoutMs: 30_000,
+    }, file))
+    assert.throws(() => validateEvalCase({
+      id: 'followups-empty', task: 'test', expect: [validMatcher], followups: [],
+    }, file), /followups must be a non-empty string\[\]/)
+    assert.throws(() => validateEvalCase({
+      id: 'followups-bad-item', task: 'test', expect: [validMatcher], followups: [''],
+    }, file), /followups must be a non-empty string\[\]/)
+    assert.throws(() => validateEvalCase({
+      id: 'followups-bad-timeout', task: 'test', expect: [validMatcher], followups: ['go'], settleTimeoutMs: -1,
+    }, file), /settleTimeoutMs must be a positive finite number/)
+  })
+
   it('rejects a non-object', () => {
     assert.throws(() => validateEvalCase(null, file), /case must be an object/)
     assert.throws(() => validateEvalCase('string', file), /case must be an object/)

@@ -57,6 +57,20 @@ export function validateDisableRows(disableRows, label) {
 }
 
 /**
+ * Validate a `followups` declaration (case-level): an array of non-empty
+ * strings, one per additional driven turn. Throws with `label` context.
+ * @param {unknown} followups - the value to validate.
+ * @param {string} label - error-message context (e.g. `case '<id>'`).
+ */
+export function validateFollowups(followups, label) {
+  if (!Array.isArray(followups)
+    || followups.length === 0
+    || followups.some(text => typeof text !== 'string' || text === '')) {
+    throw new Error(`${label}: followups must be a non-empty string[] of followup turn texts (got '${JSON.stringify(followups)}')`)
+  }
+}
+
+/**
  * Validate one eval case's shape. Throws with a descriptive message on
  * the first violation found. Checks:
  *
@@ -72,6 +86,9 @@ export function validateDisableRows(disableRows, label) {
  *   leaf values are scalars or arrays of scalars (see `validateRowConfig`).
  *   The overlay REPLACES the row's whole config — restate any keys the row
  *   needs, not just the ones being changed.
+ * - `followups` (if present) is a non-empty array of followup turn texts
+ *   (cross-turn driving; see `validateFollowups`), with optional positive
+ *   finite `settleTimeoutMs`.
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
  * - mock mode requires a `script` with `steps` array.
  *
@@ -99,6 +116,13 @@ export function validateEvalCase(evalCase, file) {
   }
   if (evalCase.rowConfig !== undefined) {
     validateRowConfig(evalCase.rowConfig, `case '${evalCase.id}'`)
+  }
+  if (evalCase.followups !== undefined) {
+    validateFollowups(evalCase.followups, `${file}: case '${evalCase.id}'`)
+    if (evalCase.settleTimeoutMs !== undefined
+      && (typeof evalCase.settleTimeoutMs !== 'number' || !Number.isFinite(evalCase.settleTimeoutMs) || evalCase.settleTimeoutMs <= 0)) {
+      throw new Error(`${file}: case '${evalCase.id}': settleTimeoutMs must be a positive finite number (got '${JSON.stringify(evalCase.settleTimeoutMs)}')`)
+    }
   }
   if (!Array.isArray(evalCase.expect)) {
     throw new Error(`${file}: case '${evalCase.id}': expect must be a Matcher[]`)

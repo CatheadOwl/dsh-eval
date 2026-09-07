@@ -1,5 +1,5 @@
 ---
-description: dsh-eval 文档索引——安装与宿主接线、review、matcher 全集、disableRows/rowConfig 契约、intent case 规约、报告结构与已知问题的路由表
+description: dsh-eval 文档索引——安装与宿主接线、review、matcher 全集、disableRows/rowConfig/followups 契约、intent case 规约、报告结构与已知问题的路由表
 ---
 
 # dsh-eval · docs index
@@ -11,6 +11,7 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 | [matchers.md](matchers.md) | trace matcher 与 mock helper 全集 |
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
+| [cross-turn.md](cross-turn.md) | `followups` 跨轮异步驱动契约（driver 行换装、子 agent settle 等待、mock 单 cursor 编排、有界重派断言） |
 | [intent-cases.md](intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report.md](report.md) | 机器可读报告（`--format json` / `--report`）结构 |
 | [runner-api.md](runner-api.md) | 程序化 runner API：`runEvalCase` options 契约、EvalRunResult 字段、跨档取 `cliPath` |

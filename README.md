@@ -115,6 +115,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
 | [disablerows](docs/disablerows.md) | `disableRows` and the turn-close gate boundary contract |
 | [rowconfig](docs/rowconfig.md) | the `rowConfig` per-row config override contract (whole-segment replacement, restate needed keys) |
+| [cross-turn](docs/cross-turn.md) | the `followups` cross-turn async driving contract (driver-row swap, subagent settle wait, single-cursor mock orchestration, bounded-redispatch assertions) |
 | [intent-cases](docs/intent-cases.md) | real intent-case spec: when to write one, assertion face, guards, CI semantics |
 | [report](docs/report.md) | machine-readable report structure (`--format json` / `--report`) |
 | [known-issues](docs/known-issues.md) | known issues and workarounds (e.g. REQUEST_EXTENSION in staged homes) |

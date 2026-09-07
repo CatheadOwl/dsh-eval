@@ -450,3 +450,50 @@ export function userMessageTextExcludes(sourceMatcher, substring) {
     },
   }
 }
+
+/**
+ * Exactly `expected` subagent children matching the label matcher were
+ * dispatched. The bounded-redispatch assertion ("one dispatch per turn, no
+ * more") — pair with cross-turn driving (`followups`), where the count spans
+ * every driven turn.
+ */
+export function subagentDispatchCount(matcher, expected) {
+  return {
+    describe: `subagent dispatch count: ${describeMatcher(matcher)} × ${expected}`,
+    check(trace) {
+      const count = trace.subagentChildren.filter(child => childMatches(matcher, child)).length
+      return count === expected
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `expected ${expected} dispatched subagent(s) matching ${describeMatcher(matcher)}; `
+              + `saw ${count} (${childLabelList(trace)})`,
+          }
+    },
+  }
+}
+
+/**
+ * Exactly `expected` subagent children matching the label matcher COMPLETED
+ * (produced a non-empty assistant text). Unlike `subagentCompleted` (any one
+ * suffices), this pins every dispatched child's outcome — "dispatched ⇒
+ * observable outcome" for cross-turn cases where a truncated child must fail
+ * the case even when its siblings finished.
+ */
+export function subagentCompletedCount(matcher, expected) {
+  return {
+    describe: `subagent completed count: ${describeMatcher(matcher)} × ${expected}`,
+    check(trace) {
+      const children = trace.subagentChildren.filter(child => childMatches(matcher, child))
+      const completed = children.filter(child => child.finalText !== '')
+      return completed.length === expected
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `expected exactly ${expected} completed subagent(s) matching ${describeMatcher(matcher)}; `
+              + `saw ${completed.length} of ${children.length} dispatched `
+              + `(${children.map(child => `${child.label ?? '<unlabeled>'}:${child.finalText !== '' ? 'done' : 'silent'}`).join(', ')})`,
+          }
+    },
+  }
+}

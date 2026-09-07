@@ -50,6 +50,16 @@ describe('buildOverlayYaml', () => {
     assert.match(yaml, /flag: true/)
     assert.match(yaml, /name: "x y"/)
   })
+
+  it('swaps in the multi-turn driver only when followups is supplied', () => {
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', followups: ['rescan now'] })
+    assert.match(yaml, /- id: headless-runner\n  disabled: true/)
+    assert.match(yaml, /- id: eval-multi-turn-driver/)
+    assert.match(yaml, /name: "file:\/\/\/.+multi-turn-driver\.mjs"/)
+    const plain = buildOverlayYaml({ sessionsRoot: 's' })
+    assert.ok(!plain.includes('headless-runner'))
+    assert.ok(!plain.includes('eval-multi-turn-driver'))
+  })
 })
 
 describe('mock script builders', () => {

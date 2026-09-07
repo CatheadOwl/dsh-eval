@@ -19,6 +19,9 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
 /** The scripted mock adapter plugin, referenced from generated overlays. */
 const MOCK_ADAPTER_PATH = join(FRAMEWORK_ROOT, 'src', 'mock', 'mock-adapter.mjs')
 
+/** The multi-turn driver plugin, mounted when a case declares `followups`. */
+const MULTI_TURN_DRIVER_PATH = join(FRAMEWORK_ROOT, 'src', 'driver', 'multi-turn-driver.mjs')
+
 /** JSON double-quoted strings are valid YAML scalars — enough for this emitter. */
 function yamlScalar(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value)
@@ -91,6 +94,16 @@ export function buildOverlayYaml(parts) {
     lines.push('- insert:')
     lines.push('    - id: eval-mock-llm')
     lines.push(`      name: ${yamlScalar(pathToFileURL(MOCK_ADAPTER_PATH).href)}`)
+  }
+  if (parts.followups !== undefined) {
+    // Cross-turn driving replaces the one-shot headless runner: it exits at
+    // the FIRST idle and aborts every in-process background subagent at
+    // teardown, so fire-and-forget children need the driver's longer lifetime.
+    lines.push('- id: headless-runner')
+    lines.push('  disabled: true')
+    lines.push('- insert:')
+    lines.push('    - id: eval-multi-turn-driver')
+    lines.push(`      name: ${yamlScalar(pathToFileURL(MULTI_TURN_DRIVER_PATH).href)}`)
   }
   return `${lines.join('\n')}\n`
 }
