@@ -1,0 +1,5 @@
+{"type":"session","version":1,"id":"session-child-pending","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","parentSession":"session-parent","origin":"subagent","delegationDepth":1}
+{"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
+{"seq":1,"time":1755446400150,"type":"subagent/descriptor","data":{"version":3,"mode":"one-shot","provider":"subagent-in-process","label":"gates:fix:coggit-misplaced"}}
+{"seq":2,"time":1755446400200,"type":"tool/call","data":{"turn":1,"step":1,"callId":"pending-call","name":"read","arguments":"{\"file_path\":\"a.md\"}"}}
+{"seq":3,"time":1755446400300,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

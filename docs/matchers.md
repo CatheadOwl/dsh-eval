@@ -1,5 +1,5 @@
 ---
-description: trace matcher 与 mock helper 全集——工具面/文本面/输入面断言语义（toolCalled 到 userMessageTextIncludes）与 toolCallStep/textStep 脚本构件
+description: trace matcher 与 mock helper 全集——工具面/文本面/输入面/派发面断言语义（toolCalled 到 subagentCompleted）与 toolCallStep/textStep 脚本构件
 ---
 
 # Trace matchers 与 mock helpers
@@ -18,6 +18,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `finalText` | 最后一个组装 assistant 文本（无则 `''`） |
 | `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
 | `requestHeaders` | `{ seq, reason, system, toolNames }[]`（组装后 system prompt + 挂载工具名） |
+| `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
 | `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
 
 `runEvalCase` 返回的 `result.trace` 即此形状（无 session 日志时为 `undefined`；字段语义见 [runner-api.md](runner-api.md)）。
@@ -42,6 +43,15 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - `systemPromptIncludes(substring)`：组装后的 system prompt 含子串；
 - `toolMounted(name)`：工具出现在某个 request/header 的挂载列表；
 - `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `plugin` 名（如 steer 生产方），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（插件 steer 为 `{ kind: 'plugin', plugin: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
+
+## 派发面（子 agent）
+
+主 session 日志不含派发事件（宿主不向父 session 写），但子 agent 的独立 session 日志与主日志同 persistence root，随 run 一并被收集——派发面投影即来自这些子日志：
+
+- `subagentDispatched(label)`：至少一个子 agent 以匹配的 label 派发。`label` 用字符串/RegExp 匹配子会话的 `subagent/descriptor` label（如 `gates:fix:<gate>`、前缀 `/^gates:fix:/`），或谓词取整个子记录（可按 `mode`/`provider`/`delegationDepth` 匹配）；
+- `subagentCompleted(label)`：匹配的子 agent 产出了答案——其自身日志含至少一条非空 assistant 文本（不区分中止/正常收束：日志层无 subagent 完成事件，产出过文本即算）。只派发未应答（子日志存在但无产出）不通过。
+
+边界：子会话产物（独立 JSONL）经 `subagentChildren` 记录进入断言面（身份 + 子自身文本）；子会话内部的工具调用**不**并入主投影的 `toolCalls`/`toolResults`（那属于主会话行为面），需要时经 `sessions` 原始日志自行投影。
 
 ## Mock script helpers
 

@@ -21,6 +21,8 @@ import {
   toolMounted,
   userMessageTextIncludes,
   userMessageTextExcludes,
+  subagentDispatched,
+  subagentCompleted,
 } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
@@ -28,6 +30,11 @@ const trace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'sample-se
 const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
 const errorTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8'))])
 const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
+const subagentTrace = buildTrace([
+  parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8')),
+  parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8')),
+  parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child-pending.jsonl'), 'utf8')),
+])
 
 describe('toolCalled', () => {
   it('matches exact names and regexps', () => {
@@ -277,5 +284,44 @@ describe('userMessageTextExcludes', () => {
 
   it('passes vacuously when no message from the source exists', () => {
     assert.equal(userMessageTextExcludes('nonexistent', 'anything').check(steerTrace).ok, true)
+  })
+})
+
+describe('subagentDispatched', () => {
+  it('matches child labels by exact string, regexp, and predicate', () => {
+    assert.equal(subagentDispatched('gates:fix:doc-link').check(subagentTrace).ok, true)
+    assert.equal(subagentDispatched(/^gates:fix:/).check(subagentTrace).ok, true)
+    assert.equal(subagentDispatched(child => child.mode === 'one-shot' && child.delegationDepth === 1).check(subagentTrace).ok, true)
+    assert.equal(subagentDispatched('gates:fix:missing').check(subagentTrace).ok, false)
+  })
+
+  it('lists observed labels on failure', () => {
+    const outcome = subagentDispatched('other').check(subagentTrace)
+    assert.match(outcome.message, /gates:fix:doc-link, gates:fix:coggit-misplaced/)
+  })
+
+  it('fails with no children at all', () => {
+    const outcome = subagentDispatched(/^gates:/).check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no subagent children/)
+  })
+})
+
+describe('subagentCompleted', () => {
+  it('passes only for children that produced an answer text', () => {
+    assert.equal(subagentCompleted('gates:fix:doc-link').check(subagentTrace).ok, true)
+    assert.equal(subagentCompleted(/^gates:fix:doc/).check(subagentTrace).ok, true)
+  })
+
+  it('fails for a dispatched child that stayed silent', () => {
+    const outcome = subagentCompleted('gates:fix:coggit-misplaced').check(subagentTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /produced no assistant text/)
+  })
+
+  it('fails when no matching child was dispatched at all', () => {
+    const outcome = subagentCompleted('never-dispatched').check(subagentTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /expected a dispatched subagent/)
   })
 })

@@ -90,10 +90,55 @@ function parseArguments(raw) {
 }
 
 /**
+ * Project one subagent child log into an assertable record. The durable
+ * identity (`label` / `mode` / `provider`) comes from the FIRST
+ * `subagent/descriptor` event whose payload carries the descriptor version
+ * this projection supports (3) — mirroring `foldSubagentDescriptor` in
+ * `deepseek-harness/packages/subagent/subagent/src/descriptor.ts`, where the
+ * establishing provider appends exactly one authoritative descriptor and
+ * later events cannot rewrite it. Completion is the child's own last
+ * assistant text — a child that produced none may have been dispatched but
+ * never ran to an answer (turn/end reasons are not consulted).
+ */
+function projectChild(log) {
+  let label
+  let mode
+  let provider
+  for (const event of log.events) {
+    if (event.type !== 'subagent/descriptor') continue
+    const data = event.data
+    if (data === null || typeof data !== 'object') continue
+    if (label !== undefined || mode !== undefined || provider !== undefined) break
+    if (data.version !== 3) continue
+    if (typeof data.label === 'string') label = data.label
+    if (typeof data.mode === 'string') mode = data.mode
+    if (typeof data.provider === 'string') provider = data.provider
+  }
+  const assistantTexts = log.events
+    .filter(event => event.type === 'assistant/message')
+    .map(event => messageText(event.data.message))
+    .filter(text => text !== '')
+  return {
+    sessionId: log.header.id,
+    parentSession: log.header.parentSession,
+    delegationDepth: log.header.delegationDepth,
+    label,
+    mode,
+    provider,
+    assistantTexts,
+    finalText: assistantTexts.at(-1) ?? '',
+  }
+}
+
+/**
  * Build one assertable trace from parsed session logs. Child sessions surface
  * only through the parent's tool events, so the MAIN log (no `origin:
- * 'subagent'` header) owns the tool/final-text projections; all logs stay
- * available under `sessions`.
+ * 'subagent'` header) owns the tool/final-text projections; subagent children
+ * project separately under `subagentChildren`; all logs stay available under
+ * `sessions`. A log carrying `parentSession` without `origin: 'subagent'`
+ * (non-subagent fork/resume shape) counts as a child record here but remains
+ * a main candidate too — the host-side ownership check walks the agent chain,
+ * which the log alone cannot reproduce.
  * @param {{ header: object, events: object[] }[]} logs - parsed session logs.
  * @returns {EvalTrace}
  */
@@ -101,6 +146,9 @@ export function buildTrace(logs) {
   const mains = logs.filter(log => log.header.origin !== 'subagent')
   const main = [...mains].sort((a, b) => b.events.length - a.events.length)[0]
   const events = main?.events ?? []
+  const subagentChildren = logs
+    .filter(log => log.header.origin === 'subagent' || log.header.parentSession !== undefined)
+    .map(projectChild)
 
   const toolCalls = []
   const toolResults = []
@@ -183,6 +231,7 @@ export function buildTrace(logs) {
     answerText,
     userMessages,
     requestHeaders,
+    subagentChildren,
     finalText: assistantTexts.at(-1) ?? '',
   }
 }
@@ -234,5 +283,11 @@ export function loadTraceDir(sessionsRoot) {
  *     `source`.
  * @property {{ seq: number, reason: string, system: string, toolNames: string[] }[]} requestHeaders
  *   - projected `request/header` events (assembled system prompt + mounted tools).
+ * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, label: string | undefined, mode: string | undefined, provider: string | undefined, assistantTexts: string[], finalText: string }[]} subagentChildren
+ *   - one record per subagent child log (`origin: 'subagent'` header, or a
+ *     header carrying `parentSession`). Identity comes from the first
+ *     version-3 `subagent/descriptor` event; `finalText` is the child's own
+ *     last assistant text ('' when it produced none — dispatched but not
+ *     answered).
  * @property {string} finalText - the last assembled assistant text ('' when none).
  */

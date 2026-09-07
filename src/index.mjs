@@ -25,6 +25,8 @@ export {
   toolMounted,
   userMessageTextIncludes,
   userMessageTextExcludes,
+  subagentDispatched,
+  subagentCompleted,
 } from './assertions.mjs'
 
 export { toolCallStep, textStep } from './mock/script.mjs'

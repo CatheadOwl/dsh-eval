@@ -340,6 +340,69 @@ export function toolMounted(matcher) {
 }
 
 /**
+ * Whether a subagent child record satisfies a label matcher: string/RegExp
+ * against the child's durable `label` (`subagent/descriptor`), or a predicate
+ * over the full child record (mode/provider/delegationDepth-based matching).
+ * A child without a label never satisfies a string/RegExp matcher.
+ */
+function childMatches(matcher, child) {
+  if (typeof matcher === 'function') return matcher(child) === true
+  if (child.label === undefined) return false
+  return matcher instanceof RegExp ? matcher.test(child.label) : child.label === matcher
+}
+
+/** Render the label list of a trace's subagent children for diagnostics. */
+function childLabelList(trace) {
+  const labels = trace.subagentChildren.map(child => child.label ?? '<unlabeled>')
+  return labels.length === 0 ? '(no subagent children)' : `[${labels.join(', ')}]`
+}
+
+/** At least one subagent child was dispatched with a matching label. */
+export function subagentDispatched(matcher) {
+  return {
+    describe: `subagent dispatched: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const hit = trace.subagentChildren.some(child => childMatches(matcher, child))
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `expected a dispatched subagent matching ${describeMatcher(matcher)}; `
+              + `saw ${childLabelList(trace)}`,
+          }
+    },
+  }
+}
+
+/**
+ * A subagent child with a matching label ran to an answer: its own session
+ * log holds at least one non-empty assistant text. Dispatch alone (the child
+ * log exists but produced nothing) does not satisfy this matcher.
+ */
+export function subagentCompleted(matcher) {
+  return {
+    describe: `subagent completed: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const children = trace.subagentChildren.filter(child => childMatches(matcher, child))
+      if (children.length === 0) {
+        return {
+          ok: false,
+          message: `expected a dispatched subagent matching ${describeMatcher(matcher)}; `
+            + `saw ${childLabelList(trace)}`,
+        }
+      }
+      const hit = children.some(child => child.finalText !== '')
+      return hit
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `${describeMatcher(matcher)} was dispatched but produced no assistant text`,
+          }
+    },
+  }
+}
+
+/**
  * A user message from a source matching `sourceMatcher` contains `substring`.
  * Source matcher: string/RegExp against `source.plugin`, or a predicate over
  * the full `source`. This is how a case asserts plugin steer — a `user/message`

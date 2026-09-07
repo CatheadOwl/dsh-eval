@@ -118,6 +118,28 @@ describe('buildTrace', () => {
     assert.equal(merged.sessionId, 'session-parent')
     assert.deepEqual(merged.toolCalls.map(call => call.callId), ['call-a'])
   })
+
+  it('projects subagent children with descriptor identity and their own answer', () => {
+    const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
+    const child = parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8'))
+    const pending = parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child-pending.jsonl'), 'utf8'))
+    const merged = buildTrace([parent, child, pending])
+    assert.equal(merged.subagentChildren.length, 2)
+    const answered = merged.subagentChildren.find(c => c.sessionId === 'session-child')
+    assert.equal(answered.label, 'gates:fix:doc-link')
+    assert.equal(answered.mode, 'one-shot')
+    assert.equal(answered.provider, 'subagent-in-process')
+    assert.equal(answered.parentSession, 'session-parent')
+    assert.equal(answered.delegationDepth, 1)
+    assert.equal(answered.finalText, 'fixed the doc link')
+    const silent = merged.subagentChildren.find(c => c.sessionId === 'session-child-pending')
+    assert.equal(silent.label, 'gates:fix:coggit-misplaced')
+    assert.equal(silent.finalText, '')
+  })
+
+  it('projects an empty subagentChildren list without child logs', () => {
+    assert.deepEqual(trace.subagentChildren, [])
+  })
 })
 
 describe('loadTraceDir', () => {
