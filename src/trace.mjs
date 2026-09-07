@@ -104,7 +104,7 @@ export function buildTrace(logs) {
 
   const toolCalls = []
   const toolResults = []
-  const assistantTexts = []
+  const assistantEntries = []
   const userMessages = []
   const requestHeaders = []
   for (const event of events) {
@@ -142,7 +142,7 @@ export function buildTrace(logs) {
       })
     } else if (event.type === 'assistant/message') {
       const text = messageText(event.data.message)
-      if (text !== '') assistantTexts.push(text)
+      if (text !== '') assistantEntries.push({ seq: event.seq, text })
     } else if (event.type === 'user/message') {
       // The user-role model-visible surface: the task prompt (kind 'user'),
       // plugin steering, or injected context. `source` tells them apart —
@@ -159,12 +159,28 @@ export function buildTrace(logs) {
     }
   }
 
+  const assistantTexts = assistantEntries.map(entry => entry.text)
+  // The answer to the task, as opposed to the last message: once a
+  // plugin-sourced injection (kind 'plugin' — a turn-close gate splice, an
+  // infra complaint) enters the conversation, every assistant message after
+  // it responds to the injection, not to the task. The answer is therefore
+  // the last assistant text BEFORE the first plugin injection; without one
+  // it degenerates to finalText (the task was the reviewer's last business).
+  const firstInjectionSeq = userMessages.find(
+    message => message.source?.kind === 'plugin',
+  )?.seq
+  const answerEntries = firstInjectionSeq === undefined
+    ? assistantEntries
+    : assistantEntries.filter(entry => entry.seq < firstInjectionSeq)
+  const answerText = answerEntries.at(-1)?.text ?? ''
+
   return {
     sessions: logs,
     sessionId: main?.header.id,
     toolCalls,
     toolResults,
     assistantTexts,
+    answerText,
     userMessages,
     requestHeaders,
     finalText: assistantTexts.at(-1) ?? '',
@@ -207,6 +223,10 @@ export function loadTraceDir(sessionsRoot) {
  * @property {{ seq: number, turn: number, step: number, callId: string, name: string, arguments: string, parsedArguments: unknown }[]} toolCalls
  * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined, isError: boolean | undefined }[]} toolResults
  * @property {string[]} assistantTexts - non-empty assembled assistant messages, log order.
+ * @property {string} answerText - the last assistant text BEFORE the first
+ *   plugin-sourced user message (gate splice / injected complaint); equals
+ *   finalText when no plugin injection intervened ('' when none at all).
+ *   The "answer to the task", as opposed to the possibly-hijacked last message.
  * @property {{ seq: number, source: object, text: string }[]} userMessages
  *   - non-empty `user/message` events (task prompt, plugin steer, injected
  *     context) with their verbatim `source` (`kind` + plugin-specific fields),

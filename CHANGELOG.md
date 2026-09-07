@@ -21,6 +21,16 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   into the host plugin face deliberately (e.g. reviewing a plugin's own
   gates).
 
+### Fixed
+
+- Review artifacts now capture the reviewer's **answer**, not the last
+  message: `run-N.txt` and the report's per-run conclusions use the last
+  assistant text before any plugin-sourced injection (trace-derived), so a
+  tail interaction (e.g. a gate splice) no longer replaces the analysis
+  with an infra complaint. The raw final message is kept as
+  `run-N.stdout.txt` when it diverges, and each report run cites its
+  transcript (`run-N.stderr.txt`).
+
 ## [0.2.0] — 2026-09-06
 
 ### Changed

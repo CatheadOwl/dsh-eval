@@ -94,6 +94,19 @@ describe('buildTrace', () => {
     assert.ok(steerTrace.userMessages[1].text.includes('task-a.md'))
   })
 
+  it('derives answerText as the last assistant text before a plugin injection', () => {
+    // steer-session: assistant "done" → gates splice → assistant "fixed the
+    // link". finalText is the post-splice message; the ANSWER is "done".
+    const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
+    assert.equal(steerTrace.finalText, 'fixed the link')
+    assert.equal(steerTrace.answerText, 'done')
+  })
+
+  it('degenerates answerText to finalText without plugin injections', () => {
+    assert.equal(trace.answerText, trace.finalText)
+    assert.equal(trace.answerText, 'Done: cognition created.')
+  })
+
   it('projects an empty userMessages list when no user/message event exists', () => {
     assert.deepEqual(trace.userMessages, [])
   })

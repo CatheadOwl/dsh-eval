@@ -139,7 +139,15 @@ for (const file of files) {
     }, result)
     for (const attempt of result.attempts) {
       const payload = attempt.result ?? {}
-      if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.stdout, 'utf8')
+      // run-N.txt is the reviewer's ANSWER (trace-derived, splice-proof),
+      // falling back to stdout for executors/trace-less runs; the raw final
+      // message stays in run-N.stdout.txt when it differs from the answer,
+      // the full session transcript in run-N.stderr.txt.
+      if (payload.answer !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.answer, 'utf8')
+      else if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.stdout, 'utf8')
+      if (payload.stdout !== undefined && payload.answer !== undefined && payload.stdout !== payload.answer) {
+        writeFileSync(join(output, `run-${attempt.index}.stdout.txt`), payload.stdout, 'utf8')
+      }
       if (payload.stderr) writeFileSync(join(output, `run-${attempt.index}.stderr.txt`), payload.stderr, 'utf8')
       if (payload.toolBoundaryEvidence) writeFileSync(join(output, `run-${attempt.index}.tool-boundary-evidence.json`), payload.toolBoundaryEvidence, 'utf8')
       if (!attempt.ok) {

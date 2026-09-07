@@ -68,7 +68,14 @@ export function renderReviewReport(parts) {
       if (attempt.ok) {
         lines.push(`### run ${attempt.index} — ok`)
         lines.push('')
-        lines.push('```text', attempt.result.stdout.trimEnd(), '```')
+        // The answer, not the raw final message: adapters derive an
+        // answer that survives tail interactions (gate splices); stdout
+        // is the fallback for executors without trace-derived answers.
+        lines.push('```text', (attempt.result?.answer ?? attempt.result?.stdout ?? '').trimEnd(), '```')
+        // Traceability: the grader can always recover the full conversation
+        // from the persisted per-run artifacts.
+        lines.push('')
+        lines.push(`- transcript: \`run-${attempt.index}.stderr.txt\`${attempt.result?.answer !== undefined && attempt.result.answer !== attempt.result.stdout ? ' (answer differs from the final message — see `run-' + attempt.index + '.stdout.txt`)' : ''}`)
       } else {
         lines.push(`### run ${attempt.index} — FAIL`)
         lines.push('')

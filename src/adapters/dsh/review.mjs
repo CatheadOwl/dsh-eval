@@ -183,6 +183,17 @@ export function createDshHeadlessReviewExecutor(options) {
           boundaryError.result = result
           throw boundaryError
         }
+        // The ANSWER to the task, not the last message: stdout carries the
+        // headless CLI's final assistant message — whatever the reviewer
+        // said LAST. If any tail interaction intervened (a turn-close gate
+        // splice that slipped past the blank environment, an infra
+        // complaint), stdout holds that instead of the analysis. The
+        // trace's answerText (last assistant text before the first
+        // plugin-sourced injection) IS the analysis; stdout remains the
+        // fallback for trace-less runs.
+        result.answer = trace.answerText !== '' ? trace.answerText : stdout
+      } else {
+        result.answer = stdout
       }
 
       return result

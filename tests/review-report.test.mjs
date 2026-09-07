@@ -46,6 +46,28 @@ describe('renderReviewReport', () => {
     assert.match(markdown, /- \[ \] change plugin output/)
   })
 
+  it('quotes the splice-proof answer and points at the transcript per run', () => {
+    const markdown = renderReviewReport({
+      experiment,
+      result: {
+        runs: 2,
+        observations: 'obs',
+        attempts: [
+          // Hijacked run: answer differs from the raw final message.
+          { index: 1, ok: true, result: { answer: 'the analysis', stdout: 'cannot fix the gate error' } },
+          // Clean run: answer === stdout, no divergence note.
+          { index: 2, ok: true, result: { answer: 'clean answer', stdout: 'clean answer' } },
+        ],
+      },
+      adapter: 'dsh-headless',
+    })
+    assert.match(markdown, /### run 1 — ok[\s\S]*?```text\nthe analysis\n```/)
+    assert.ok(!/### run 1[\s\S]*?cannot fix the gate error/.test(markdown.split('### run 2')[0]))
+    assert.match(markdown, /- transcript: `run-1\.stderr\.txt` \(answer differs from the final message — see `run-1\.stdout\.txt`\)/)
+    assert.match(markdown, /### run 2 — ok[\s\S]*?```text\nclean answer\n```/)
+    assert.match(markdown, /- transcript: `run-2\.stderr\.txt`\n/)
+  })
+
   it('renders a dry-run report that marks zero runs and names no adapter', () => {
     const markdown = renderReviewReport({ experiment, observations: 'obs text' })
     assert.match(markdown, /adapter: none \(dry run\)/)
