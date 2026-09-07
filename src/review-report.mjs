@@ -73,9 +73,15 @@ export function renderReviewReport(parts) {
         // is the fallback for executors without trace-derived answers.
         lines.push('```text', (attempt.result?.answer ?? attempt.result?.stdout ?? '').trimEnd(), '```')
         // Traceability: the grader can always recover the full conversation
-        // from the persisted per-run artifacts.
+        // from the persisted per-run artifacts. The divergence note matches
+        // the bin's write predicate exactly (both fields defined and
+        // differing) — a stdout-less executor writes no run-N.stdout.txt,
+        // so it must not be cited either.
+        const diverged = attempt.result?.answer !== undefined
+          && attempt.result?.stdout !== undefined
+          && attempt.result.answer !== attempt.result.stdout
         lines.push('')
-        lines.push(`- transcript: \`run-${attempt.index}.stderr.txt\`${attempt.result?.answer !== undefined && attempt.result.answer !== attempt.result.stdout ? ' (answer differs from the final message — see `run-' + attempt.index + '.stdout.txt`)' : ''}`)
+        lines.push(`- transcript: \`run-${attempt.index}.stderr.txt\`${diverged ? ` (answer differs from the final message — see \`run-${attempt.index}.stdout.txt\`)` : ''}`)
       } else {
         lines.push(`### run ${attempt.index} — FAIL`)
         lines.push('')
