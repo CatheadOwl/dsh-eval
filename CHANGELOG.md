@@ -8,28 +8,28 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-## [Unreleased]
+## [0.2.1] — 2026-09-09
+
+### Added
+
+- Subagent dispatch observability: `subagentChildren` projection plus
+  `subagentDispatched` / `subagentCompleted` matchers.
+- Multi-turn followups: cross-turn asynchronous driving for review
+  experiments, with dispatch/completion count assertions.
 
 ### Changed
 
-- `dsh-review` reviewer sessions now boot a **blank environment by default**:
-  every out-of-tree plugin row the staged profile composes (out-of-tree
-  bundles in `dsh.profile.bundles` plus the profile's own patch rows) is
-  disabled via overlay, so host-profile gates/plugins can no longer steer or
-  crash a reviewer. Model/session wiring rows are always kept. Pass
-  `--keep-plugin-rows` (or executor option `keepPluginRows`) to opt back
-  into the host plugin face deliberately (e.g. reviewing a plugin's own
-  gates).
+- `dsh-review` boots a **blank environment by default**: staged out-of-tree
+  plugin rows are disabled via overlay, so host-profile gates/plugins can no
+  longer steer or crash a reviewer. Pass `--keep-plugin-rows` (or executor
+  option `keepPluginRows`) to opt back in deliberately.
 
 ### Fixed
 
-- Review artifacts now capture the reviewer's **answer**, not the last
-  message: `run-N.txt` and the report's per-run conclusions use the last
-  assistant text before any plugin-sourced injection (trace-derived), so a
-  tail interaction (e.g. a gate splice) no longer replaces the analysis
-  with an infra complaint. The raw final message is kept as
-  `run-N.stdout.txt` when it diverges, and each report run cites its
-  transcript (`run-N.stderr.txt`).
+- Review artifacts capture the reviewer's **answer**, not the last message:
+  conclusions use the last assistant text before any plugin-sourced injection
+  (trace-derived); the raw final message is kept as `run-N.stdout.txt` when it
+  diverges, and each report run cites its transcript.
 
 ## [0.2.0] — 2026-09-06
 
@@ -52,5 +52,6 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `@deepseek-ai/dsh-llm` is a peerDependency provided by the host
   ecosystem.
 
+[0.2.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.1
 [0.2.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.0
 [0.1.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.1.0

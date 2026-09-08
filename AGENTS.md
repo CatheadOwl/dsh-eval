@@ -33,7 +33,7 @@ rules SSOT seed 在 [.agent/rules/homepage-quality.md](.agent/rules/homepage-qua
 
 - README 主页结构性改动后，按 [.agents/homepage-review.md](.agents/homepage-review.md) 派遣一轮主页评审（协议内含 dispatch 模板与机械验收）。
 - 发布走四步：peer 闭包预检 → `npm pack` 干跑验内容 → 干净安装冒烟（tarball 安装 + 按 `docs/host-wiring.md` 接线 + 跑一条 mock case）→ 发布后从 registry 重装复跑。发布物 = 验收物。
-- 版本 bump 时补 [CHANGELOG.md](CHANGELOG.md) 条目（version/日期/发布内容，消费者面措辞，Keep a Changelog 格式）；changelog 住包根、随 tarball 发布——放包外则独立 repo 与 npm 都看不到。
+- 版本 bump 时补 [CHANGELOG.md](CHANGELOG.md) 条目（version/日期/发布内容，消费者面措辞，Keep a Changelog 格式）；changelog 住包根、随 tarball 发布——放包外则独立 repo 与 npm 都看不到。条目精简：每个消费者可感知的功能性变更一条短句（what + breaking 迁移提示）；发布工作流/内部闸/docs-only 改动不进发布面，raw 记录与裁剪账留开发仓控制面（每版本一档，不随包发布）。
 - docs 以中文为主，README 保留英文定位句与「文档以中文为主」声明；新 docs 文件带 frontmatter description（md-metadata 门禁）。
 
 ## Editing these instructions
