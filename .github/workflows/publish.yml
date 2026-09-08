@@ -1,0 +1,69 @@
+name: Publish npm
+
+# Publishes @catheadowl/dsh-eval to the npm registry via npm trusted
+# publishing (OIDC): npm trusts CatheadOwl/dsh-eval + publish.yml, so no
+# long-lived token lives in repo secrets. Version bumps ride a `v*` tag that
+# must match package.json.
+#
+# No host checkout needed: the package ships plain .mjs sources and its
+# prepack chain (four verify gates) runs on Node stdlib only. The
+# @deepseek-ai/dsh-llm peer is runtime-provided by the dsh host ecosystem
+# and never resolved at pack time.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish (trusted publishing)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # OIDC trusted publishing (npm trusts CatheadOwl/dsh-eval + publish.yml)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # explicit pin: the action reads packageManager from the workspace
+          # root package.json, which doesn't exist here
+          version: 11.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      # Trusted publishing needs npm >= 11.5 for OIDC; node 22 ships older.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          pkg_version="v$(node -p "require('./package.json').version")"
+          tag_version="${GITHUB_REF##*/}"
+          if [ "$pkg_version" != "$tag_version" ]; then
+            echo "::error::tag $tag_version does not match package.json $pkg_version"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: "Publish (prepack chain: four verify gates)"
+        if: github.event_name == 'push'
+        run: npm publish --access public
+
+      # Preflight form (workflow_dispatch): same chain, ending in a pack
+      # dry-run instead of a publish — surfaces workflow bugs without publish
+      # side effects. Run once before tagging a release.
+      - name: "Preflight pack dry-run (prepack chain, no publish)"
+        if: github.event_name == 'workflow_dispatch'
+        run: npm pack --dry-run

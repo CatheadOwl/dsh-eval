@@ -3,6 +3,10 @@
   "description": "Agent eval framework over dsh headless runs: case runner, session-trace assertions, and a scripted mock-LLM layer for plugin intent tests.",
   "version": "0.2.1",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CatheadOwl/dsh-eval.git"
+  },
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "main": "src/index.mjs",
