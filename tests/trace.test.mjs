@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { parseSessionLog, buildTrace, loadTraceDir } from '../src/trace.mjs'
+import { parseSessionLog, buildTrace, isSessionLogFilename, loadTraceDir } from '../src/trace.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 
@@ -149,5 +150,41 @@ describe('loadTraceDir', () => {
 
   it('returns undefined when no session artifact exists', () => {
     assert.equal(loadTraceDir(FIXTURES), undefined)
+  })
+
+  // The host names each immutable format generation: v0 keeps `session.jsonl`,
+  // later generations add `vN` (`session.v3.jsonl`). Matching only the v0 name
+  // finds no trace at all after a format bump.
+  it('discovers a versioned generation artifact (session.vN.jsonl)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-trace-'))
+    try {
+      writeFileSync(join(dir, 'session.v3.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
+      assert.equal(loadTraceDir(dir)?.sessionId, 'session-fixture-1')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('ignores migration temporaries and non-generation names', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-trace-'))
+    try {
+      const text = readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8')
+      writeFileSync(join(dir, 'session.migration.abc123.jsonl.tmp'), text)
+      writeFileSync(join(dir, 'session.v3.jsonl.zstd'), text)
+      assert.equal(loadTraceDir(dir), undefined)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('isSessionLogFilename', () => {
+  it('accepts every committed generation name and rejects everything else', () => {
+    for (const name of ['session.jsonl', 'session.v3.jsonl', 'session.v12.jsonl']) {
+      assert.equal(isSessionLogFilename(name), true, name)
+    }
+    for (const name of ['session.v3.jsonl.zstd', 'session.migration.abc.jsonl.tmp', 'sample-session.jsonl', 'session.v3.jsonl.bak']) {
+      assert.equal(isSessionLogFilename(name), false, name)
+    }
   })
 })

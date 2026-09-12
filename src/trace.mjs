@@ -236,12 +236,30 @@ export function buildTrace(logs) {
   }
 }
 
-/** Recursively collect files named `name` under `dir`. */
-function collectFiles(dir, name, out = []) {
+/**
+ * Session artifact basenames: format v0 keeps `session.jsonl`, every later
+ * generation carries a `vN` component (`session.v3.jsonl` — the host's
+ * `generationLogFilename`). Matching the v0 name alone finds no trace at all
+ * once the host bumps the format, which surfaces as "no session trace
+ * materialized" rather than as a parse error.
+ */
+const SESSION_LOG_FILENAME = /^session(?:\.v\d+)?\.jsonl$/u
+
+/**
+ * Whether one file basename is a session JSONL artifact of any format generation.
+ * @param {string} name - the file basename to test.
+ * @returns {boolean} true for `session.jsonl` and `session.vN.jsonl`.
+ */
+export function isSessionLogFilename(name) {
+  return SESSION_LOG_FILENAME.test(name)
+}
+
+/** Recursively collect files whose basename satisfies `matches` under `dir`. */
+function collectFiles(dir, matches, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) collectFiles(path, name, out)
-    else if (entry.name === name) out.push(path)
+    if (entry.isDirectory()) collectFiles(path, matches, out)
+    else if (matches(entry.name)) out.push(path)
   }
   return out
 }
@@ -254,7 +272,7 @@ function collectFiles(dir, name, out = []) {
 export function loadTraceDir(sessionsRoot) {
   let files
   try {
-    files = collectFiles(sessionsRoot, 'session.jsonl')
+    files = collectFiles(sessionsRoot, isSessionLogFilename)
   } catch {
     return undefined
   }

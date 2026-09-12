@@ -8,6 +8,20 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Fixed
+
+- Session-trace discovery follows the host's **format-generation artifact
+  names**: `session.jsonl` for v0 and `session.vN.jsonl` for later
+  generations (`session.v3.jsonl` on the current host). Matching only the v0
+  name made every behavior case fail with "no session trace materialized"
+  after the host bumped the session format.
+- The multi-turn driver reads the durable log through
+  `Session#snapshotEvents()`; the `session.events` getter it used was removed
+  upstream, so any case declaring `followups` aborted the headless run with
+  `agent.session.events is not iterable`.
+
 ## [0.2.1] — 2026-09-09
 
 ### Added

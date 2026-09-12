@@ -33,7 +33,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync, cpSync, readdirSync,
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadTraceDir } from './trace.mjs'
+import { isSessionLogFilename, loadTraceDir } from './trace.mjs'
 import { validateRowConfig, validateDisableRows, validateFollowups } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
@@ -204,7 +204,7 @@ function collectSessionLogTexts(sessionsRoot) {
     for (const entry of entries) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) walk(path)
-      else if (entry.name === 'session.jsonl') texts.push(readFileSync(path, 'utf8'))
+      else if (isSessionLogFilename(entry.name)) texts.push(readFileSync(path, 'utf8'))
     }
   }
   walk(sessionsRoot)

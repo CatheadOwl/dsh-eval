@@ -60,7 +60,10 @@ function isSubagentSession(session) {
 function summarize(agent) {
   let text = ''
   let reason
-  for (const event of agent.session.events) {
+  // `snapshotEvents()` replaced the removed `session.events` getter upstream
+  // (5660f44d29); reading the dead property throws "agent.session.events is not
+  // iterable" and kills the whole headless run.
+  for (const event of agent.session.snapshotEvents()) {
     if (event.type === 'assistant/message') {
       const joined = event.data.message.content
         .filter(block => block.type === 'text')
