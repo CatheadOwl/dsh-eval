@@ -55,6 +55,8 @@ dsh-review \
 
 真实运行的 reviewer 会话默认在**空白环境**启动：适配器先照常暂存所选 profile，再枚举它组合出的**全部树外插件行**（`package.json` 的 `dsh.profile.bundles` 中非 `@deepseek-ai/*` 的 bundle 各自 patch 文件里的行，加上 profile 自有 `cordis.patch.yml` 的行），在 `--patch` overlay 里逐行禁用——宿主 profile 装了什么 gates/插件都与 reviewer 无关，可复现性不再依赖「本机 profile 恰好干净」。白名单保留 reviewer 起不来就无测可言的接线行（`agent-default-model`、`session-title-llm`、`system-prompt`、`session-persistence-jsonl`）；宿主模板工具行（`tool-fs`、shell、web、subagent 等）由静态清单继续禁用，cwd 指向空临时目录——reviewer 只能从物化的观测文本推理。运行后解析 session trace 的 `request/header` 事件做**工具边界校验**：发现任何非预期工具即视为 adapter failure（证据写入 `.runs/<id>/run-N.tool-boundary-evidence.json`）。
 
+**校验没跑成也要记账**：收不到 session artifact（宿主 artifact 命名或会话格式换代是最常见的成因）时 `validateToolBoundary` 返回 `status: 'not-executed'` 而**不是**通过，适配器把该状态与 seam 诊断挂上执行结果；报告头写明 `tool boundary: NOT EXECUTED on run(s) N`，对应轮次的 `run-N.txt` 顶部与报告条目也各写一行原因，`run.json` 的 `toolBoundaries` 给机器读。这是有意的取向：**「没验证」必须看起来像没验证**——静默 fail-open 会让一份「工具边界从未检查过」的 review 产物读起来完全正常。
+
 **刻意复用宿主插件面**（例如要评审某插件自己的 gate 行为）：加 `--keep-plugin-rows`——跳过树外行枚举，仅保留静态工具禁用，宿主 gates 恢复运行。
 
 > 注意：无 `id` 的组合条目对 id 定位的禁用天然不可见（宿主 loader 语义），本包的树外 bundle 生态均为带 id 行形态；发现无 id 树外行时以工具边界校验 fail-loud 兜底。白名单是**按行名**无条件保留——若某树外 bundle 刻意以白名单名（如 `system-prompt`）insert 自己的行，该行不会被禁（威胁模型是本机自己的 profile，非对抗面）；此类泄漏同样由工具边界校验兜底。
@@ -65,9 +67,9 @@ dsh-review \
 
 - `observations.md`：本次实时物化的可见证据；
 - `task.txt`：实际发给每位 reviewer 的完整任务；
-- `run-N.txt`：该轮 reviewer 的**答案**——trace 推导（首条插件注入消息之前的最后一条 assistant 文本，抗回合尾部劫持），无 trace 时回落到 stdout 的最终消息；劫持发生时原始最终消息另存 `run-N.stdout.txt`；
+- `run-N.txt`：该轮 reviewer 的**答案**——trace 推导（首条插件注入消息之前的最后一条 assistant 文本，抗回合尾部劫持），无 trace 时回落到 stdout 的最终消息；劫持发生时原始最终消息另存 `run-N.stdout.txt`；工具边界校验未执行时，本条文件顶部先写一行 `[tool-boundary: NOT EXECUTED — <原因>]`（答案本身退回 stdout 的最终消息）；
 - `run-N.stderr.txt` / error：完整会话转录（判读回溯的 transcript 指针，报告每轮引用）/ 失败原因；
-- `run.json`：experiment、rubric、adapter、profile 与 run 数；
+- `run.json`：experiment、rubric、adapter、profile、run 数与每轮 `toolBoundaries` 记账（`checked` / `not-executed` + 原因）；
 - `review-report.md`：判读报告骨架——机器字段自动填（experiment/adapter/ profile/runs、observations 指纹、rubric 位置、每轮 reviewer **答案**与 transcript 指针），三个 **人工判读栏目**留白待填：intentional design 命中项、新 red flag、下一步（改输出 / 改 rubric / 改 behavior case / 不处理）。刻意不做自动评分——review 层的价值在人工判断，报告只把判断物化成可归档、可对比的工程证据（dry-run 也会生成，runs 记 0）。
 
 ## 六条评审规则

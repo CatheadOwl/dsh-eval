@@ -10,6 +10,22 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+### Added
+
+- Session-seam boundary assertions: `collectSessionTrace` reports which
+  candidate artifact files were actually present when no session trace
+  materializes (behavior failures name the host artifact naming instead of a
+  bare "no session trace materialized"), and `parseSessionLog` refuses a
+  `header.version` outside `KNOWN_SESSION_FORMAT_VERSIONS` with the version
+  number instead of projecting empty fields. `EvalRunResult.traceGap` carries
+  the diagnosis to the CLI failure text.
+
+### Removed
+
+- `loadTraceDir` (experimental): replaced by `collectSessionTrace`, which
+  returns the trace together with the reason none was built. Migrate
+  `loadTraceDir(root)` to `collectSessionTrace(root).trace`.
+
 ### Fixed
 
 - Session-trace discovery follows the host's **format-generation artifact
@@ -21,6 +37,12 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `Session#snapshotEvents()`; the `session.events` getter it used was removed
   upstream, so any case declaring `followups` aborted the headless run with
   `agent.session.events is not iterable`.
+- Review runs no longer fail open when no session artifact materializes:
+  `validateToolBoundary` reports `status: 'not-executed'` (not a pass), the
+  executor result carries the gap, the report states
+  `tool boundary: NOT EXECUTED on run(s) N`, and both `run-N.txt` and
+  `run.json` record it — a review whose tool face was never verified no longer
+  reads as a normal one.
 
 ## [0.2.1] — 2026-09-09
 

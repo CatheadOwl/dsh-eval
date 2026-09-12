@@ -226,8 +226,8 @@ test('fails on tool boundary violation when session trace shows unexpected tools
       "const home = process.env.DSH_HOME",
       "const dir = join(home, 'sessions')",
       "mkdirSync(dir, { recursive: true })",
-      "writeFileSync(join(dir, 'session.jsonl'),",
-      "  '{\"type\":\"session\",\"id\":\"s1\"}\\n'",
+      "writeFileSync(join(dir, 'session.v3.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
       "  + '{\"seq\":0,\"type\":\"request/header\",\"data\":{\"reason\":\"initial\",\"header\":{\"system\":\"s\",\"tools\":[{\"name\":\"coggit_status\"}]}}}\\n')",
       '',
     ].join('\n'))
@@ -271,8 +271,8 @@ test('captures the trace-derived answer when a tail interaction hijacks the fina
       "console.log('cannot fix the gate error')",
       "const dir = join(process.env.DSH_HOME, 'sessions')",
       "mkdirSync(dir, { recursive: true })",
-      "writeFileSync(join(dir, 'session.jsonl'),",
-      "  '{\"type\":\"session\",\"id\":\"s1\"}\\n'",
+      "writeFileSync(join(dir, 'session.v3.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
       "  + '{\"seq\":1,\"type\":\"user/message\",\"data\":{\"content\":[{\"type\":\"text\",\"text\":\"analyze\"}],\"source\":{\"kind\":\"user\"}}}\\n'",
       "  + '{\"seq\":2,\"type\":\"assistant/message\",\"data\":{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"the analysis\"}]}}}\\n'",
       "  + '{\"seq\":3,\"type\":\"user/message\",\"data\":{\"content\":[{\"type\":\"text\",\"text\":\"doc-link failed\"}],\"source\":{\"kind\":\"plugin\",\"plugin\":\"gates\"}}}\\n'",
@@ -294,13 +294,16 @@ test('captures the trace-derived answer when a tail interaction hijacks the fina
   }
 })
 
-test('skips tool boundary check when no session log materializes', async () => {
+test('accounts for a tool boundary check that could not run (no session log)', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-review-no-trace-test-'))
   try {
     const realHome = join(root, 'real-home')
     mkdirSync(realHome, { recursive: true })
     const cli = join(root, 'fake-cli.mjs')
-    // The fake CLI exits 0 without writing any session log.
+    // The fake CLI exits 0 without writing any session log — the shape a host
+    // artifact-naming change produces. The check cannot run, so the result
+    // must SAY that (status + seam diagnosis) instead of reporting a silent
+    // pass and an apparently normal answer (EVAL-021).
     writeFileSync(cli, 'console.log("ok")\n')
 
     const execute = createDshHeadlessReviewExecutor({
@@ -309,7 +312,44 @@ test('skips tool boundary check when no session log materializes', async () => {
       timeoutMs: 10_000,
     })
     const result = await execute('task')
-    assert.equal(result.toolValidation, undefined)
+    assert.equal(result.toolValidation.status, 'not-executed')
+    assert.equal(result.toolValidation.ok, false)
+    assert.match(result.traceGap, /no session trace materialized/)
+    assert.match(result.traceGap, /the host artifact naming may have changed generation/)
+    // The answer still falls back to stdout's final message — now declared.
+    assert.equal(result.answer.trim(), 'ok')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('records a checked tool boundary on the result when the trace exists', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-checked-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    mkdirSync(realHome, { recursive: true })
+    const cli = join(root, 'fake-cli.mjs')
+    writeFileSync(cli, [
+      "import { mkdirSync, writeFileSync } from 'node:fs'",
+      "import { join } from 'node:path'",
+      "console.log('the answer')",
+      "const dir = join(process.env.DSH_HOME, 'sessions')",
+      "mkdirSync(dir, { recursive: true })",
+      "writeFileSync(join(dir, 'session.v3.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
+      "  + '{\"seq\":0,\"type\":\"request/header\",\"data\":{\"reason\":\"initial\",\"header\":{\"system\":\"s\",\"tools\":[]}}}\\n')",
+      '',
+    ].join('\n'))
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    const result = await execute('task')
+    assert.equal(result.toolValidation.status, 'checked')
+    assert.equal(result.toolValidation.ok, true)
+    assert.equal(result.traceGap, undefined)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

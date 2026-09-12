@@ -85,4 +85,62 @@ describe('renderReviewReport', () => {
     assert.match(markdown, /inline string — see experiment definition/)
     assert.ok(!markdown.includes('line one'))
   })
+
+  // A review whose tool face was never verified is weaker evidence: the report
+  // header states the boundary status, and the affected run carries the reason
+  // next to the answer it qualifies (EVAL-021).
+  it('flags runs whose tool boundary check never ran, with the seam diagnosis', () => {
+    const gap = 'no session trace materialized: no session artifact (session.jsonl / session.vN.jsonl) '
+      + "under '/run/sessions' — the root holds no files (missing or empty); the host artifact naming may have changed generation"
+    const markdown = renderReviewReport({
+      experiment,
+      result: {
+        runs: 2,
+        observations: 'obs',
+        attempts: [
+          { index: 1, ok: true, result: { answer: 'a', stdout: 'a', toolValidation: { status: 'checked', ok: true } } },
+          {
+            index: 2,
+            ok: true,
+            result: { answer: 'b', stdout: 'b', toolValidation: { status: 'not-executed', ok: false }, traceGap: gap },
+          },
+        ],
+      },
+      adapter: 'dsh-headless',
+    })
+    assert.match(markdown, /- tool boundary: NOT EXECUTED on run\(s\) 2 — no session artifact/)
+    assert.match(markdown, /### run 2 — ok[\s\S]*?- \*\*tool-boundary check NOT EXECUTED\*\*: no session trace materialized/)
+    assert.ok(!/### run 1[\s\S]*?NOT EXECUTED/.test(markdown.split('### run 2')[0]))
+  })
+
+  it('reports a fully checked boundary, and names an executor that reports none', () => {
+    const checked = renderReviewReport({
+      experiment,
+      result: {
+        runs: 1,
+        observations: 'obs',
+        attempts: [{ index: 1, ok: true, result: { stdout: 'x', toolValidation: { status: 'checked', ok: true } } }],
+      },
+    })
+    assert.match(checked, /- tool boundary: checked on every run/)
+    const custom = renderReviewReport({
+      experiment,
+      result: { runs: 1, observations: 'obs', attempts: [{ index: 1, ok: true, result: { stdout: 'x' } }] },
+    })
+    assert.match(custom, /- tool boundary: not reported by this executor/)
+    // A run that failed before validation must not read as "the executor never
+    // validates" — the summary says how many runs actually reported a status.
+    const partial = renderReviewReport({
+      experiment,
+      result: {
+        runs: 2,
+        observations: 'obs',
+        attempts: [
+          { index: 1, ok: true, result: { stdout: 'x', toolValidation: { status: 'checked', ok: true } } },
+          { index: 2, ok: false, error: 'dsh reviewer exited with code 1' },
+        ],
+      },
+    })
+    assert.match(partial, /- tool boundary: checked on 1 of 2 run\(s\); the rest reported none/)
+  })
 })

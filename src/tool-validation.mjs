@@ -37,19 +37,27 @@ function collectMountedToolNames(trace) {
  * against the allowed set.  An empty allowed set (the review default)
  * means the reviewer must see no tools at all.
  *
- * @param {import('./trace.mjs').EvalTrace | undefined} trace - the parsed trace; `undefined` skips validation.
+ * The result is explicit about whether the check RAN: `status` is
+ * `'checked'` only when a trace was available, and `'not-executed'` when
+ * there was none. `ok` is true only for a checked boundary with no
+ * unexpected tool — a missing trace is NOT a pass, so callers must branch
+ * on `status` and account for the skip (see `createDshHeadlessReviewExecutor`
+ * and docs/review.md) instead of reading `ok` alone.
+ *
+ * @param {import('./trace.mjs').EvalTrace | undefined} trace - the parsed trace; `undefined` means the check could not run.
  * @param {{ allowedTools?: Set<string> }} [options]
- * @returns {{ ok: boolean, unexpected: string[], actual: string[], allowed: string[] }}
+ * @returns {{ status: 'checked' | 'not-executed', ok: boolean, unexpected: string[], actual: string[], allowed: string[] }}
  */
 export function validateToolBoundary(trace, options = {}) {
   const allowed = options.allowedTools ?? new Set()
   const allowedNames = [...allowed].sort()
   if (trace === undefined || trace === null) {
-    return { ok: true, unexpected: [], actual: [], allowed: allowedNames }
+    return { status: 'not-executed', ok: false, unexpected: [], actual: [], allowed: allowedNames }
   }
   const actual = collectMountedToolNames(trace)
   const unexpected = actual.filter(name => !allowed.has(name))
   return {
+    status: 'checked',
     ok: unexpected.length === 0,
     unexpected,
     actual,
@@ -61,7 +69,7 @@ export function validateToolBoundary(trace, options = {}) {
  * Render a diagnostic evidence document for a tool boundary failure.
  * Suitable for writing to `.runs/<id>/tool-boundary-evidence.json`.
  *
- * @param {{ ok: boolean, unexpected: string[], actual: string[], allowed: string[] }} validation
+ * @param {{ status: 'checked' | 'not-executed', ok: boolean, unexpected: string[], actual: string[], allowed: string[] }} validation
  * @param {{ runDir: string, profile: string }} context
  * @returns {string}
  */

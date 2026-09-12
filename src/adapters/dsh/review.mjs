@@ -9,7 +9,7 @@ import { overlayDisableRows } from '../../overlay.mjs'
 import {
   resolveRealDshHome, stageSandboxHome, stagedPluginRows, teardownSandbox, spawnHeadlessDsh,
 } from '../../sandbox.mjs'
-import { loadTraceDir } from '../../trace.mjs'
+import { collectSessionTrace } from '../../trace.mjs'
 import { validateToolBoundary, renderToolBoundaryEvidence } from '../../tool-validation.mjs'
 
 /**
@@ -162,39 +162,43 @@ export function createDshHeadlessReviewExecutor(options) {
 
       // Post-run tool boundary check: parse the session
       // trace, verify no unexpected tools were mounted in the reviewer's
-      // session, fail the run on violation.  An absent session log skips
-      // the check gracefully (accepted fail-open).
+      // session, fail the run on violation.  A missing session log does NOT
+      // skip the check silently: `validateToolBoundary` reports
+      // `status: 'not-executed'`, and the adapter carries that fact (plus the
+      // seam diagnosis) on the result so the report and run artifacts state
+      // that the boundary guarantee was not verified (EVAL-021).
       // Validation inspects the main session only (buildTrace selects
       // non-subagent logs); plugin tools leaking in a subagent session
       // would not be caught — irrelevant in review where the overlay
       // disables every subagent tool row.
-      const trace = loadTraceDir(join(dshHome, 'sessions'))
-      if (trace) {
-        const validation = validateToolBoundary(trace, { allowedTools })
-        result.toolValidation = validation
-        if (!validation.ok) {
-          // Attach evidence for the caller to persist (the adapter's
-          // runDir is ephemeral — removed by the finally block).  The
-          // bin writes this to `.runs/<id>/tool-boundary-evidence.json`.
-          result.toolBoundaryEvidence = renderToolBoundaryEvidence(validation, { runDir, profile })
-          const boundaryError = new Error(
-            `tool boundary violation: unexpected tools [${validation.unexpected.join(', ')}]`,
-          )
-          boundaryError.result = result
-          throw boundaryError
-        }
-        // The ANSWER to the task, not the last message: stdout carries the
-        // headless CLI's final assistant message — whatever the reviewer
-        // said LAST. If any tail interaction intervened (a turn-close gate
-        // splice that slipped past the blank environment, an infra
-        // complaint), stdout holds that instead of the analysis. The
-        // trace's answerText (last assistant text before the first
-        // plugin-sourced injection) IS the analysis; stdout remains the
-        // fallback for trace-less runs.
-        result.answer = trace.answerText !== '' ? trace.answerText : stdout
-      } else {
-        result.answer = stdout
+      const { trace, gap } = collectSessionTrace(join(dshHome, 'sessions'))
+      const validation = validateToolBoundary(trace, { allowedTools })
+      result.toolValidation = validation
+      if (validation.status === 'not-executed') {
+        // `traceGap` mirrors the behavior runner's field name for the same
+        // seam diagnosis; the bin writes both into run-N.txt and the report.
+        result.traceGap = gap
       }
+      if (validation.status === 'checked' && !validation.ok) {
+        // Attach evidence for the caller to persist (the adapter's
+        // runDir is ephemeral — removed by the finally block).  The
+        // bin writes this to `.runs/<id>/tool-boundary-evidence.json`.
+        result.toolBoundaryEvidence = renderToolBoundaryEvidence(validation, { runDir, profile })
+        const boundaryError = new Error(
+          `tool boundary violation: unexpected tools [${validation.unexpected.join(', ')}]`,
+        )
+        boundaryError.result = result
+        throw boundaryError
+      }
+      // The ANSWER to the task, not the last message: stdout carries the
+      // headless CLI's final assistant message — whatever the reviewer
+      // said LAST. If any tail interaction intervened (a turn-close gate
+      // splice that slipped past the blank environment, an infra
+      // complaint), stdout holds that instead of the analysis. The
+      // trace's answerText (last assistant text before the first
+      // plugin-sourced injection) IS the analysis; stdout remains the
+      // fallback for trace-less runs (recorded by `traceGap` above).
+      result.answer = trace !== undefined && trace.answerText !== '' ? trace.answerText : stdout
 
       return result
     } finally {

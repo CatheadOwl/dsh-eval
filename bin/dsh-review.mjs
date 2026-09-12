@@ -136,15 +136,29 @@ for (const file of files) {
       adapter: 'dsh-headless',
       profile,
       runs: result.runs,
+      // Machine-readable boundary accounting per run: `checked` (the request
+      // headers were inspected) vs `not-executed` (no session artifact, so the
+      // reviewer's tool face was never verified) — the report and run-N.txt
+      // carry the same fact in prose (EVAL-021).
+      toolBoundaries: result.attempts.map(attempt => ({
+        run: attempt.index,
+        status: attempt.result?.toolValidation?.status ?? 'not-reported',
+        ...(attempt.result?.traceGap === undefined ? {} : { reason: attempt.result.traceGap }),
+      })),
     }, result)
     for (const attempt of result.attempts) {
       const payload = attempt.result ?? {}
       // run-N.txt is the reviewer's ANSWER (trace-derived, splice-proof),
       // falling back to stdout for executors/trace-less runs; the raw final
       // message stays in run-N.stdout.txt when it differs from the answer,
-      // the full session transcript in run-N.stderr.txt.
-      if (payload.answer !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.answer, 'utf8')
-      else if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), payload.stdout, 'utf8')
+      // the full session transcript in run-N.stderr.txt. A run whose tool
+      // boundary was never verified says so at the TOP of this file: it is
+      // what a grader opens first, and its answer is the fallback one.
+      const boundaryNotice = payload.toolValidation?.status === 'not-executed'
+        ? `[tool-boundary: NOT EXECUTED — ${payload.traceGap ?? 'no session trace materialized'}]\n\n`
+        : ''
+      if (payload.answer !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), boundaryNotice + payload.answer, 'utf8')
+      else if (payload.stdout !== undefined) writeFileSync(join(output, `run-${attempt.index}.txt`), boundaryNotice + payload.stdout, 'utf8')
       if (payload.stdout !== undefined && payload.answer !== undefined && payload.stdout !== payload.answer) {
         writeFileSync(join(output, `run-${attempt.index}.stdout.txt`), payload.stdout, 'utf8')
       }

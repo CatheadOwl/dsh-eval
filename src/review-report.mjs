@@ -24,6 +24,29 @@ export function observationsFingerprint(observations) {
 }
 
 /**
+ * One-line statement of whether the tool boundary check RAN on the review
+ * runs. A run without a session artifact reports `status: 'not-executed'`;
+ * that must show up in the report header, because a review whose tool face was
+ * never verified is weaker evidence than one whose was (EVAL-021). Executors
+ * that do not validate at all (custom executors, dry runs) say so instead of
+ * implying a pass.
+ */
+function toolBoundarySummary(attempts) {
+  const skipped = attempts.filter(attempt => attempt.result?.toolValidation?.status === 'not-executed')
+  if (skipped.length > 0) {
+    return `NOT EXECUTED on run(s) ${skipped.map(attempt => attempt.index).join(', ')}`
+      + ' — no session artifact; the reviewer tool face was not verified (see the per-run notes)'
+  }
+  const checked = attempts.filter(attempt => attempt.result?.toolValidation?.status === 'checked')
+  if (attempts.length > 0 && checked.length === attempts.length) return 'checked on every run'
+  if (checked.length > 0) {
+    return `checked on ${checked.length} of ${attempts.length} run(s); the rest reported none`
+      + ' (failed before validation, or a non-verifying executor)'
+  }
+  return 'not reported by this executor'
+}
+
+/**
  * Render the review report markdown.
  *
  * @param {object} parts
@@ -54,6 +77,7 @@ export function renderReviewReport(parts) {
   lines.push(`- adapter: ${parts.adapter ?? 'none (dry run)'}`)
   if (parts.profile !== undefined) lines.push(`- profile: \`${parts.profile}\``)
   lines.push(`- runs: ${dry ? '0 (dry run — observations materialized only)' : result.runs}`)
+  if (!dry) lines.push(`- tool boundary: ${toolBoundarySummary(result.attempts)}`)
   lines.push(`- observations: \`observations.md\` (sha256:${observationsFingerprint(observations)})`)
   lines.push(`- rubric: ${rubric.includes('\n') ? '(inline string — see experiment definition)' : `\`${rubric}\``}`)
   lines.push('')
@@ -82,6 +106,13 @@ export function renderReviewReport(parts) {
           && attempt.result.answer !== attempt.result.stdout
         lines.push('')
         lines.push(`- transcript: \`run-${attempt.index}.stderr.txt\`${diverged ? ` (answer differs from the final message — see \`run-${attempt.index}.stdout.txt\`)` : ''}`)
+        if (attempt.result?.toolValidation?.status === 'not-executed') {
+          // The unverified-boundary fact rides the run it applies to, next to
+          // the answer it qualifies: this answer is stdout's final message
+          // (there was no trace to derive it from) and no request header was
+          // ever inspected for tool leakage.
+          lines.push(`- **tool-boundary check NOT EXECUTED**: ${attempt.result.traceGap ?? 'no session trace materialized'} — the answer above is stdout's final message, not a trace-derived answer.`)
+        }
       } else {
         lines.push(`### run ${attempt.index} — FAIL`)
         lines.push('')

@@ -70,3 +70,32 @@ describe('runEvalCase cleanup', () => {
     rmSync(repoDir, { recursive: true, force: true })
   })
 })
+
+// The runner owns the seam diagnosis the CLI prints: a run that produced no
+// session artifact must hand back WHY, so the failure text names the host
+// artifact naming instead of pointing at the parser (EVAL-020).
+describe('runEvalCase session seam diagnosis', () => {
+  it('carries the collection gap on the result when nothing materializes', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-eval-home-'))
+    const cliPath = join(home, 'fake-cli.mjs')
+    // A CLI that exits 0 without writing any session artifact — the shape a
+    // host artifact-naming change produces.
+    writeFileSync(cliPath, 'process.exit(0)\n')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const result = await runEvalCase(
+        { id: 'seam-gap-test', task: 'test', expect: [] },
+        { profile: 'test', cliPath },
+      )
+      assert.equal(result.trace, undefined)
+      assert.match(result.traceGap, /no session trace materialized/)
+      assert.match(result.traceGap, /the host artifact naming may have changed generation/)
+      assert.deepEqual(result.sessionLogs, [])
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+})

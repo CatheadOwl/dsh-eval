@@ -1,4 +1,4 @@
-{"type":"session","version":1,"id":"session-fixture-1","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","delegationDepth":0}
+{"type":"session","version":3,"id":"session-fixture-1","createdAt":1755446400000,"cwd":"C:\\tmp\\workspace","delegationDepth":0}
 {"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
 {"seq":1,"time":1755446400200,"type":"step/start","data":{"turn":1,"step":1}}
 {"seq":2,"time":1755446400300,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-1","name":"coggit_status","arguments":"{}"}}

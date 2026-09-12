@@ -1,5 +1,5 @@
 ---
-description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置，以及本包对宿主 session seam 的三处硬断言（artifact 代际命名 / 拼接帧容器 / snapshotEvents 读取面）。
+description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置，以及本包对宿主 session seam 的四处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面）。
 ---
 
 # 安装与宿主接线
@@ -56,19 +56,20 @@ node -e "console.log(require('fs').existsSync('node_modules/@deepseek-ai/dsh/lib
 
 `false` = 解析层缺 CLI：先把上述 junction 重建为指向宿主检出；仍 `false` 则宿主检出未构建（先构建宿主）。这类 junction 维护是机器相关的开发环境事务，不入库，由各开发环境自行承接（同上文 peer 接线的 gitignore 纪律）。behavior 与 review 的真实运行都从定位到的 CLI spawn dsh 本体。
 
-## 宿主 session seam：本包硬断言的三处，坏了多是静默降级
+## 宿主 session seam：本包硬断言的四处，坏了多是具名失败
 
-behavior 与 review 的证据都取自**真实 dsh 会话的产物与进程内日志**，因此本包直接断言宿主的几处 session seam。它们随宿主演进时不会有编译期提示，而且多数坏成**静默降级**（case 报「no session trace materialized」、进程报 `agent.session.events is not iterable`），所以宿主检出更新后、动本包引用它们的文档前，先按本节对源码重新验证：
+behavior 与 review 的证据都取自**真实 dsh 会话的产物与进程内日志**，因此本包直接断言宿主的几处 session seam。它们随宿主演进时不会有编译期提示，所以每一处都配一行**执法面**（表里的符号就是）；宿主检出更新后、动本包引用它们的文档前，先按本节对源码重新验证：
 
-| 断言 | 宿主依据 | 坏了长什么样 |
-|---|---|---|
-| 会话 artifact 按**格式代**命名：v0 是 `session.jsonl`，之后每代带小写数字（当前 `session.v3.jsonl`）；`compression: none` 时无 `.zstd` 后缀 | `session-persistence-jsonl/src/format.ts` 的 `generationLogFilename`，配 `core/session/src/types.ts` 的 `SESSION_FORMAT_VERSION` | 只按 v0 名收集 ⇒ 一条日志都收不到，case 报 `no session trace materialized (exit 0)`（不是解析错误，别往解析器找） |
-| 会话日志是**拼接帧容器**（宿主默认 zstd），须逐帧扫描 | `session-persistence-jsonl/src/zstd.ts` 的帧扫描 | 整文件一次解压 ⇒ `ZSTD_error_prefix_unknown`（第二帧魔数被当输入） |
-| 进程内读 durable 事件的 API 是 `Session#snapshotEvents()`（不可变冻结快照）；早期的 `session.events` getter 已被删除 | `core/session/src/index.ts` 的 `snapshotEvents` | 属性访问得到 `undefined` ⇒ 进程内消费者抛 `agent.session.events is not iterable`，整个 headless run 直接死 |
+| 断言 | 宿主依据 | 本包执法面 | 坏了长什么样 |
+|---|---|---|---|
+| 会话 artifact 按**格式代**命名：v0 是 `session.jsonl`，之后每代带小写数字（当前 `session.v3.jsonl`）；`compression: none` 时无 `.zstd` 后缀 | `session-persistence-jsonl/src/format.ts` 的 `generationLogFilename`，配 `core/session/src/types.ts` 的 `SESSION_FORMAT_VERSION` | `isSessionLogFilename`（命名判定）+ `collectSessionTrace`（收集）⇒ behavior 失败文案 / review 记账里的 `traceGap` | 只按 v0 名收集 ⇒ 一条日志都收不到；失败文案列出**实际扫到的候选文件名**并写明「宿主 artifact 命名可能已换代」，不再只报 `no session trace materialized` |
+| 会话 header 的 `version` 戳是宿主对逻辑代际的声明（当前 v3） | 同上；已发布的代际链见 `session-format-catalog/src/generated.ts`（codecs v0–v3、`currentVersion: 3`） | `KNOWN_SESSION_FORMAT_VERSIONS`（`parseSessionLog` 入口准入） | 未知代际 ⇒ 解析当场拒绝并报出版本号（`session header version vN is not a known generation`），不再把各投影字段静默降级成空数组 |
+| 会话日志是**拼接帧容器**（宿主默认 zstd），须逐帧扫描 | `session-persistence-jsonl/src/zstd.ts` 的帧扫描 | eval overlay 固定 `compression: none` + `packChunks: false`（`src/overlay.mjs`） | 整文件一次解压 ⇒ `ZSTD_error_prefix_unknown`（第二帧魔数被当输入） |
+| 进程内读 durable 事件的 API 是 `Session#snapshotEvents()`（不可变冻结快照）；早期的 `session.events` getter 已被删除 | `core/session/src/index.ts` 的 `snapshotEvents` | driver 行（`src/driver/multi-turn-driver.mjs`）直接调用，没有回退路径 | 属性访问得到 `undefined` ⇒ 进程内消费者抛 `agent.session.events is not iterable`，整个 headless run 直接死 |
 
-前两行的实际读取面由本包的 eval overlay 固定：`compression: none` + `packChunks: false`，所以每轮 run 的 artifact 是**明文逐事件**布局，命名判定在 `src/trace.mjs`（`loadTraceDir` 与 `isSessionLogFilename`）；第三行是 driver 行（`src/driver/multi-turn-driver.mjs`）读日志时直接依赖的方法，没有回退路径。
+命名行与代际行的读取面由本包的 eval overlay 固定（`compression: none` + `packChunks: false`），所以每轮 run 的 artifact 是**明文逐事件**布局；命名判定、代际准入与收集入口都在 `src/trace.mjs`（`isSessionLogFilename` / `KNOWN_SESSION_FORMAT_VERSIONS` / `collectSessionTrace`），behavior runner 与 review adapter 共用同一个收集入口，缺 artifact 时各自把 `traceGap` 带进失败文案与产物记账。帧容器行走 overlay 固定；最后一行是 driver 行读日志时直接依赖的方法。
 
-> **维护触发器**：宿主 session 格式、持久化命名或 `Session` 读取面变更 ⇒ 先按上表对 vendored 检出重新验证断言，再更新本篇与引用它们的源码/认知——机械闸查不出这类漂移，只有真跑一条 case 才会暴露。
+> **维护触发器**：宿主 session 格式、持久化命名或 `Session` 读取面变更 ⇒ 先按上表对 vendored 检出重新验证断言，再更新本篇与引用它们的源码/认知。前两行现在是**机械的**——命名或代际戳变了，跑一条 case 就红在具名文案上（候选文件名 / 版本号）；后两行仍只有真跑一条 case 才会暴露。
 
 ## 环境面：profile 与插件安装
 

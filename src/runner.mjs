@@ -29,11 +29,11 @@
  * module is the orchestration only.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync, cpSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { isSessionLogFilename, loadTraceDir } from './trace.mjs'
+import { collectSessionTrace, listSessionLogFiles } from './trace.mjs'
 import { validateRowConfig, validateDisableRows, validateFollowups } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
@@ -150,7 +150,7 @@ export async function runEvalCase(evalCase, options) {
       timeoutMs,
     })
 
-    const trace = loadTraceDir(sessionsRoot)
+    const { trace, gap: traceGap } = collectSessionTrace(sessionsRoot)
     const sessionLogs = collectSessionLogTexts(sessionsRoot)
 
     // Workspace assertions live HERE, before the run dir cleanup: a case's
@@ -184,7 +184,7 @@ export async function runEvalCase(evalCase, options) {
 
     return {
       caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
-      stdout, stderr, trace, sessionLogs, inspectError, runDir,
+      stdout, stderr, trace, traceGap, sessionLogs, inspectError, runDir,
     }
   } finally {
     teardownSandbox(runDir, { keep: process.env.DSH_EVAL_KEEP_TMP === '1' })
@@ -193,22 +193,7 @@ export async function runEvalCase(evalCase, options) {
 
 /** Read every session artifact under the root as text (best-effort, pre-cleanup). */
 function collectSessionLogTexts(sessionsRoot) {
-  const texts = []
-  const walk = (dir) => {
-    let entries
-    try {
-      entries = readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      const path = join(dir, entry.name)
-      if (entry.isDirectory()) walk(path)
-      else if (isSessionLogFilename(entry.name)) texts.push(readFileSync(path, 'utf8'))
-    }
-  }
-  walk(sessionsRoot)
-  return texts
+  return listSessionLogFiles(sessionsRoot).map(path => readFileSync(path, 'utf8'))
 }
 
 /**
@@ -221,6 +206,9 @@ function collectSessionLogTexts(sessionsRoot) {
  * @property {string} stdout - printed final assistant text (plus any startup chatter).
  * @property {string} stderr
  * @property {import('./trace.mjs').EvalTrace | undefined} trace
+ * @property {string | undefined} traceGap - why no trace was built (the host
+ *   session seam diagnosis from `collectSessionTrace`); `undefined` whenever
+ *   `trace` is defined. The CLI prints it as the failure text.
  * @property {string[]} sessionLogs - raw session artifact texts, pre-cleanup.
  * @property {string | undefined} inspectError - the case's `inspect` failure text, when it threw.
  * @property {string} runDir - removed unless DSH_EVAL_KEEP_TMP=1.

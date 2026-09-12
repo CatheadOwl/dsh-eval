@@ -134,7 +134,8 @@ function writeArtifacts(evalCase, result, mode) {
     writeFileSync(join(artifactsDir, 'stderr.txt'), result.stderr)
     writeFileSync(join(artifactsDir, 'trace.json'), JSON.stringify({
       caseId: evalCase.id, mode, task: evalCase.task,
-      exitCode: result.exitCode, timedOut: result.timedOut, trace: result.trace,
+      exitCode: result.exitCode, timedOut: result.timedOut,
+      traceGap: result.traceGap, trace: result.trace,
     }, undefined, 2))
     result.sessionLogs.forEach((text, index) => {
       writeFileSync(join(artifactsDir, `session-${index}.jsonl`), text)
@@ -247,14 +248,19 @@ for (const file of files.sort()) {
 
     if (result.trace === undefined) {
       const artifactsDir = writeArtifacts(evalCase, result, mode)
+      // The runner's seam diagnosis (which candidate file names were actually
+      // collected, or which artifact was refused) IS the failure text: a bare
+      // "no session trace materialized" pointed readers at the parser while
+      // the real drift was the host's artifact naming (EVAL-019/EVAL-020).
+      const reason = `${result.traceGap ?? 'no session trace materialized'} (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})`
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'fail',
-        failures: [`no session trace materialized (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})`],
+        failures: [reason],
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, artifactsDir,
       }))
       process.stderr.write(
-        `FAIL ${evalCase.id}: no session trace materialized (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})\n`
+        `FAIL ${evalCase.id}: ${reason}\n`
         + `     artifacts: ${artifactsDir}\n--- stderr ---\n${result.stderr}\n`,
       )
       continue

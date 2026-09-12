@@ -16,7 +16,12 @@ export { stageProfileStore } from './sandbox.mjs'
 export { buildOverlayYaml, overlayDisableRows } from './overlay.mjs'
 
 // --- session-trace primitives ---
-export { parseSessionLog, buildTrace, loadTraceDir } from './trace.mjs'
+export {
+  parseSessionLog,
+  buildTrace,
+  collectSessionTrace,
+  KNOWN_SESSION_FORMAT_VERSIONS,
+} from './trace.mjs'
 
 // --- review experiment execution layer ---
 export {

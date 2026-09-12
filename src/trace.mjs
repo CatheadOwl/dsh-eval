@@ -6,13 +6,43 @@
  * Event shapes follow `deepseek-harness/packages/core/session/src/types.ts`
  * (`SessionEventMap`); packed `*-chunks` storage rows are tolerated and
  * skipped — they only carry `assistant/chunk` deltas eval never asserts on.
+ *
+ * Both seam directions carry an explicit boundary: an artifact whose header
+ * stamp is not a known generation is refused here (`parseSessionLog`), and a
+ * collection that finds no artifact yields a named diagnosis rather than an
+ * unexplained `undefined` (`collectSessionTrace`). See docs/host-wiring.md.
  */
 
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 /** Storage row types that pack `assistant/chunk` delta runs (see chunk-rows.ts). */
 const CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
+
+/**
+ * Session format generations this parser accepts. Mirror of the generation
+ * chain the vendored host ships codecs for
+ * (`session-format-catalog/src/generated.ts`: codecs v0–v3,
+ * `currentVersion: 3` = `SESSION_FORMAT_VERSION` in
+ * `core/session/src/types.ts`). The projection is written and verified
+ * against the current generation; older ones parse tolerantly. A stamp
+ * outside this set means the host moved to a generation whose payload this
+ * projection was never verified against — fail at the seam instead of
+ * projecting empty fields, and bump this set only together with the
+ * re-verification the docs' maintenance trigger describes.
+ */
+export const KNOWN_SESSION_FORMAT_VERSIONS = new Set([0, 1, 2, 3])
+
+/** Known generations rendered for an error message: `v0, v1, v2, v3`. */
+function knownGenerationsLabel() {
+  return [...KNOWN_SESSION_FORMAT_VERSIONS].sort((a, b) => a - b).map(version => `v${version}`).join(', ')
+}
+
+/** One header version stamp, rendered compactly for a diagnostic. */
+function headerVersionLabel(version) {
+  if (typeof version === 'number') return `v${version}`
+  return `(${JSON.stringify(version ?? null)})`
+}
 
 /**
  * Parse one uncompressed JSONL session artifact.
@@ -24,6 +54,15 @@ export function parseSessionLog(text) {
   if (lines.length === 0) throw new Error('empty session log')
   const header = JSON.parse(lines[0])
   if (header.type !== 'session') throw new Error('first line is not a session header')
+  // Generation gate: the header stamp is the host's own declaration of the
+  // artifact's logical layout. An unknown one is a seam drift, not a parse
+  // detail — say so here rather than degrade every projection to empty.
+  if (!KNOWN_SESSION_FORMAT_VERSIONS.has(header.version)) {
+    throw new Error(
+      `session header version ${headerVersionLabel(header.version)} is not a known generation`
+      + ` (known: ${knownGenerationsLabel()}); the host session format may have changed generation`,
+    )
+  }
   const events = []
   for (const line of lines.slice(1)) {
     let record
@@ -254,33 +293,94 @@ export function isSessionLogFilename(name) {
   return SESSION_LOG_FILENAME.test(name)
 }
 
-/** Recursively collect files whose basename satisfies `matches` under `dir`. */
-function collectFiles(dir, matches, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+/** Recursively list files under `dir`; an unreadable directory contributes nothing. */
+function listFiles(dir, out = []) {
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) collectFiles(path, matches, out)
-    else if (matches(entry.name)) out.push(path)
+    if (entry.isDirectory()) listFiles(path, out)
+    else out.push(path)
   }
   return out
 }
 
 /**
- * Load every session log under a persistence root and build one trace.
+ * Every session artifact under `sessionsRoot` (any generation, see
+ * `isSessionLogFilename`) as absolute paths — the collection half of the
+ * seam, shared by the trace builder and by the raw-log capture the behavior
+ * runner does before cleanup.
  * @param {string} sessionsRoot - the run's `session-persistence-jsonl` root.
- * @returns {EvalTrace | undefined} the trace, or `undefined` when no log materialized.
+ * @returns {string[]} artifact paths, in directory order.
  */
-export function loadTraceDir(sessionsRoot) {
-  let files
-  try {
-    files = collectFiles(sessionsRoot, isSessionLogFilename)
-  } catch {
-    return undefined
+export function listSessionLogFiles(sessionsRoot) {
+  return listFiles(sessionsRoot).filter(path => isSessionLogFilename(basename(path)))
+}
+
+/** Most candidate names one gap diagnostic lists before it truncates. */
+const GAP_NAME_LIMIT = 10
+
+/**
+ * Why a collection produced no artifact, phrased for a failure message: the
+ * candidate names actually seen (a renamed artifact is the likeliest host
+ * drift) plus the generation suspicion. Never returns an empty string — an
+ * empty root is itself the fact to report.
+ */
+function traceGapMessage(sessionsRoot, files) {
+  const names = [...new Set(files.map(file => basename(file)))]
+  const lookalikes = names.filter(name => name.toLowerCase().startsWith('session'))
+  const pool = lookalikes.length > 0 ? lookalikes : names
+  const shown = pool.slice(0, GAP_NAME_LIMIT)
+  const rest = pool.length - shown.length
+  const scan = shown.length === 0
+    ? 'the root holds no files (missing or empty)'
+    : `${lookalikes.length > 0 ? 'session-like file(s)' : 'file(s)'} under it: `
+      + `${shown.join(', ')}${rest > 0 ? ` (+${rest} more)` : ''}`
+  return 'no session trace materialized: no session artifact'
+    + ` (session.jsonl / session.vN.jsonl) under '${sessionsRoot}' — ${scan}`
+    + '; the host artifact naming may have changed generation'
+}
+
+/**
+ * Collect one run's session trace and, when there is none, the seam
+ * diagnosis for it.
+ *
+ * The `gap` string exists so that "the host's artifact/session layout moved"
+ * surfaces as that sentence in the behavior runner's failure text and in the
+ * review adapter's accounting, instead of as a bare `undefined` the reader
+ * has to trace back through the parser (see docs/host-wiring.md).
+ *
+ * @param {string} sessionsRoot - the run's `session-persistence-jsonl` root.
+ * @returns {{ trace: EvalTrace | undefined, gap: string | undefined }} the
+ *   trace, or `undefined` plus the reason no trace could be built.
+ */
+export function collectSessionTrace(sessionsRoot) {
+  const files = listFiles(sessionsRoot)
+  const artifacts = files.filter(file => isSessionLogFilename(basename(file)))
+  if (artifacts.length === 0) {
+    return { trace: undefined, gap: traceGapMessage(sessionsRoot, files) }
   }
-  if (files.length === 0) return undefined
-  const logs = files
-    .map(file => readFileSync(file, 'utf8'))
-    .map(parseSessionLog)
-  return buildTrace(logs)
+  const logs = []
+  const broken = []
+  for (const artifact of artifacts) {
+    try {
+      logs.push(parseSessionLog(readFileSync(artifact, 'utf8')))
+    } catch (error) {
+      broken.push(`${basename(artifact)}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  if (broken.length > 0) {
+    return {
+      trace: undefined,
+      gap: `session artifact(s) failed to parse — ${broken.join('; ')}`
+        + '; the host session format may have changed generation',
+    }
+  }
+  return { trace: buildTrace(logs), gap: undefined }
 }
 
 /**

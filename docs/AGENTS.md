@@ -11,7 +11,7 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 | 篇 | 上游锚 | 触发事件 → 动作 |
 |---|---|---|
 | `host-wiring.md` | dsh CLI 依赖闭包、`@deepseek-ai/dsh-llm` registry dist-tags | 宿主发新版 / peer 集变更 / 新 dist-tag → 重跑闭包预检，更新三形结局与古董版本号 |
-| `host-wiring.md` 的「宿主 session seam」节 | dsh 宿主 session 持久化与进程内读取面（vendored 检出） | 会话格式代际 / artifact 命名 / `Session` 读取面演进 → 先对源码重验三处断言，再改本节与 `src/trace.mjs`、`src/driver/multi-turn-driver.mjs` |
+| `host-wiring.md` 的「宿主 session seam」节 | dsh 宿主 session 持久化与进程内读取面（vendored 检出） | 会话格式代际 / artifact 命名 / `Session` 读取面演进 → 先对源码重验四处断言（命名行与代际行现由 `isSessionLogFilename` / `KNOWN_SESSION_FORMAT_VERSIONS` 机械执法，跑一条 case 即红在具名文案上），再改本节与 `src/trace.mjs`、`src/driver/multi-turn-driver.mjs` |
 | `known-issues.md` | 本包问题跟踪中的对应条目（按名对齐） | 上游修复落地 → 删条不留僵尸；新增已知问题先登记再入篇 |
 | `matchers.md` | `src/index.mjs` facade | 加导出即改（package-face 闸强制）；语义变更即改描述与分类（工具面/文本面/输入面） |
 | `runner-api.md` | `src/runner.mjs`（`runEvalCase` options / `EvalRunResult`）、`src/cli.mjs`（跨档取 `cliPath` 一节） | options/result 字段或 CLI 解析链变更同 commit 更新；`dshRepoDir` 删除（0.3.0）时删表中该行 |

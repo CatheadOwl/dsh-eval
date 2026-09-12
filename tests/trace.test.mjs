@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { parseSessionLog, buildTrace, isSessionLogFilename, loadTraceDir } from '../src/trace.mjs'
+import { parseSessionLog, buildTrace, isSessionLogFilename, collectSessionTrace, KNOWN_SESSION_FORMAT_VERSIONS } from '../src/trace.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 
@@ -34,6 +34,27 @@ describe('parseSessionLog', () => {
     const text = `${readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8')}{"seq":9,"type":"tur`
     const { events } = parseSessionLog(text)
     assert.equal(events.length, 9)
+  })
+
+  // The header stamp is the host's declaration of the artifact's generation.
+  // An unknown one is seam drift: refuse it here so the projection never
+  // degrades to empty arrays silently (EVAL-020).
+  it('accepts every known generation and refuses an unknown one by its number', () => {
+    const header = version => `{"type":"session","version":${version},"id":"s"}\n`
+    for (const version of KNOWN_SESSION_FORMAT_VERSIONS) {
+      assert.doesNotThrow(() => parseSessionLog(header(version)), `v${version} must be accepted`)
+    }
+    assert.throws(
+      () => parseSessionLog(header(4)),
+      /session header version v4 is not a known generation \(known: v0, v1, v2, v3\); the host session format may have changed generation/,
+    )
+  })
+
+  it('refuses a session header with no generation stamp', () => {
+    assert.throws(
+      () => parseSessionLog('{"type":"session","id":"s"}\n'),
+      /session header version \(null\) is not a known generation/,
+    )
   })
 })
 
@@ -143,13 +164,13 @@ describe('buildTrace', () => {
   })
 })
 
-describe('loadTraceDir', () => {
-  it('returns undefined for an absent root', () => {
-    assert.equal(loadTraceDir(join(FIXTURES, 'does-not-exist')), undefined)
+describe('collectSessionTrace — collection', () => {
+  it('returns nothing for an absent root', () => {
+    assert.equal(collectSessionTrace(join(FIXTURES, 'does-not-exist')).trace, undefined)
   })
 
-  it('returns undefined when no session artifact exists', () => {
-    assert.equal(loadTraceDir(FIXTURES), undefined)
+  it('returns nothing when no session artifact exists', () => {
+    assert.equal(collectSessionTrace(FIXTURES).trace, undefined)
   })
 
   // The host names each immutable format generation: v0 keeps `session.jsonl`,
@@ -159,7 +180,7 @@ describe('loadTraceDir', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-trace-'))
     try {
       writeFileSync(join(dir, 'session.v3.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
-      assert.equal(loadTraceDir(dir)?.sessionId, 'session-fixture-1')
+      assert.equal(collectSessionTrace(dir).trace?.sessionId, 'session-fixture-1')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -171,7 +192,71 @@ describe('loadTraceDir', () => {
       const text = readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8')
       writeFileSync(join(dir, 'session.migration.abc123.jsonl.tmp'), text)
       writeFileSync(join(dir, 'session.v3.jsonl.zstd'), text)
-      assert.equal(loadTraceDir(dir), undefined)
+      assert.equal(collectSessionTrace(dir).trace, undefined)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('collectSessionTrace — diagnosis', () => {
+  it('returns the trace and no gap when a generation artifact is present', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
+    try {
+      writeFileSync(join(dir, 'session.v3.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
+      const { trace, gap } = collectSessionTrace(dir)
+      assert.equal(trace?.sessionId, 'session-fixture-1')
+      assert.equal(gap, undefined)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // The empty-collection diagnosis must name what was actually there: a host
+  // that renamed its artifact otherwise reads as "the parser is broken" (the
+  // 2026-09-12 format-v3 incident, EVAL-019/EVAL-020).
+  it('names session-like candidate files when no artifact matches the naming rule', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
+    try {
+      writeFileSync(join(dir, 'session.v4.jsonl.zstd'), 'not a plaintext artifact')
+      writeFileSync(join(dir, 'metadata.json'), '{}')
+      const { trace, gap } = collectSessionTrace(dir)
+      assert.equal(trace, undefined)
+      assert.match(gap, /no session trace materialized/)
+      assert.match(gap, /session-like file\(s\) under it: session\.v4\.jsonl\.zstd/)
+      assert.match(gap, /the host artifact naming may have changed generation/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('falls back to every file name, and reports an empty root as such', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
+    const empty = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
+    try {
+      writeFileSync(join(dir, 'conversation.v4.jsonl'), 'x')
+      const renamed = collectSessionTrace(dir)
+      assert.match(renamed.gap, /file\(s\) under it: conversation\.v4\.jsonl/)
+      assert.match(renamed.gap, /the host artifact naming may have changed generation/)
+      assert.match(collectSessionTrace(empty).gap, /the root holds no files \(missing or empty\)/)
+      assert.match(
+        collectSessionTrace(join(FIXTURES, 'does-not-exist')).gap,
+        /the root holds no files \(missing or empty\)/,
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(empty, { recursive: true, force: true })
+    }
+  })
+
+  it('reports an artifact refused by the parse boundary instead of a bare undefined', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
+    try {
+      writeFileSync(join(dir, 'session.v9.jsonl'), '{"type":"session","version":9,"id":"s"}\n')
+      const { trace, gap } = collectSessionTrace(dir)
+      assert.equal(trace, undefined)
+      assert.match(gap, /session artifact\(s\) failed to parse — session\.v9\.jsonl: session header version v9 is not a known generation/)
+      assert.match(gap, /the host session format may have changed generation/)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

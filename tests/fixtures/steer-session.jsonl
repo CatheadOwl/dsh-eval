@@ -1,4 +1,4 @@
-{"type":"session","id":"session-fixture-steer","origin":"main"}
+{"type":"session","version":3,"id":"session-fixture-steer","origin":"main"}
 {"seq":0,"time":1755446400000,"type":"turn/start","data":{"turn":1}}
 {"seq":1,"time":1755446400100,"type":"step/start","data":{"turn":1,"step":1}}
 {"seq":2,"time":1755446400200,"type":"user/message","surfaceOp":"append","data":{"id":"msg-task","role":"user","content":[{"type":"text","text":"write task-a.md"}],"source":{"kind":"user"}}}

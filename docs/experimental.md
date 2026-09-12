@@ -20,16 +20,17 @@ import { resolveDshCliChain } from '@catheadowl/dsh-eval/experimental'
 | `stageProfileStore` | 把真实 profile store junction 感知地暂存进沙箱 home（沙箱机制） |
 | `buildOverlayYaml` | 由片段拼装 dsh overlay YAML（整段发射器） |
 | `overlayDisableRows` | 生成 `disabled: true` 的行禁用 overlay 片段 |
-| `parseSessionLog` | 解析一条未压缩 JSONL session artifact 为 `{ header, events }` |
+| `parseSessionLog` | 解析一条未压缩 JSONL session artifact 为 `{ header, events }`；header 的 `version` 戳不在已知代际集合内即抛错 |
 | `buildTrace` | 把 session 事件投影为 matcher 使用的 trace 对象 |
-| `loadTraceDir` | 从 run 目录装载并解析 trace（无日志时返回 `undefined`） |
+| `collectSessionTrace` | 收集一个 run 的 trace 与「为什么没有 trace」的 seam 诊断：返回 `{ trace, gap }`，`gap` 文案含实际候选文件名与代际嫌疑（唯一的收集入口） |
+| `KNOWN_SESSION_FORMAT_VERSIONS` | 本包接受的 session 格式代际集合（`parseSessionLog` 的准入面；宿主新增代际时与本包重验同步） |
 | `executeReviewExperiment` | 用给定 executor 执行抽象 review 实验 |
 | `materializeReviewExperiment` | 把实验定义物化为产物目录 |
 | `renderObservationSections` | 标准 observation renderer（自定义 executor 用） |
 | `OBSERVATIONS_PLACEHOLDER` | prompt 中的观测占位符常量（必须恰好出现一次） |
 | `createDshHeadlessReviewExecutor` | 构造 dsh headless review executor |
 | `runDshReviewExperiment` | 端到端跑一个 dsh review 实验 |
-| `validateToolBoundary` | 校验 trace 满足 turn-close 工具边界契约 |
+| `validateToolBoundary` | 校验 trace 满足 turn-close 工具边界契约；结果带 `status`（`checked` / `not-executed`），无 trace 时**不是**通过 |
 | `renderToolBoundaryEvidence` | 渲染边界校验的机器可读证据 |
 
 新公开能力先进本入口；稳定后经明确决策才升入包根入口（升入即接受 semver 义务）。
