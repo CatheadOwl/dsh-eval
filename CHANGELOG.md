@@ -12,6 +12,28 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
+- **Behavior experiment surface (experimental): arms × repeats × guard ×
+  aggregation.** `defineBehaviorExperiment` freezes an experiment whose arms
+  are case-field overrides (`task` / `expect` / `prepare` / `rowConfig` /
+  `disableRows` / `followups` / `settleTimeoutMs` / `timeoutMs` — no separate
+  per-arm config channel), `executeBehaviorExperiment` runs every arm × run
+  with framework-minted case ids, deep-merging arm `rowConfig` overrides onto
+  the case's own declaration (writing only the differing keys behaves exactly
+  like restating the whole config), and aggregates per-arm descriptive stats
+  over guard-clean runs only. The false-green shapes this replaces are
+  structurally impossible here: a run without a trace is a named row failure (never
+  silently dropped), and an arm with zero guard-clean runs is **INVALID**
+  with every failing row's reason — never an empty aggregation cell. The
+  preregistered `decisionRule` and a definition fingerprint ride every
+  result and summary; judgment and significance stay with the consumer (no
+  pass/fail exit-code semantics). `renderBehaviorSummary` /
+  `writeBehaviorArtifacts` produce the `summary.md` + `results.json` pair.
+  See `docs/experiments.md`.
+- **`evaluateMatchers` (experimental): the official programmatic evaluation
+  entry.** Runs a case's `expect` set against a trace with the evidence-anchor
+  rule inlined, so hand-rolled drivers no longer bypass the enforcement
+  inside `runEvalCase` (the tier seam `run-relates-ab`-style consumers used
+  to hit). Throws on a missing trace instead of evaluating against nothing.
 - **`rowConfig` values accept nested plain objects.** A parameter group (e.g.
   `variant: { form: 'standard', emphasis: 2 }`) can now be declared as one
   value instead of being flattened into unrelated scalar keys; nested objects

@@ -31,6 +31,17 @@ export {
   OBSERVATIONS_PLACEHOLDER,
 } from './experiment/review.mjs'
 
+// --- behavior experiment surface (arms × repeats) ---
+export {
+  defineBehaviorExperiment,
+  executeBehaviorExperiment,
+  renderBehaviorSummary,
+  writeBehaviorArtifacts,
+} from './experiment/behavior.mjs'
+
+// --- official matcher evaluation entry ---
+export { evaluateMatchers } from './evaluate.mjs'
+
 // --- dsh review executors ---
 export {
   createDshHeadlessReviewExecutor,

@@ -12,6 +12,7 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
 | [cross-turn.md](cross-turn.md) | `followups` 跨轮异步驱动契约（driver 行换装、子 agent settle 等待、mock 单 cursor 编排、有界重派断言） |
+| [experiments.md](experiments.md) | 行为实验契约：臂 = case 字段覆写 × 重复 × 守卫 × 聚合（`defineBehaviorExperiment`、臂覆写深合并、invalid 纪律、预注册 decisionRule） |
 | [intent-cases.md](intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report.md](report.md) | 机器可读报告（`--format json` / `--report`）结构 |
 | [runner-api.md](runner-api.md) | 程序化 runner API：`runEvalCase` options 契约、EvalRunResult 字段、跨档取 `cliPath` |
