@@ -136,17 +136,17 @@ describe('validateEvalCase', () => {
   })
 
   it('rejects empty or missing id', () => {
-    assert.throws(() => validateEvalCase({ id: '', task: 'x', expect: [] }, file), /non-empty string/)
-    assert.throws(() => validateEvalCase({ task: 'x', expect: [] }, file), /non-empty string/)
+    assert.throws(() => validateEvalCase({ id: '', task: 'x', expect: [validMatcher] }, file), /non-empty string/)
+    assert.throws(() => validateEvalCase({ task: 'x', expect: [validMatcher] }, file), /non-empty string/)
   })
 
   it('rejects missing task', () => {
-    assert.throws(() => validateEvalCase({ id: 'a', expect: [] }, file), /task must be a string/)
+    assert.throws(() => validateEvalCase({ id: 'a', expect: [validMatcher] }, file), /task must be a string/)
   })
 
   it('rejects invalid mode', () => {
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'bogus', expect: [] }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'bogus', expect: [validMatcher] }, file),
       /mode must be 'real' or 'mock'/,
     )
   })
