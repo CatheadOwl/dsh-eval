@@ -217,7 +217,11 @@ function projectChild(log) {
  * @returns {Record<string, number>} count per event type, insertion-ordered.
  */
 function countEventTypes(events) {
-  const counts = {}
+  // Null-prototype accumulator: a plug-in event type may name an
+  // `Object.prototype` member (`constructor`, `toString`, `__proto__`), and
+  // `counts['constructor'] ?? 0` would otherwise read the inherited function
+  // and string-concatenate, while `__proto__` would be swallowed by its setter.
+  const counts = Object.create(null)
   for (const event of events) {
     if (typeof event?.type !== 'string') continue
     counts[event.type] = (counts[event.type] ?? 0) + 1
@@ -545,6 +549,14 @@ export function collectSessionTrace(sessionsRoot) {
  *   records where count minus length is positive, per projection, plus the two
  *   child-identity counters. Undefined only on a hand-built trace; a nested log
  *   under `sessions` carries none because the parsers never add one.
+ * @property {{ mainLogDescriptorEvents: number, supportedDescriptors: number, projectionLength: number, children: object[] }} census.subagent
+ *   - the child-log data source the main-log counts cannot reach.
+ *     `mainLogDescriptorEvents` counts `subagent/descriptor` events in the MAIN
+ *     log itself (the current host writes them into the child log, so this is
+ *     usually 0); `projectionLength` is how many children entered
+ *     `subagentChildren`; `supportedDescriptors` sums the per-child counts
+ *     below, i.e. it counts DESCRIPTOR EVENTS, not child sessions — one child
+ *     may fold its identity from a single descriptor while logging several.
  * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number, label: string | undefined, mode: string | undefined, provider: string | undefined }[]} census.subagent.children
  *   - the accepted child logs, each with the identity `projectChild` folded
  *     from them; `descriptorEvents === 0` means the log states no identity at

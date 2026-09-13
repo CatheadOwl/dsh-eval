@@ -60,6 +60,10 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Fixed
 
+- `census.eventTypeCounts` counts prototype-named event types correctly: a
+  plug-in event type such as `constructor` or `__proto__` used to produce a
+  string-concatenated value or vanish from the map entirely, so a field named
+  like a count could hold a non-number.
 - Session-trace discovery follows the host's **format-generation artifact
   names**: `session.jsonl` for v0 and `session.vN.jsonl` for later
   generations (`session.v3.jsonl` on the current host). Matching only the v0

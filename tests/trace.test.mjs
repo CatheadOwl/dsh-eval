@@ -259,6 +259,40 @@ describe('buildTrace', () => {
     assert.equal(subagentDispatchCount(/^gates:fix:/, 0).check(built).ok, true)
   })
 
+  // A plug-in event type is an open string, and names like `constructor`,
+  // `toString` and `__proto__` exist on `Object.prototype`. An accumulator that
+  // inherits them either string-concatenates (`?? 0` never fires on an inherited
+  // function) or swallows the key through the `__proto__` setter — either way the
+  // census stops being numbers about events.
+  it('census counts prototype-named event types as numbers', () => {
+    const log = '{"type":"session","version":3,"id":"session-proto"}'
+      + '\n{"seq":1,"type":"constructor","data":{}}'
+      + '\n{"seq":2,"type":"toString","data":{}}'
+      + '\n{"seq":3,"type":"__proto__","data":{}}'
+      + '\n{"seq":4,"type":"__proto__","data":{}}'
+    const census = buildTrace([parseSessionLog(log)]).census
+    assert.equal(census.eventTypeCounts.constructor, 1)
+    assert.equal(census.eventTypeCounts.toString, 1)
+    assert.equal(census.eventTypeCounts.__proto__, 2)
+    assert.equal(typeof census.eventTypeCounts.constructor, 'number')
+    for (const count of Object.values(census.eventTypeCounts)) assert.equal(typeof count, 'number')
+  })
+
+  // `supportedDescriptors` sums the per-child counts, so it counts DESCRIPTOR
+  // EVENTS, not child sessions: a child may log several supported descriptors
+  // while its identity still folds from the first one only.
+  it('census sums descriptor events per child, not child sessions', () => {
+    const main = '{"type":"session","version":3,"id":"session-main"}'
+    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+      + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":3,"label":"first"}}'
+      + '\n{"seq":2,"type":"subagent/descriptor","data":{"version":3,"label":"second"}}'
+    const merged = buildTrace([parseSessionLog(main), parseSessionLog(child)])
+    assert.equal(merged.subagentChildren.length, 1)
+    assert.equal(merged.subagentChildren[0].label, 'first')
+    assert.equal(merged.census.subagent.supportedDescriptors, 2)
+    assert.equal(merged.census.subagent.children[0].supportedDescriptors, 2)
+  })
+
   it('leaves the caller logs untouched and keeps the census on the run trace only', () => {
     const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
     const merged = buildTrace([parent])
