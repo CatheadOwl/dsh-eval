@@ -62,19 +62,24 @@ export function validateDisableRows(disableRows, label) {
  *
  * `inspect` is the one channel the framework cannot audit: the hook is opaque
  * code that may read raw session events (`trace.sessions[].events`, immune to
- * projection degradation) or nothing at all. This rule therefore calls such a
- * case `'inspect'` — an anchor that is DECLARED, not verified — and the report
- * carries that on the case record, so a record whose evidence face was never
- * examined is visible in CI instead of looking like any other green case.
+ * projection degradation) or nothing at all. The exemption therefore rests on
+ * the case EXPLICITLY declaring `evidence: 'inspect'` — vouching that the
+ * hook reads raw evidence — not on the hook's mere existence (an empty
+ * `inspect: () => {}` must not re-open the vacuous-green door A1 closes).
+ * This rule calls such a case `'inspect'` — an anchor that is DECLARED, not
+ * verified — and the report carries that on the case record, so a record
+ * whose evidence face was never examined is visible in CI instead of looking
+ * like any other green case.
  *
- * @param {object} evalCase - the case (its `expect` array and `inspect` hook).
+ * @param {object} evalCase - the case (its `expect` array, `evidence`
+ *   declaration, and `inspect` hook).
  * @returns {'matcher' | 'inspect' | 'none'} the channel, `'none'` when neither
  *   exists (the shape `validateEvidenceAnchor` rejects).
  */
 export function evidenceAnchorKind(evalCase) {
   if (Array.isArray(evalCase?.expect)
     && evalCase.expect.some(matcher => requiresEvidence(matcher))) return 'matcher'
-  if (typeof evalCase?.inspect === 'function') return 'inspect'
+  if (evalCase?.evidence === 'inspect' && typeof evalCase?.inspect === 'function') return 'inspect'
   return 'none'
 }
 
@@ -99,24 +104,27 @@ export function evidenceAnchorKind(evalCase) {
  * evidence: the hook receives the workspace and the trace, and the framework
  * hands it `trace: undefined` when no trace materialized, which is the case's
  * own cue to fail loudly (`extras`' injection smoke reads raw session events
- * this way — a projection-independent channel). The exemption is by presence
- * only: nothing here can judge what a hook does, which is why
- * `evidenceAnchorKind` records such a case as DECLARED rather than verified and
- * the report carries that on the case record.
+ * this way — a projection-independent channel). The exemption requires the
+ * case to DECLARE `evidence: 'inspect'` — the declaration vouches that the
+ * hook reads raw evidence, because nothing here can judge what a hook does
+ * (it may read raw events or nothing at all, which is why
+ * `evidenceAnchorKind` records such a case as DECLARED rather than verified
+ * and the report carries that on the case record).
  *
  * @param {object[]} expect - the case's matcher array.
  * @param {string} label - error-message context (e.g. `file: case '<id>'`).
- * @param {object} [evalCase] - the case, read for its `inspect` hook.
+ * @param {object} [evalCase] - the case, read for its `evidence` declaration
+ *   and `inspect` hook.
  */
 export function validateEvidenceAnchor(expect, label, evalCase) {
   if (expect.some(matcher => requiresEvidence(matcher))) return
-  if (typeof evalCase?.inspect === 'function') return
+  if (evalCase?.evidence === 'inspect' && typeof evalCase?.inspect === 'function') return
   const negative = expect.map(matcher => `'${matcher.describe}'`).join(', ')
   throw new Error(
     `${label}: no evidence anchor — every matcher passes vacuously on an empty projection`
     + `${negative === '' ? ' (expect is empty)' : ` (${negative})`};`
     + ' add one assertion that requires evidence (a positive matcher), mark a custom negative matcher'
-    + ' with requiresEvidence: false, or assert in an inspect hook',
+    + " with requiresEvidence: false, or declare evidence: 'inspect' and assert in an inspect hook",
   )
 }
 
@@ -160,7 +168,8 @@ export function validateFollowups(followups, label) {
  * - `expect` carries at least one evidence anchor: a matcher that can fail on
  *   an empty projection (see `validateEvidenceAnchor`). Negative matchers
  *   self-report `requiresEvidence: false`; custom matchers default to
- *   requiring evidence.
+ *   requiring evidence. A case whose only anchor is its `inspect` hook must
+ *   DECLARE `evidence: 'inspect'` (with the hook present) for the exemption.
  * - mock mode requires a `script` with `steps` array.
  *
  * @param {object} evalCase - the case to validate.
@@ -210,6 +219,17 @@ export function validateEvalCase(evalCase, file) {
   if (evalCase.mode === 'mock') {
     if (evalCase.script === undefined || !Array.isArray(evalCase.script?.steps)) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)
+    }
+  }
+  // Part of the anchor domain, so it sits directly before the anchor rule:
+  // a structural mistake (including a malformed declaration) is what the
+  // author hears about first, the catch-all anchor error last.
+  if (evalCase.evidence !== undefined) {
+    if (evalCase.evidence !== 'inspect') {
+      throw new Error(`${file}: case '${evalCase.id}': evidence must be 'inspect' (got '${JSON.stringify(evalCase.evidence)}')`)
+    }
+    if (typeof evalCase.inspect !== 'function') {
+      throw new Error(`${file}: case '${evalCase.id}': evidence: 'inspect' requires an inspect hook — the declaration vouches for the hook's assertions, not for the case`)
     }
   }
   // Last, deliberately: the anchor rule is the catch-all, so a case that is

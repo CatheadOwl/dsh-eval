@@ -92,7 +92,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 - **自定义 matcher**：语义为负向的，在返回对象上写 `requiresEvidence: false` 即可加入契约；其余不用管（缺省要求证据）。
 - `requiresEvidence(matcher)`：该判据的公开读取面（`true` = 它是证据锚）——校验与自定义封装可用它，不必复述字段名。
-- **`inspect` 豁免（声明式，非已验证）**：case 若带 `inspect` hook，加载期即豁免本规则——hook 收到 workspace 与 trace（**无 trace 时收到 `undefined`，由 case 自己响亮失败**），所以「断言写在 hook 里」的 case 不必再凑一条 matcher。但 hook 是**框架审计不了的代码**：它可能遍历原始 session 事件（`trace.sessions[].events`，绕过宽松投影、免疫降级），也可能什么都不读。因此豁免是**按存在性**给的，这类 case 在报告里被标成 `evidenceAnchor: 'inspect'`（唯一的声明式锚；matcher 锚的 case 不带该字段），让"证据面没被审过"在 CI 产物里可见，而不是看起来和别的绿灯一样。
+- **`inspect` 豁免（显式声明制，非已验证）**：case 声明 `evidence: 'inspect'` 且带 `inspect` hook 时，加载期豁免本规则。豁免的正当性是「**inspect 读了原始证据**」，不是「inspect 存在」：hook 收到 workspace 与 trace（**无 trace 时收到 `undefined`，由 case 自己响亮失败**），可能遍历原始 session 事件（`trace.sessions[].events`，绕过宽松投影、免疫降级），也可能什么都不读——框架审计不了，所以豁免按**显式声明**给而不按 hook 存在性给：一行 `inspect: () => {}` 不足以放行全负向 case；**声明而无 hook、hook 而无声明（且无 matcher 锚）都会被拒**。声明了的 case 在报告里带 `evidenceAnchor: 'inspect'` 字段（唯一的声明式锚；matcher 锚的 case 不带该字段），让"证据面没被审过"在 CI 产物里可见，而不是看起来和别的绿灯一样。
 - **射程外**（不做过度承诺，写在这里以免误以为会被拦）：退化参数（`toolSequence([])`、`finalTextIncludes('')`、`finalTextMatches(/.*/u)` 形态正向、实际恒真）、半降级（`requestHeaders` 在而 `toolNames` 空）、以及"正向断言断言了一件与本 case 无关的事"（写作纪律，机械面覆盖不了）。
 - 典型迁移：一条只写 `toolNotCalled(/^coggit_/)` 的隔离 case，补一条存在性正向断言（例如 `finalTextMatches(/\d/u)`——任务要求给数字时必须给得出）。
 

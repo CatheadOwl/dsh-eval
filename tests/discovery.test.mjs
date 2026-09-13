@@ -234,24 +234,38 @@ describe('validateEvalCase', () => {
     }, file), /no evidence anchor/)
   })
 
-  // A case can anchor in its own `inspect` hook instead: the hook receives the
-  // workspace and the trace (undefined when nothing materialized), so its own
-  // checks are the evidence surface. The repo's wiring-smoke case is this
-  // shape — rejecting it was a regression the ADR's survey missed.
-  it('accepts an empty expect when the case asserts in an inspect hook', () => {
+  // A case can anchor in its own `inspect` hook instead — but the exemption
+  // rests on an explicit `evidence: 'inspect'` declaration, not on the hook's
+  // existence: the hook is unauditable code, and an empty `inspect: () => {}`
+  // must not re-open the vacuous-green door the guard closes. The repo's
+  // wiring-smoke case is this shape, declaration included.
+  it('exempts an inspect-anchored case only when it declares evidence', () => {
     assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-8', task: 'x', expect: [],
-      inspect: () => {},
+      id: 'anchor-8', task: 'x', expect: [], evidence: 'inspect', inspect: () => {},
     }, file))
+    // A matcher anchor makes the declaration unnecessary (and still wins).
     assert.doesNotThrow(() => validateEvalCase({
       id: 'anchor-9', task: 'x',
-      expect: [toolNotCalled('read')],
+      expect: [validMatcher],
       inspect: () => {},
     }, file))
-    // Empty expect WITHOUT an inspect hook is a case that cannot fail at all.
+    // Presence alone no longer exempts — the false-green shape the explicit
+    // declaration exists to close.
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-11', task: 'x', expect: [], inspect: () => {},
+    }, file), /no evidence anchor/)
+    // Empty expect without any hook is a case that cannot fail at all.
     assert.throws(() => validateEvalCase({
       id: 'anchor-10', task: 'x', expect: [],
     }, file), /no evidence anchor — every matcher passes vacuously on an empty projection \(expect is empty\)/)
+    // The declaration itself is validated: bogus values and hook-less
+    // declarations are refused before the anchor rule speaks.
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-12', task: 'x', expect: [validMatcher], evidence: 'vibes',
+    }, file), /evidence must be 'inspect'/)
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-13', task: 'x', expect: [validMatcher], evidence: 'inspect',
+    }, file), /requires an inspect hook/)
   })
 
   it('validateEvidenceAnchor reports the same rule when called directly', () => {
@@ -261,22 +275,28 @@ describe('validateEvalCase', () => {
       /^Error: case x: no evidence anchor/,
     )
     assert.doesNotThrow(
+      () => validateEvidenceAnchor([], 'case x', { evidence: 'inspect', inspect: () => {} }),
+      "a declared inspect hook anchors the case",
+    )
+    // The declaration names the exit in the rejection text.
+    assert.throws(
       () => validateEvidenceAnchor([], 'case x', { inspect: () => {} }),
-      'an inspect hook anchors the case',
+      /declare evidence: 'inspect' and assert in an inspect hook/,
     )
     assert.throws(
-      () => validateEvidenceAnchor([], 'case x', { inspect: 'not a function' }),
+      () => validateEvidenceAnchor([], 'case x', { evidence: 'inspect', inspect: 'not a function' }),
       /\(expect is empty\)/,
     )
   })
 
   // The rule must load the repo's own corpus: a wiring smoke that asserts only
   // inside its inspect hook (`expect: []`) is the shape that made a first cut of
-  // this rule reject a shipped case.
-  it('loads the repo case that asserts in its inspect hook with an empty expect', async () => {
+  // this rule reject a shipped case — it now carries the explicit declaration.
+  it('loads the repo case that declares an inspect anchor with an empty expect', async () => {
     const fromEval = fileURLToPath(new URL('../../extras/modules/prompt/eval/behavior/mock/injection-smoke.eval.mjs', import.meta.url))
     const loaded = (await import(pathToFileURL(fromEval).href)).default
     assert.deepEqual(loaded.expect, [])
+    assert.equal(loaded.evidence, 'inspect')
     assert.equal(typeof loaded.inspect, 'function')
     assert.doesNotThrow(() => validateEvalCase(loaded, fromEval))
   })
@@ -287,10 +307,14 @@ describe('validateEvalCase', () => {
   it('names the anchoring channel, with inspect as the declared one', () => {
     assert.equal(evidenceAnchorKind({ expect: [validMatcher] }), 'matcher')
     assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')] }), 'none')
-    assert.equal(evidenceAnchorKind({ expect: [], inspect: () => {} }), 'inspect')
-    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')], inspect: () => {} }), 'inspect')
+    assert.equal(evidenceAnchorKind({ expect: [], evidence: 'inspect', inspect: () => {} }), 'inspect')
+    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')], evidence: 'inspect', inspect: () => {} }), 'inspect')
     // A matcher anchor always wins, whatever else the case carries.
-    assert.equal(evidenceAnchorKind({ expect: [validMatcher], inspect: () => {} }), 'matcher')
+    assert.equal(evidenceAnchorKind({ expect: [validMatcher], evidence: 'inspect', inspect: () => {} }), 'matcher')
+    // Without the declaration the hook is not an anchor — presence alone
+    // vouches for nothing.
+    assert.equal(evidenceAnchorKind({ expect: [], inspect: () => {} }), 'none')
+    assert.equal(evidenceAnchorKind({ expect: [], evidence: 'inspect' }), 'none')
     assert.equal(evidenceAnchorKind({}), 'none')
     assert.equal(evidenceAnchorKind(undefined), 'none')
   })
