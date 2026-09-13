@@ -8,7 +8,7 @@ description: rowConfig 边界契约——case 级按 loader 行 id 覆写行 con
 
 ## 机制
 
-- 序列化为 overlay 条目 `- id: <row>` + `config:` 键值块（`buildOverlayYaml`），与 `session-persistence-jsonl` 重根、`persona`、`disableRows` 走同一条 per-run overlay 通道；
+- 序列化为 overlay 条目 `- id: <row>` + `config:` 键值块（`buildOverlayYaml`），与 `session-persistence-jsonl` 重根、`disableRows` 走同一条 per-run overlay 通道；per-case persona 也走本通道（`{ 'system-prompt': { personaPrefix, personaSuffix } }`，case 级 `persona` 字段已删除）；
 - 取值优先级同 overlay 语义：覆盖 bundle/patch 层为该行声明的 config。
 
 ## 整段替换语义（最大的坑）

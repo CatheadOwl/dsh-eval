@@ -55,7 +55,7 @@ export function overlayDisableRows(rowIds) {
 /**
  * Serialize the per-run overlay patch list for one eval case.
  * @param {object} parts - overlay ingredients (see runEvalCase):
- *   `sessionsRoot` (required), optional `persona`, `disableRows`,
+ *   `sessionsRoot` (required), optional `disableRows`,
  *   `rowConfig`, and `mock` (mount the scripted adapter + re-point the
  *   default model).
  * @returns {string} the overlay file text.
@@ -67,11 +67,6 @@ export function buildOverlayYaml(parts) {
   lines.push(`    root: ${yamlScalar(parts.sessionsRoot)}`)
   lines.push('    packChunks: false')
   lines.push('    compression: none')
-  if (parts.persona !== undefined) {
-    lines.push('- id: system-prompt')
-    lines.push('  config:')
-    lines.push(`    persona: ${yamlScalar(parts.persona)}`)
-  }
   if (parts.disableRows !== undefined && parts.disableRows.length > 0) {
     lines.push(overlayDisableRows(parts.disableRows).trimEnd())
   }

@@ -93,6 +93,9 @@ describe('validateEvalCase', () => {
     assert.throws(() => validateEvalCase({
       id: 'gates-legacy', task: 'test', expect: [validMatcher], gates: 'off',
     }, file), /'gates' field was removed/)
+    assert.throws(() => validateEvalCase({
+      id: 'persona-legacy', task: 'test', expect: [validMatcher], persona: 'You are terse.',
+    }, file), /'persona' field was removed.*rowConfig: \{ 'system-prompt': \{ personaPrefix, personaSuffix \} \}/s)
   })
 
   it('accepts rowConfig with scalar / scalar-array / nested-object leaves and rejects non-scalar leaves', () => {

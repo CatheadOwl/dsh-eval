@@ -8,7 +8,6 @@
  * - always: `session-persistence-jsonl` re-rooted to the run dir, plaintext
  *   one-event-per-line layout (config override is whole-replace, so every
  *   field the backend needs is restated);
- * - optional case persona: `system-prompt` persona override;
  * - optional `disableRows: ['<row-id>', ...]` case declaration: the listed
  *   loader rows are disabled, so e.g. a turn-close blocking gate plugin
  *   cannot splice feedback steps past the script's terminal step (the
@@ -46,7 +45,7 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
  * Run one eval case end to end.
  *
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
- * script?: { steps: ChunkStep[] }, persona?: string, disableRows?: string[],
+ * script?: { steps: ChunkStep[] }, disableRows?: string[],
  * rowConfig?: Record<string, Record<string, unknown>>,
  * followups?: string[], settleTimeoutMs?: number,
  * prepare?: (workspace: string) => void | Promise<void>,
@@ -138,7 +137,6 @@ export async function runEvalCase(evalCase, options) {
     const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
-      persona: evalCase.persona,
       disableRows: evalCase.disableRows,
       rowConfig: evalCase.rowConfig,
       mock: mode === 'mock',

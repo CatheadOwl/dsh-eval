@@ -70,6 +70,14 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Removed
 
+- **The case-level `persona` field.** It emitted a `persona` config key the
+  host's `SystemPrompt.Config` schema never had, so the key was silently inert
+  — and because a row-config override whole-replaces the row, it also dropped
+  the profile's `personaPrefix` / `personaSuffix`. A case declaring `persona`
+  is now refused at load time. **Migrating a case that trips this**: declare
+  `rowConfig: { 'system-prompt': { personaPrefix: '...', personaSuffix: '...' } }`
+  instead, restating both keys the row still needs (the headless profile's
+  baseline ships a `personaSuffix`).
 - `loadTraceDir` (experimental): replaced by `collectSessionTrace`, which
   returns the trace together with the reason none was built. Migrate
   `loadTraceDir(root)` to `collectSessionTrace(root).trace`.

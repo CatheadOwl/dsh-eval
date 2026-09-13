@@ -13,10 +13,12 @@ describe('buildOverlayYaml', () => {
     assert.ok(!yaml.includes('eval-mock'))
   })
 
-  it('adds the persona override only when a case supplies one', () => {
-    const withPersona = buildOverlayYaml({ sessionsRoot: 's', persona: 'You are terse.' })
-    assert.match(withPersona, /- id: system-prompt/)
-    assert.match(withPersona, /persona: "You are terse\."/)
+  it('never emits a system-prompt row (the case persona field is gone; persona overrides ride rowConfig)', () => {
+    const yaml = buildOverlayYaml({
+      sessionsRoot: 's',
+      rowConfig: { 'system-prompt': { personaPrefix: 'You are terse.' } },
+    })
+    assert.match(yaml, /- id: "system-prompt"\n  config:\n    personaPrefix: "You are terse\."/)
     assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('system-prompt'))
   })
 

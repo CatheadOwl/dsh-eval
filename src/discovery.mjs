@@ -141,6 +141,9 @@ export function validateFollowups(followups, label) {
  * - `id` is a non-empty string.
  * - `task` is a string.
  * - `mode` (if present) is `'real'` or `'mock'`.
+ * - `persona` is **rejected** if present — removed, use `rowConfig` on the
+ *   `system-prompt` row (`personaPrefix` / `personaSuffix`) instead; see the
+ *   error text for the full migration shape.
  * - `disableRows` (if present) is an array of strings (loader row ids to
  *   disable in this run's overlay). An EMPTY array is legal and means
  *   "disable nothing, explicitly" — it overrides a `disableRows` default
@@ -178,6 +181,9 @@ export function validateEvalCase(evalCase, file) {
   }
   if (evalCase.gates !== undefined) {
     throw new Error(`${file}: case '${evalCase.id}': the 'gates' field was removed — declare disableRows: ['gates'] instead`)
+  }
+  if (evalCase.persona !== undefined) {
+    throw new Error(`${file}: case '${evalCase.id}': the 'persona' field was removed — it emitted a config key the host's SystemPrompt.Config never had (silently inert, and whole-replace dropped the profile's personaPrefix/personaSuffix); declare rowConfig: { 'system-prompt': { personaPrefix, personaSuffix } } instead, restating both keys`)
   }
   if (evalCase.disableRows !== undefined) {
     validateDisableRows(evalCase.disableRows, `${file}: case '${evalCase.id}'`)
