@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
+import { discoverFiles, validateEvalCase, validateEvidenceAnchor, detectDuplicateIds } from '../src/discovery.mjs'
+import { toolNotCalled, userMessageTextExcludes, subagentDispatchCount } from '../src/assertions.mjs'
 
 describe('discoverFiles', () => {
   function seed(suffix) {
@@ -169,12 +170,64 @@ describe('validateEvalCase', () => {
 
   it('rejects mock mode without script.steps', () => {
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [] }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [validMatcher] }, file),
       /mock mode requires script\.steps/,
     )
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [], script: {} }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [validMatcher], script: {} }, file),
       /mock mode requires script\.steps/,
+    )
+  })
+
+  // A case whose whole expect passes on an empty projection reports "nothing
+  // was measured" as "passed" — the loader refuses that shape up front
+  // (EVAL-022 / ADR 0005).
+  it('rejects an expect set with no evidence anchor, naming the negative matchers', () => {
+    const outcome = () => validateEvalCase({
+      id: 'anchor-1', task: 'x',
+      expect: [toolNotCalled(/^coggit_/), userMessageTextExcludes('gates', 'task-b.md')],
+    }, file)
+    assert.throws(outcome, /no evidence anchor/)
+    assert.throws(outcome, /tool not called: \/\^coggit_\//)
+    assert.throws(outcome, /add one assertion that requires evidence/)
+    assert.throws(outcome, /requiresEvidence: false/)
+  })
+
+  it('accepts an anchor in any position, including a parameter-dependent count matcher', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-2', task: 'x',
+      expect: [toolNotCalled(/^coggit_/), validMatcher],
+    }, file))
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-3', task: 'x',
+      expect: [validMatcher, toolNotCalled(/^coggit_/)],
+    }, file))
+    // `subagentDispatchCount(m, 0)` asserts absence; `(m, 1)` asks for presence
+    // and therefore anchors the case.
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-4', task: 'x', expect: [subagentDispatchCount(/^gates:/, 0)],
+    }, file), /no evidence anchor/)
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-5', task: 'x', expect: [subagentDispatchCount(/^gates:/, 1)],
+    }, file))
+  })
+
+  it('treats an unmarked custom matcher as an anchor and a self-reported one as negative', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-6', task: 'x',
+      expect: [toolNotCalled('read'), { describe: 'custom', check: () => ({ ok: true, message: '' }) }],
+    }, file))
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-7', task: 'x',
+      expect: [{ describe: 'custom negative', check: () => ({ ok: true, message: '' }), requiresEvidence: false }],
+    }, file), /no evidence anchor/)
+  })
+
+  it('validateEvidenceAnchor reports the same rule when called directly', () => {
+    assert.doesNotThrow(() => validateEvidenceAnchor([validMatcher], 'case x'))
+    assert.throws(
+      () => validateEvidenceAnchor([subagentDispatchCount('a', 0)], 'case x'),
+      /^Error: case x: no evidence anchor/,
     )
   })
 })

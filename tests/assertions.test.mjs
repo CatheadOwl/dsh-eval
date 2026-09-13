@@ -25,6 +25,7 @@ import {
   subagentCompleted,
   subagentDispatchCount,
   subagentCompletedCount,
+  requiresEvidence,
 } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
@@ -365,5 +366,59 @@ describe('subagentCompletedCount', () => {
 
   it('passes at zero on a trace without subagents', () => {
     assert.equal(subagentCompletedCount(/^gates:/, 0).check(trace).ok, true)
+  })
+})
+
+// The evidence-anchor contract: a matcher that passes on an empty projection
+// must say so, or the loader cannot tell "nothing was measured" from "passed"
+// (EVAL-022 / ADR 0005).
+describe('requiresEvidence', () => {
+  it('marks the four absence-asserting factories as negative', () => {
+    assert.equal(requiresEvidence(toolNotCalled(/^coggit_/)), false)
+    assert.equal(requiresEvidence(userMessageTextExcludes('gates', 'task-b.md')), false)
+    assert.equal(requiresEvidence(subagentDispatchCount(/^gates:/, 0)), false)
+    assert.equal(requiresEvidence(subagentCompletedCount(/^gates:/, 0)), false)
+  })
+
+  it('treats positive factories as requiring evidence', () => {
+    for (const matcher of [
+      toolCalled('read'),
+      firstTool('read'),
+      toolSequence(['read']),
+      toolCallArgs('read', {}),
+      toolResultFor('read'),
+      toolResultIsError('read'),
+      toolResultSucceeded('read'),
+      toolResultTextIncludes('read', 'x'),
+      finalTextIncludes('x'),
+      finalTextMatches(/x/u),
+      assistantTextIncludes('x'),
+      systemPromptIncludes('x'),
+      toolMounted('read'),
+      userMessageTextIncludes('gates', 'x'),
+      subagentDispatched('gates:fix:x'),
+      subagentCompleted('gates:fix:x'),
+      // The SAME factories turn positive when the argument asks for presence.
+      subagentDispatchCount(/^gates:/, 1),
+      subagentCompletedCount(/^gates:/, 1),
+    ]) {
+      assert.equal(requiresEvidence(matcher), true, `${matcher.describe} must require evidence`)
+    }
+  })
+
+  it('defaults an unknown custom matcher to requiring evidence', () => {
+    assert.equal(requiresEvidence({ describe: 'custom', check: () => ({ ok: true, message: '' }) }), true)
+    assert.equal(requiresEvidence({ describe: 'custom negative', check: () => ({ ok: true, message: '' }), requiresEvidence: false }), false)
+    assert.equal(requiresEvidence(undefined), true)
+  })
+
+  it('keeps the factories that pass vacuously on an empty projection green', () => {
+    // The polarity claim is about behaviour, not just the marker: these pass
+    // on a trace with no evidence at all.
+    const empty = buildTrace([])
+    assert.equal(toolNotCalled('read').check(empty).ok, true)
+    assert.equal(userMessageTextExcludes('gates', 'x').check(empty).ok, true)
+    assert.equal(subagentDispatchCount(/^gates:/, 0).check(empty).ok, true)
+    assert.equal(subagentCompletedCount(/^gates:/, 0).check(empty).ok, true)
   })
 })

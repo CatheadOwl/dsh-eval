@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { runEvalCase } from '../src/runner.mjs'
+import { toolCalled } from '../src/assertions.mjs'
 
 /**
  * Build a minimal fake deepseek-harness repo — just enough for
@@ -85,7 +86,7 @@ describe('runEvalCase session seam diagnosis', () => {
     process.env.DSH_HOME = home
     try {
       const result = await runEvalCase(
-        { id: 'seam-gap-test', task: 'test', expect: [] },
+        { id: 'seam-gap-test', task: 'test', expect: [toolCalled('never-called')] },
         { profile: 'test', cliPath },
       )
       assert.equal(result.trace, undefined)

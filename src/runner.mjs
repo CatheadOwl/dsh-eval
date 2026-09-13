@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectSessionTrace, listSessionLogFiles } from './trace.mjs'
-import { validateRowConfig, validateDisableRows, validateFollowups } from './discovery.mjs'
+import { validateRowConfig, validateDisableRows, validateFollowups, validateEvidenceAnchor } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
 import { resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh } from './sandbox.mjs'
@@ -131,6 +131,9 @@ export async function runEvalCase(evalCase, options) {
     }
     if (evalCase.followups !== undefined) {
       validateFollowups(evalCase.followups, `case '${evalCase.id}'`)
+    }
+    if (Array.isArray(evalCase.expect)) {
+      validateEvidenceAnchor(evalCase.expect, `case '${evalCase.id}'`)
     }
     const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({

@@ -73,6 +73,25 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空——`*Count(label, 0)` 在这种日志上真空通过，而五个主投影面全部正常；
 - 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动）。失败文案目前不带计数。
 
+## 证据锚（`requiresEvidence`）
+
+上节的补救是**报告面**；这一节是**加载期**的守卫：每条 case 的 `expect` 至少要有一条**在空投影下会红**的断言（证据锚），否则加载即拒绝。`dsh-eval` 与 `runEvalCase` 两条入口都执法，报错文案一致。
+
+极性由 matcher 对象自报，判据是**工厂 + 参数**，不是工厂名：
+
+| 形态 | 极性 |
+|---|---|
+| `toolNotCalled` / `userMessageTextExcludes` | 负向（自报 `requiresEvidence: false`） |
+| `subagentDispatchCount(m, 0)` / `subagentCompletedCount(m, 0)` | 负向（**参数**为 0 才负向） |
+| `subagentDispatchCount(m, n>0)` / `subagentCompletedCount(m, n>0)` | 正向 |
+| 其余框架 matcher（`toolCalled`、`finalTextIncludes`、`assistantTextIncludes`、`toolMounted`…） | 正向 |
+| 自定义 matcher（未声明） | 正向（缺省要求证据） |
+
+- **自定义 matcher**：语义为负向的，在返回对象上写 `requiresEvidence: false` 即可加入契约；其余不用管（缺省要求证据）。
+- `requiresEvidence(matcher)`：该判据的公开读取面（`true` = 它是证据锚）——校验与自定义封装可用它，不必复述字段名。
+- **射程外**（不做过度承诺，写在这里以免误以为会被拦）：退化参数（`toolSequence([])`、`finalTextIncludes('')`、`finalTextMatches(/.*/u)` 形态正向、实际恒真）、半降级（`requestHeaders` 在而 `toolNames` 空）、以及"正向断言断言了一件与本 case 无关的事"（写作纪律，机械面覆盖不了）。
+- 典型迁移：一条只写 `toolNotCalled(/^coggit_/)` 的隔离 case，补一条存在性正向断言（例如 `finalTextMatches(/\d/u)`——任务要求给数字时必须给得出）。
+
 ## Mock script helpers
 
 - `toolCallStep(name, args)`：一步「模型调工具」，结束于 tool-calls；

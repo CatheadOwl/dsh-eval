@@ -6,6 +6,7 @@
 
 import { readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { requiresEvidence } from './assertions.mjs'
 
 /**
  * Directories never to descend into during discovery. `.runs` holds
@@ -57,6 +58,36 @@ export function validateDisableRows(disableRows, label) {
 }
 
 /**
+ * Validate the evidence anchor of an `expect` array: at least one matcher must
+ * be able to FAIL on an empty projection.
+ *
+ * The trace projection is tolerant (see `trace.mjs`): a host event whose
+ * payload drifts leaves the projection empty instead of throwing. Matchers
+ * that assert ABSENCE pass on an empty projection — vacuously. A case whose
+ * whole `expect` is such matchers turns "nothing was measured" into "passed".
+ * This rule rejects that shape at load time instead of reporting a green case.
+ *
+ * Polarity comes from the matcher object: a negative matcher self-reports
+ * `requiresEvidence: false` (`assertions.mjs`), everything else — including an
+ * unknown custom matcher — counts as requiring evidence. Shared by
+ * `validateEvalCase` (load time) and `runEvalCase` (execution time) so both
+ * report the identical message.
+ *
+ * @param {object[]} expect - the case's matcher array.
+ * @param {string} label - error-message context (e.g. `file: case '<id>'`).
+ */
+export function validateEvidenceAnchor(expect, label) {
+  const anchored = expect.some(matcher => requiresEvidence(matcher))
+  if (anchored) return
+  const negative = expect.map(matcher => `'${matcher.describe}'`).join(', ')
+  throw new Error(
+    `${label}: no evidence anchor — every matcher passes vacuously on an empty projection (${negative});`
+    + ' add one assertion that requires evidence (a positive matcher), or mark a custom negative matcher'
+    + ' with requiresEvidence: false',
+  )
+}
+
+/**
  * Validate a `followups` declaration (case-level): an array of non-empty
  * strings, one per additional driven turn. Throws with `label` context.
  * @param {unknown} followups - the value to validate.
@@ -90,6 +121,10 @@ export function validateFollowups(followups, label) {
  *   (cross-turn driving; see `validateFollowups`), with optional positive
  *   finite `settleTimeoutMs`.
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
+ * - `expect` carries at least one evidence anchor: a matcher that can fail on
+ *   an empty projection (see `validateEvidenceAnchor`). Negative matchers
+ *   self-report `requiresEvidence: false`; custom matchers default to
+ *   requiring evidence.
  * - mock mode requires a `script` with `steps` array.
  *
  * @param {object} evalCase - the case to validate.
@@ -133,6 +168,7 @@ export function validateEvalCase(evalCase, file) {
       throw new Error(`${file}: case '${evalCase.id}': expect[${i}] must have { describe: string, check: function }`)
     }
   }
+  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`)
   if (evalCase.mode === 'mock') {
     if (evalCase.script === undefined || !Array.isArray(evalCase.script?.steps)) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)

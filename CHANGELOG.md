@@ -29,6 +29,26 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   number instead of projecting empty fields. `EvalRunResult.traceGap` carries
   the diagnosis to the CLI failure text.
 
+### Changed
+
+- **Every case now needs an evidence anchor.** A case whose `expect` contains
+  only matchers that pass on an empty projection is refused at load time
+  (`no evidence anchor`), because the trace projection is tolerant: when a host
+  event payload drifts the projection empties out instead of failing, and
+  absence-asserting matchers — `toolNotCalled`, `userMessageTextExcludes`, and
+  `subagentDispatchCount` / `subagentCompletedCount` with `expected === 0` —
+  then pass vacuously, reporting "nothing was measured" as "passed". Both
+  entry points enforce it (`dsh-eval` at load, `runEvalCase` at execution).
+  **Migrating a case that trips this**: add one matcher that requires evidence
+  (any positive matcher; for a case whose task forbids tool use, a text-existence
+  anchor such as `finalTextMatches(/\d/u)` works), or — for a custom matcher
+  whose semantics are negative — set `requiresEvidence: false` on the object it
+  returns. `requiresEvidence(matcher)` reports the verdict for a matcher.
+  Out of the rule's scope: degenerate arguments (`toolSequence([])`,
+  `finalTextIncludes('')`, `finalTextMatches(/.*/u)`), half-degraded
+  `requestHeaders`, and a positive assertion about something unrelated to the
+  case.
+
 ### Removed
 
 - `loadTraceDir` (experimental): replaced by `collectSessionTrace`, which

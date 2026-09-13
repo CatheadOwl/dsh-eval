@@ -29,6 +29,7 @@ export {
   subagentCompleted,
   subagentDispatchCount,
   subagentCompletedCount,
+  requiresEvidence,
 } from './assertions.mjs'
 
 export { toolCallStep, textStep } from './mock/script.mjs'
