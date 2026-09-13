@@ -1,5 +1,5 @@
 ---
-description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置，以及本包对宿主 session seam 的四处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面）。
+description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置、本包对宿主 session seam 的四处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
 ---
 
 # 安装与宿主接线
@@ -70,6 +70,16 @@ behavior 与 review 的证据都取自**真实 dsh 会话的产物与进程内�
 命名行与代际行的读取面由本包的 eval overlay 固定（`compression: none` + `packChunks: false`），所以每轮 run 的 artifact 是**明文逐事件**布局；命名判定、代际准入与收集入口都在 `src/trace.mjs`（`isSessionLogFilename` / `KNOWN_SESSION_FORMAT_VERSIONS` / `collectSessionTrace`），behavior runner 与 review adapter 共用同一个收集入口，缺 artifact 时各自把 `traceGap` 带进失败文案与产物记账。帧容器行走 overlay 固定；最后一行是 driver 行读日志时直接依赖的方法。
 
 > **维护触发器**：宿主 session 格式、持久化命名或 `Session` 读取面变更 ⇒ 先按上表对 vendored 检出重新验证断言，再更新本篇与引用它们的源码/认知。前两行现在是**机械的**——命名或代际戳变了，跑一条 case 就红在具名文案上（候选文件名 / 版本号）；后两行仍只有真跑一条 case 才会暴露。
+
+### 宿主 LLM adapter 线上契约（mock 模式专用）
+
+mock 模式经 `eval-mock-llm` 插件（`src/mock/mock-adapter.mjs`）注册 `EvalMockAdapter`，它 `extends` 的 `LlmAdapter` 基类解析自**本包的 peer 实例**——该实例可以落后于驱动它的宿主运行时（实测：宿主 0.1.5-rc.2 的 LLM 服务对已注册 adapter 新增 `registration.adapter.prepareCall(...)` 调用面时，本地 peer 还是 0.0.1-rc.1，继承面缺失，全部 mock run 死在启动期）。因此适配器**自带** `prepareCall` 覆写、不依赖继承面在不在：形状镜像宿主基类默认契约（`PreparedAdapterCall`——`{ model: resolveModel(...), stream: options => this.stream(options) }`，model 元数据与派发入口绑定同一代适配器）。
+
+| 断言 | 宿主依据 | 本包执法面 | 坏了长什么样 |
+|---|---|---|---|
+| 宿主 LLM 服务经 `prepareCall` 派发每次模型调用：adapter 级 `prepareCall(provider, model, signal)` 返回 `{ model, stream }`（一次性句柄，防 HMR 混代） | `packages/llm/llm/src/index.ts` 的 `registration.adapter.prepareCall(...)` 调用与 `LlmAdapter` 基类（`PreparedAdapterCall`） | `EvalMockAdapter` 自带 `prepareCall` 覆写（`src/mock/mock-adapter.mjs`）——真跑一条 mock case 即红在具名错误串上 | mock run 空转：无 session 事件、workspace 未落、final text 空，stderr 带 `registration.adapter.<method> is not a function` |
+
+> **维护触发器**：宿主 adapter 线上契约演进（新增/改签名线上方法）⇒ 先对宿主 `packages/llm/llm/src/index.ts` 重验 `EvalMockAdapter` 的自带面（`prepareCall` / `resolveModel` / `stream` 的形状与语义），再同 commit 改本节与 `src/mock/mock-adapter.mjs`。
 
 ## 环境面：profile 与插件安装
 

@@ -111,6 +111,17 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Fixed
 
+- **Mock mode against host 0.1.5-rc.2: the scripted adapter now carries its
+  own `prepareCall`.** The host's LLM service dispatches every model call
+  through `registration.adapter.prepareCall(...)`, a wire-contract step the
+  adapter's inherited base class did not have — the base resolves from this
+  package's `@deepseek-ai/dsh-llm` peer instance, which lagged the host
+  runtime (0.0.1-rc.1 vs 0.1.5-rc.2), so every mock run died at startup with
+  `registration.adapter.prepareCall is not a function`. The override mirrors
+  the host base-class default (`{ model, stream }` bound to one adapter
+  generation), making the wire contract independent of the peer instance's
+  generation; the seam is now documented in `docs/host-wiring.md` with a
+  maintenance trigger.
 - `census.eventTypeCounts` counts prototype-named event types correctly: a
   plug-in event type such as `constructor` or `__proto__` used to produce a
   string-concatenated value or vanish from the map entirely, so a field named

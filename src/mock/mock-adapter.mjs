@@ -40,6 +40,20 @@ class EvalMockAdapter extends LlmAdapter {
     }
   }
 
+  // Carried explicitly instead of inherited: this plugin's `LlmAdapter` base
+  // resolves from THIS package's peer instance, which can lag the host
+  // runtime that drives it (host 0.1.5-rc.2 grew `prepareCall` while the
+  // local peer was 0.0.1-rc.1 — the inherited face was missing and every mock
+  // run died at `registration.adapter.prepareCall is not a function`). The
+  // shape is the host base-class default: model metadata plus a dispatch
+  // entry bound to this same adapter generation.
+  async prepareCall(provider, model, signal) {
+    return {
+      model: await this.resolveModel(provider, model, signal),
+      stream: options => this.stream(options),
+    }
+  }
+
   async * stream(_options) {
     const step = this.steps[this.cursor]
     this.cursor += 1
