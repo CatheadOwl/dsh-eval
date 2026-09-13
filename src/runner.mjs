@@ -133,7 +133,7 @@ export async function runEvalCase(evalCase, options) {
       validateFollowups(evalCase.followups, `case '${evalCase.id}'`)
     }
     if (Array.isArray(evalCase.expect)) {
-      validateEvidenceAnchor(evalCase.expect, `case '${evalCase.id}'`)
+      validateEvidenceAnchor(evalCase.expect, `case '${evalCase.id}'`, evalCase)
     }
     const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({

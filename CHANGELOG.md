@@ -43,7 +43,10 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   (any positive matcher; for a case whose task forbids tool use, a text-existence
   anchor such as `finalTextMatches(/\d/u)` works), or — for a custom matcher
   whose semantics are negative — set `requiresEvidence: false` on the object it
-  returns. `requiresEvidence(matcher)` reports the verdict for a matcher.
+  returns, or assert in an `inspect` hook (which receives the workspace and the
+  trace, so a check there is itself the evidence). `requiresEvidence(matcher)`
+  reports the verdict for a matcher. Cases with an empty `expect` and no
+  `inspect` hook are refused: nothing could make them fail.
   Out of the rule's scope: degenerate arguments (`toolSequence([])`,
   `finalTextIncludes('')`, `finalTextMatches(/.*/u)`), half-degraded
   `requestHeaders`, and a positive assertion about something unrelated to the

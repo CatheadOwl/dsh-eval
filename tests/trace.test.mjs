@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { parseSessionLog, buildTrace, isSessionLogFilename, collectSessionTrace, KNOWN_SESSION_FORMAT_VERSIONS } from '../src/trace.mjs'
+import { subagentDispatchCount } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 
@@ -194,6 +195,9 @@ describe('buildTrace', () => {
       delegationDepth: 1,
       descriptorEvents: 1,
       supportedDescriptors: 1,
+      label: 'gates:fix:doc-link',
+      mode: 'one-shot',
+      provider: 'subagent-in-process',
     }])
   })
 
@@ -214,13 +218,16 @@ describe('buildTrace', () => {
 
     // The identity-loss path the five main-log projections cannot see: the
     // child entered `subagentChildren` with no label, mode or provider.
-    assert.deepEqual(census.projectionSkipped.children, { withoutIdentity: 1 })
+    assert.deepEqual(census.projectionSkipped.children, { withoutIdentity: 1, withoutLabel: 1 })
     assert.deepEqual(census.subagent.children, [{
       sessionId: 'session-child',
       parentSession: 'session-main',
       delegationDepth: undefined,
       descriptorEvents: 1,
       supportedDescriptors: 0,
+      label: undefined,
+      mode: undefined,
+      provider: undefined,
     }])
 
     // An event type no projection reads still shows up in the count.
@@ -231,11 +238,39 @@ describe('buildTrace', () => {
     assert.equal('subagent/descriptor' in census.eventTypeCounts, false)
   })
 
-  it('keeps the census on the run trace only, never on a nested session log', () => {
+  // Partial identity is its own signal: a supported descriptor that carries
+  // mode/provider but no label still leaves the child unmatchable by the
+  // label-keyed count matchers, so `*Count(label, 0)` stays vacuously green
+  // even though `supportedDescriptors` looks healthy.
+  it('census flags a child whose label is missing even when other identity fields folded', () => {
+    const main = '{"type":"session","version":3,"id":"session-main"}'
+    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+      + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":3,"mode":"one-shot","provider":"p"}}'
+    const built = buildTrace([parseSessionLog(main), parseSessionLog(child)])
+    const census = built.census
+
+    assert.equal(census.subagent.supportedDescriptors, 1)
+    assert.equal(census.projectionSkipped.children.withoutIdentity, undefined)
+    assert.equal(census.projectionSkipped.children.withoutLabel, 1)
+    assert.equal(census.subagent.children[0].label, undefined)
+    assert.equal(census.subagent.children[0].mode, 'one-shot')
+    // The fact the census exists to surface: the label assertion is green only
+    // because no child carried a label.
+    assert.equal(subagentDispatchCount(/^gates:fix:/, 0).check(built).ok, true)
+  })
+
+  it('leaves the caller logs untouched and keeps the census on the run trace only', () => {
     const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
     const merged = buildTrace([parent])
     assert.ok(merged.census !== undefined)
+    assert.equal(merged.sessions[0], parent)
     assert.equal(merged.sessions.every(session => session.census === undefined), true)
+    // The pre-existing input keeps whatever it carried: buildTrace must not
+    // mutate the caller's parsed logs.
+    const seeded = parseSessionLog(readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
+    seeded.census = { injected: true }
+    buildTrace([seeded])
+    assert.deepEqual(seeded.census, { injected: true })
   })
 })
 

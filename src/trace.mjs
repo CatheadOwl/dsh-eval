@@ -151,6 +151,37 @@ function parseArguments(raw) {
 }
 
 /**
+ * Fold one child log's descriptor events exactly once: the identity
+ * `projectChild` asserts on, plus the counts the census reports. Single source
+ * on purpose — `projectChild` and `censusForChild` must agree on which
+ * descriptor established the identity, and the "supported" predicate must
+ * match the fold (a log whose only descriptors are unsupported yields both an
+ * empty identity and `supportedDescriptors: 0`, which is the census signal).
+ * @param {{ events: object[] }} log - one parsed child log.
+ * @returns {{ label: string | undefined, mode: string | undefined, provider: string | undefined, descriptorEvents: number, supportedDescriptors: number }}
+ */
+function foldChildDescriptor(log) {
+  let label
+  let mode
+  let provider
+  let descriptorEvents = 0
+  let supportedDescriptors = 0
+  for (const event of log.events) {
+    if (event.type !== 'subagent/descriptor') continue
+    descriptorEvents += 1
+    const data = event.data
+    if (data === null || typeof data !== 'object') continue
+    if (data.version === 3) supportedDescriptors += 1
+    if (label !== undefined || mode !== undefined || provider !== undefined) continue
+    if (data.version !== 3) continue
+    if (typeof data.label === 'string') label = data.label
+    if (typeof data.mode === 'string') mode = data.mode
+    if (typeof data.provider === 'string') provider = data.provider
+  }
+  return { label, mode, provider, descriptorEvents, supportedDescriptors }
+}
+
+/**
  * Project one subagent child log into an assertable record. The durable
  * identity (`label` / `mode` / `provider`) comes from the FIRST
  * `subagent/descriptor` event whose payload carries the descriptor version
@@ -162,19 +193,7 @@ function parseArguments(raw) {
  * never ran to an answer (turn/end reasons are not consulted).
  */
 function projectChild(log) {
-  let label
-  let mode
-  let provider
-  for (const event of log.events) {
-    if (event.type !== 'subagent/descriptor') continue
-    const data = event.data
-    if (data === null || typeof data !== 'object') continue
-    if (label !== undefined || mode !== undefined || provider !== undefined) break
-    if (data.version !== 3) continue
-    if (typeof data.label === 'string') label = data.label
-    if (typeof data.mode === 'string') mode = data.mode
-    if (typeof data.provider === 'string') provider = data.provider
-  }
+  const { label, mode, provider } = foldChildDescriptor(log)
   const assistantTexts = log.events
     .filter(event => event.type === 'assistant/message')
     .map(event => messageText(event.data.message))
@@ -209,28 +228,20 @@ function countEventTypes(events) {
 /**
  * Census for one candidate child log: whether its `subagent/descriptor`
  * events exist, how many, and how many carry the supported descriptor
- * version. `projectChild` folds the first supported one into identity; a log
- * with no supported non-zero count means the child entered
- * `subagentChildren` with empty identity — the signature of the identity-loss
+ * version, plus the folded identity itself. `label` is the field the
+ * subagent-count matchers key on, so `label: undefined` with a non-zero
+ * `descriptorEvents` is exactly the shape whose `*Count(label, 0)` assertion
+ * is green only because there was nothing to match — the identity-loss
  * degradation the census exists to make visible.
  * @param {{ header: object, events: object[] }} log - one parsed child candidate.
- * @returns {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number }}
+ * @returns {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number, label: string | undefined, mode: string | undefined, provider: string | undefined }}
  */
 function censusForChild(log) {
-  let descriptorEvents = 0
-  let supportedDescriptors = 0
-  for (const event of log.events) {
-    if (event.type !== 'subagent/descriptor') continue
-    descriptorEvents += 1
-    const data = event.data
-    if (data !== null && typeof data === 'object' && data.version === 3) supportedDescriptors += 1
-  }
   return {
     sessionId: log.header.id,
     parentSession: log.header.parentSession,
     delegationDepth: log.header.delegationDepth,
-    descriptorEvents,
-    supportedDescriptors,
+    ...foldChildDescriptor(log),
   }
 }
 
@@ -257,30 +268,27 @@ function buildCensus(events, trace, childLogs) {
     const missing = (eventTypeCounts[type] ?? 0) - projectionLengths[field]
     if (missing > 0) projectionSkipped.main[field] = missing
   }
-  const descriptorEvents = eventTypeCounts['subagent/descriptor'] ?? 0
-  let supportedDescriptors = 0
-  for (const log of childLogs) {
-    for (const event of log.events) {
-      if (event.type !== 'subagent/descriptor') continue
-      const data = event.data
-      if (data !== null && typeof data === 'object' && data.version === 3) supportedDescriptors += 1
-    }
-  }
-  for (const child of trace.subagentChildren) {
-    if (child.label === undefined && child.mode === undefined && child.provider === undefined) {
-      projectionSkipped.children.withoutIdentity
-        = (projectionSkipped.children.withoutIdentity ?? 0) + 1
-    }
-  }
+  const children = childLogs.map(censusForChild)
+  const supportedDescriptors = children.reduce((total, child) => total + child.supportedDescriptors, 0)
+  // Two degradation shapes, different signals: `withoutIdentity` is a child
+  // that folded no identity at all; `withoutLabel` is one that folded some
+  // identity but no label — the only field the `subagent*Count` matchers can
+  // match on, so its zero-count assertions are the vacuous ones.
+  const withoutIdentity = children.filter(
+    child => child.label === undefined && child.mode === undefined && child.provider === undefined,
+  ).length
+  const withoutLabel = children.filter(child => child.label === undefined).length
+  if (withoutIdentity > 0) projectionSkipped.children.withoutIdentity = withoutIdentity
+  if (withoutLabel > 0) projectionSkipped.children.withoutLabel = withoutLabel
   return {
     eventTypeCounts,
     projectionLengths,
     projectionSkipped,
     subagent: {
-      mainLogDescriptorEvents: descriptorEvents,
+      mainLogDescriptorEvents: eventTypeCounts['subagent/descriptor'] ?? 0,
       supportedDescriptors,
       projectionLength: trace.subagentChildren.length,
-      children: childLogs.map(censusForChild),
+      children,
     },
   }
 }
@@ -391,9 +399,6 @@ export function buildTrace(logs) {
     census: undefined,
   }
   result.census = buildCensus(events, result, childLogs)
-  // Only the run's own trace carries a census: a nested child log would
-  // report its events as its parent's main session.
-  for (const session of logs) delete session.census
   return result
 }
 
@@ -537,11 +542,17 @@ export function collectSessionTrace(sessionsRoot) {
  *   `subagentChildren` (their `subagent/descriptor` event counts and how many
  *   carry the supported `version === 3`). `projectionLengths` are the five
  *   main-log projections' lengths after empty-text drops; `projectionSkipped`
- *   records where count minus length is positive, per projection. Undefined
- *   only on a hand-built trace; the nested logs under `sessions` never carry
- *   their own census.
- * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number }[]} census.subagent.children
- *   - the accepted child logs; `descriptorEvents === 0` means the log states no
- *     identity at all, and a non-zero count with `supportedDescriptors === 0`
- *     means every descriptor was outside the supported version.
+ *   records where count minus length is positive, per projection, plus the two
+ *   child-identity counters. Undefined only on a hand-built trace; a nested log
+ *   under `sessions` carries none because the parsers never add one.
+ * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number, label: string | undefined, mode: string | undefined, provider: string | undefined }[]} census.subagent.children
+ *   - the accepted child logs, each with the identity `projectChild` folded
+ *     from them; `descriptorEvents === 0` means the log states no identity at
+ *     all, and a non-zero count with `supportedDescriptors === 0` means every
+ *     descriptor was outside the supported version.
+ * @property {Record<string, number>} census.projectionSkipped.children
+ *   - `withoutIdentity` counts children that folded no identity field at all;
+ *     `withoutLabel` counts children whose `label` is absent — the field the
+ *     `subagent*Count` matchers match on, so those are the records whose
+ *     zero-count assertions pass only because there was nothing to match.
  */

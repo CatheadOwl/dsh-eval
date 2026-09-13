@@ -58,8 +58,9 @@ export function validateDisableRows(disableRows, label) {
 }
 
 /**
- * Validate the evidence anchor of an `expect` array: at least one matcher must
- * be able to FAIL on an empty projection.
+ * Validate the evidence anchor of an eval case's `expect` array: at least one
+ * matcher must be able to FAIL on an empty projection, unless the case carries
+ * an `inspect` hook of its own.
  *
  * The trace projection is tolerant (see `trace.mjs`): a host event whose
  * payload drifts leaves the projection empty instead of throwing. Matchers
@@ -73,17 +74,25 @@ export function validateDisableRows(disableRows, label) {
  * `validateEvalCase` (load time) and `runEvalCase` (execution time) so both
  * report the identical message.
  *
+ * `inspect` is an evidence surface in its own right: it receives the workspace
+ * and the trace, so a case that asserts there — a wiring smoke whose checks
+ * live on raw events, for instance — is anchored even with an empty `expect`.
+ * The framework hands it `trace: undefined` when no trace materialized, which
+ * is the case's own cue to fail loudly.
+ *
  * @param {object[]} expect - the case's matcher array.
  * @param {string} label - error-message context (e.g. `file: case '<id>'`).
+ * @param {object} [evalCase] - the case, read for its `inspect` hook.
  */
-export function validateEvidenceAnchor(expect, label) {
-  const anchored = expect.some(matcher => requiresEvidence(matcher))
-  if (anchored) return
+export function validateEvidenceAnchor(expect, label, evalCase) {
+  if (expect.some(matcher => requiresEvidence(matcher))) return
+  if (typeof evalCase?.inspect === 'function') return
   const negative = expect.map(matcher => `'${matcher.describe}'`).join(', ')
   throw new Error(
-    `${label}: no evidence anchor — every matcher passes vacuously on an empty projection (${negative});`
-    + ' add one assertion that requires evidence (a positive matcher), or mark a custom negative matcher'
-    + ' with requiresEvidence: false',
+    `${label}: no evidence anchor — every matcher passes vacuously on an empty projection`
+    + `${negative === '' ? ' (expect is empty)' : ` (${negative})`};`
+    + ' add one assertion that requires evidence (a positive matcher), mark a custom negative matcher'
+    + ' with requiresEvidence: false, or assert in an inspect hook',
   )
 }
 
@@ -168,7 +177,7 @@ export function validateEvalCase(evalCase, file) {
       throw new Error(`${file}: case '${evalCase.id}': expect[${i}] must have { describe: string, check: function }`)
     }
   }
-  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`)
+  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`, evalCase)
   if (evalCase.mode === 'mock') {
     if (evalCase.script === undefined || !Array.isArray(evalCase.script?.steps)) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)

@@ -65,12 +65,12 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | 面 | 内容 |
 |---|---|
 | 主 session 事件（`eventTypeCounts` / `projectionLengths` / `projectionSkipped.main`） | 主日志（`buildTrace` 的投影输入）逐事件类型计数（任何类型，含插件扩展类型）；五个投影的长度；以及**每个投影上「计数 − 长度 > 0」的差额**（`projectionSkipped.main`，按投影字段名） |
-| 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数与其中 `version === 3` 的条数（`supportedDescriptors`）；`projectionLength` 是实际进入 `subagentChildren` 的条数；`projectionSkipped.children.withoutIdentity` 数身份（label/mode/provider 全缺）为空的子记录。**子日志不是主日志**，`eventTypeCounts` 不统计它们的 `subagent/descriptor` |
+| 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数、其中 `version === 3` 的条数（`supportedDescriptors`）**以及折叠出的身份**（`label` / `mode` / `provider`）；`projectionLength` 是实际进入 `subagentChildren` 的条数；`projectionSkipped.children` 两个身份计数——`withoutIdentity`（三项全缺）与 `withoutLabel`（`label` 缺，哪怕 mode/provider 有）。**子日志不是主日志**，`eventTypeCounts` 不统计它们的 `subagent/descriptor` |
 
 判读要点：
 
 - **差额 ≠ 缺陷**。`assistant/message`、`user/message` 的**空文本消息是设计上整条丢弃**（保护「组装文本」投影语义），这类差额属合法，普查不替你做白名单；
-- **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空——`*Count(label, 0)` 在这种日志上真空通过，而五个主投影面全部正常；
+- **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空；但**只要 `label` 缺**（`withoutLabel`），按 label 匹配的 `*Count(label, 0)` 就会真空通过——哪怕 `supportedDescriptors` 看起来健康、mode/provider 都在。两个计数分开报就是为了这个档。
 - 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动）。失败文案目前不带计数。
 
 ## 证据锚（`requiresEvidence`）

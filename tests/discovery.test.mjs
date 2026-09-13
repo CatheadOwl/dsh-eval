@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { discoverFiles, validateEvalCase, validateEvidenceAnchor, detectDuplicateIds } from '../src/discovery.mjs'
@@ -223,12 +224,51 @@ describe('validateEvalCase', () => {
     }, file), /no evidence anchor/)
   })
 
+  // A case can anchor in its own `inspect` hook instead: the hook receives the
+  // workspace and the trace (undefined when nothing materialized), so its own
+  // checks are the evidence surface. The repo's wiring-smoke case is this
+  // shape — rejecting it was a regression the ADR's survey missed.
+  it('accepts an empty expect when the case asserts in an inspect hook', () => {
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-8', task: 'x', expect: [],
+      inspect: () => {},
+    }, file))
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'anchor-9', task: 'x',
+      expect: [toolNotCalled('read')],
+      inspect: () => {},
+    }, file))
+    // Empty expect WITHOUT an inspect hook is a case that cannot fail at all.
+    assert.throws(() => validateEvalCase({
+      id: 'anchor-10', task: 'x', expect: [],
+    }, file), /no evidence anchor — every matcher passes vacuously on an empty projection \(expect is empty\)/)
+  })
+
   it('validateEvidenceAnchor reports the same rule when called directly', () => {
     assert.doesNotThrow(() => validateEvidenceAnchor([validMatcher], 'case x'))
     assert.throws(
       () => validateEvidenceAnchor([subagentDispatchCount('a', 0)], 'case x'),
       /^Error: case x: no evidence anchor/,
     )
+    assert.doesNotThrow(
+      () => validateEvidenceAnchor([], 'case x', { inspect: () => {} }),
+      'an inspect hook anchors the case',
+    )
+    assert.throws(
+      () => validateEvidenceAnchor([], 'case x', { inspect: 'not a function' }),
+      /\(expect is empty\)/,
+    )
+  })
+
+  // The rule must load the repo's own corpus: a wiring smoke that asserts only
+  // inside its inspect hook (`expect: []`) is the shape that made a first cut of
+  // this rule reject a shipped case.
+  it('loads the repo case that asserts in its inspect hook with an empty expect', async () => {
+    const fromEval = fileURLToPath(new URL('../../extras/modules/prompt/eval/behavior/mock/injection-smoke.eval.mjs', import.meta.url))
+    const loaded = (await import(pathToFileURL(fromEval).href)).default
+    assert.deepEqual(loaded.expect, [])
+    assert.equal(typeof loaded.inspect, 'function')
+    assert.doesNotThrow(() => validateEvalCase(loaded, fromEval))
   })
 })
 
