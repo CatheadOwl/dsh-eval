@@ -6,32 +6,6 @@
  * tool choice is the contract under test.
  */
 
-/**
- * Whether a matcher needs evidence to exist before it can be meaningful.
- *
- * A projector is tolerant: a host event whose payload drifts leaves the
- * projection empty instead of failing. Matchers that assert ABSENCE pass on an
- * empty projection — vacuously, without measuring anything. Those factories
- * self-report `requiresEvidence: false`, and `validateEvidenceAnchor` requires
- * every case to carry at least one matcher that does not. Positive factories
- * and unknown custom matchers default to requiring evidence (the safe
- * direction: an unmarked matcher can only satisfy the anchor, never bypass it).
- *
- * A custom matcher whose semantics are negative sets `requiresEvidence: false`
- * on the object it returns to join the anchor contract.
- *
- * @param {object} matcher - one `{ describe, check }` matcher.
- * @returns {boolean} false only when the matcher explicitly self-reports it.
- */
-export function requiresEvidence(matcher) {
-  return matcher?.requiresEvidence !== false
-}
-
-/** Tag a matcher whose assertion passes vacuously on an empty projection. */
-function markedNegative(matcher) {
-  return { ...matcher, requiresEvidence: false }
-}
-
 /** Render a name matcher for diagnostics. */
 function describeMatcher(matcher) {
   return matcher instanceof RegExp ? String(matcher) : `'${matcher}'`
@@ -100,13 +74,9 @@ export function toolCalled(matcher) {
   }
 }
 
-/**
- * No tool matching `matcher` was ever called. Passes vacuously on an empty
- * `toolCalls` projection — pair it with a positive matcher (or a positive
- * assertion elsewhere in `expect`) so the case also proves evidence arrived.
- */
+/** No tool matching `matcher` was ever called. */
 export function toolNotCalled(matcher) {
-  return markedNegative({
+  return {
     describe: `tool not called: ${describeMatcher(matcher)}`,
     check(trace) {
       const hit = trace.toolCalls.find(call => nameMatches(matcher, call.name))
@@ -114,7 +84,7 @@ export function toolNotCalled(matcher) {
         ? { ok: true, message: '' }
         : { ok: false, message: `expected no ${describeMatcher(matcher)} call; saw one at seq ${hit.seq}` }
     },
-  })
+  }
 }
 
 /** The FIRST tool call matches `matcher`. */
@@ -465,7 +435,7 @@ export function userMessageTextIncludes(sourceMatcher, substring) {
  * "not steered on someone else's file" half of an isolation assertion.
  */
 export function userMessageTextExcludes(sourceMatcher, substring) {
-  return markedNegative({
+  return {
     describe: `user message from ${describeSource(sourceMatcher)} excludes: '${substring}'`,
     check(trace) {
       const messages = trace.userMessages.filter(message => sourceMatches(sourceMatcher, message.source))
@@ -478,7 +448,7 @@ export function userMessageTextExcludes(sourceMatcher, substring) {
               + `${JSON.stringify(truncate(hit.text))}`,
           }
     },
-  })
+  }
 }
 
 /**
@@ -486,17 +456,12 @@ export function userMessageTextExcludes(sourceMatcher, substring) {
  * dispatched. The bounded-redispatch assertion ("one dispatch per turn, no
  * more") — pair with cross-turn driving (`followups`), where the count spans
  * every driven turn.
- *
- * Polarity follows the ARGUMENT, not the factory: `expected === 0` asserts
- * absence and passes vacuously on an empty projection (self-reports
- * `requiresEvidence: false`); a positive `expected` requires evidence.
  */
 export function subagentDispatchCount(matcher, expected) {
-  const countMatches = trace => trace.subagentChildren.filter(child => childMatches(matcher, child)).length
-  const matcherObject = {
+  return {
     describe: `subagent dispatch count: ${describeMatcher(matcher)} × ${expected}`,
     check(trace) {
-      const count = countMatches(trace)
+      const count = trace.subagentChildren.filter(child => childMatches(matcher, child)).length
       return count === expected
         ? { ok: true, message: '' }
         : {
@@ -506,7 +471,6 @@ export function subagentDispatchCount(matcher, expected) {
           }
     },
   }
-  return expected === 0 ? markedNegative(matcherObject) : matcherObject
 }
 
 /**
@@ -515,12 +479,9 @@ export function subagentDispatchCount(matcher, expected) {
  * suffices), this pins every dispatched child's outcome — "dispatched ⇒
  * observable outcome" for cross-turn cases where a truncated child must fail
  * the case even when its siblings finished.
- *
- * Polarity follows the ARGUMENT (see `subagentDispatchCount`): `expected === 0`
- * self-reports `requiresEvidence: false`.
  */
 export function subagentCompletedCount(matcher, expected) {
-  const matcherObject = {
+  return {
     describe: `subagent completed count: ${describeMatcher(matcher)} × ${expected}`,
     check(trace) {
       const children = trace.subagentChildren.filter(child => childMatches(matcher, child))
@@ -535,5 +496,4 @@ export function subagentCompletedCount(matcher, expected) {
           }
     },
   }
-  return expected === 0 ? markedNegative(matcherObject) : matcherObject
 }

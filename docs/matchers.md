@@ -76,26 +76,6 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - **子会话集合是启发式**：`subagentChildren` 收「header 带 `parentSession`」的日志，而宿主对 fork/resume/seed 日志也写这个字段——它们会以「无身份子记录」出现在普查里。这是集合的性质，不是本次降级（日志层无法复现宿主的 agent 链所有权判定）；
 - 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带；**无 trace 的记录没有**）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动），失败文案也不带计数。
 
-## 证据锚（`requiresEvidence`）
-
-上节的补救是**报告面**；这一节是**加载期**的守卫：每条 case 的 `expect` 至少要有一条**在空投影下会红**的断言（证据锚），否则加载即拒绝。`dsh-eval` 与 `runEvalCase` 两条入口都执法，报错文案一致。
-
-极性由 matcher 对象自报，判据是**工厂 + 参数**，不是工厂名：
-
-| 形态 | 极性 |
-|---|---|
-| `toolNotCalled` / `userMessageTextExcludes` | 负向（自报 `requiresEvidence: false`） |
-| `subagentDispatchCount(m, 0)` / `subagentCompletedCount(m, 0)` | 负向（**参数**为 0 才负向） |
-| `subagentDispatchCount(m, n>0)` / `subagentCompletedCount(m, n>0)` | 正向 |
-| 其余框架 matcher（`toolCalled`、`finalTextIncludes`、`assistantTextIncludes`、`toolMounted`…） | 正向 |
-| 自定义 matcher（未声明） | 正向（缺省要求证据） |
-
-- **自定义 matcher**：语义为负向的，在返回对象上写 `requiresEvidence: false` 即可加入契约；其余不用管（缺省要求证据）。
-- `requiresEvidence(matcher)`：该判据的公开读取面（`true` = 它是证据锚）——校验与自定义封装可用它，不必复述字段名。
-- **`inspect` 豁免（显式声明制，非已验证）**：case 声明 `evidence: 'inspect'` 且带 `inspect` hook 时，加载期豁免本规则。豁免的正当性是「**inspect 读了原始证据**」，不是「inspect 存在」：hook 收到 workspace 与 trace（**无 trace 时收到 `undefined`，由 case 自己响亮失败**），可能遍历原始 session 事件（`trace.sessions[].events`，绕过宽松投影、免疫降级），也可能什么都不读——框架审计不了，所以豁免按**显式声明**给而不按 hook 存在性给：一行 `inspect: () => {}` 不足以放行全负向 case；**声明而无 hook、hook 而无声明（且无 matcher 锚）都会被拒**。声明了的 case 在报告里带 `evidenceAnchor: 'inspect'` 字段（唯一的声明式锚；matcher 锚的 case 不带该字段），让"证据面没被审过"在 CI 产物里可见，而不是看起来和别的绿灯一样。
-- **射程外**（不做过度承诺，写在这里以免误以为会被拦）：退化参数（`toolSequence([])`、`finalTextIncludes('')`、`finalTextMatches(/.*/u)` 形态正向、实际恒真）、半降级（`requestHeaders` 在而 `toolNames` 空）、以及"正向断言断言了一件与本 case 无关的事"（写作纪律，机械面覆盖不了）。
-- 典型迁移：一条只写 `toolNotCalled(/^coggit_/)` 的隔离 case，补一条存在性正向断言（例如 `finalTextMatches(/\d/u)`——任务要求给数字时必须给得出）。
-
 ## Mock script helpers
 
 - `toolCallStep(name, args)`：一步「模型调工具」，结束于 tool-calls；

@@ -5,10 +5,9 @@
  * per-run overlay files; sharing one emitter keeps quoting rules and
  * row-patch syntax (`- id: <row>` / `disabled: true`) identical everywhere.
  *
- * YAML strategy: JSON double-quoted strings are valid YAML scalars, and JSON
- * arrays / objects are valid YAML flow sequences / mappings, so the emitters
- * lean on JSON.stringify — zero dependencies, identical quoting across
- * scalar, array, and nested-object leaves.
+ * YAML strategy: JSON double-quoted strings are valid YAML scalars, so the
+ * emitters lean on JSON.stringify — zero dependencies, identical quoting
+ * across scalar and array leaves.
  */
 
 import { join } from 'node:path'
@@ -30,14 +29,12 @@ function yamlScalar(value) {
 }
 
 /**
- * One rowConfig leaf or branch: a scalar, an array of scalars emitted as a
- * YAML flow sequence, or a nested plain object emitted as a YAML flow mapping
- * (a JSON object is valid YAML flow syntax, and keeps quoting rules identical
- * to `yamlScalar` — numbers and booleans stay YAML-native either way).
+ * One rowConfig leaf: a scalar, or an array of scalars emitted as a YAML flow
+ * sequence (a JSON array is valid YAML flow syntax, and keeps quoting rules
+ * identical to `yamlScalar`).
  */
 function yamlConfigValue(value) {
   if (Array.isArray(value)) return JSON.stringify(value.map(item => typeof item === 'string' ? item : String(item)))
-  if (value !== null && typeof value === 'object') return JSON.stringify(value)
   return yamlScalar(value)
 }
 
@@ -55,7 +52,7 @@ export function overlayDisableRows(rowIds) {
 /**
  * Serialize the per-run overlay patch list for one eval case.
  * @param {object} parts - overlay ingredients (see runEvalCase):
- *   `sessionsRoot` (required), optional `disableRows`,
+ *   `sessionsRoot` (required), optional `persona`, `disableRows`,
  *   `rowConfig`, and `mock` (mount the scripted adapter + re-point the
  *   default model).
  * @returns {string} the overlay file text.
@@ -67,6 +64,11 @@ export function buildOverlayYaml(parts) {
   lines.push(`    root: ${yamlScalar(parts.sessionsRoot)}`)
   lines.push('    packChunks: false')
   lines.push('    compression: none')
+  if (parts.persona !== undefined) {
+    lines.push('- id: system-prompt')
+    lines.push('  config:')
+    lines.push(`    persona: ${yamlScalar(parts.persona)}`)
+  }
   if (parts.disableRows !== undefined && parts.disableRows.length > 0) {
     lines.push(overlayDisableRows(parts.disableRows).trimEnd())
   }

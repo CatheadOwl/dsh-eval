@@ -28,11 +28,6 @@ import { resolveDshCliChain } from '@catheadowl/dsh-eval/experimental'
 | `materializeReviewExperiment` | 把实验定义物化为产物目录 |
 | `renderObservationSections` | 标准 observation renderer（自定义 executor 用） |
 | `OBSERVATIONS_PLACEHOLDER` | prompt 中的观测占位符常量（必须恰好出现一次） |
-| `defineBehaviorExperiment` | 定义并校验行为实验（臂 × 重复 × 守卫 × 判读标准），冻结记录带 `definitionSha256` 预注册指纹（形态与纪律见 [experiments.md](experiments.md)） |
-| `executeBehaviorExperiment` | 执行行为实验：臂覆写深合并、case id 框架铸造、逐 run 守卫与具名失败记账、零 guard-clean 臂判 invalid |
-| `renderBehaviorSummary` | 渲染实验 summary（预注册 decisionRule 原文 + 指纹 + 描述统计 + invalid 臂具名清单） |
-| `writeBehaviorArtifacts` | 落盘实验产物（`results.json` + `summary.md`） |
-| `evaluateMatchers` | 官方 matcher 评估入口：trace + `expect` 集，内联证据锚执法（程序化自建 driver 不再绕开执法点） |
 | `createDshHeadlessReviewExecutor` | 构造 dsh headless review executor |
 | `runDshReviewExperiment` | 端到端跑一个 dsh review 实验 |
 | `validateToolBoundary` | 校验 trace 满足 turn-close 工具边界契约；结果带 `status`（`checked` / `not-executed`），无 trace 时**不是**通过 |

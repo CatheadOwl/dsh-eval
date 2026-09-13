@@ -13,12 +13,10 @@ describe('buildOverlayYaml', () => {
     assert.ok(!yaml.includes('eval-mock'))
   })
 
-  it('never emits a system-prompt row (the case persona field is gone; persona overrides ride rowConfig)', () => {
-    const yaml = buildOverlayYaml({
-      sessionsRoot: 's',
-      rowConfig: { 'system-prompt': { personaPrefix: 'You are terse.' } },
-    })
-    assert.match(yaml, /- id: "system-prompt"\n  config:\n    personaPrefix: "You are terse\."/)
+  it('adds the persona override only when a case supplies one', () => {
+    const withPersona = buildOverlayYaml({ sessionsRoot: 's', persona: 'You are terse.' })
+    assert.match(withPersona, /- id: system-prompt/)
+    assert.match(withPersona, /persona: "You are terse\."/)
     assert.ok(!buildOverlayYaml({ sessionsRoot: 's' }).includes('system-prompt'))
   })
 
@@ -51,14 +49,6 @@ describe('buildOverlayYaml', () => {
     const yaml = buildOverlayYaml({ sessionsRoot: 's', rowConfig: { demo: { flag: true, name: 'x y' } } })
     assert.match(yaml, /flag: true/)
     assert.match(yaml, /name: "x y"/)
-  })
-
-  it('emits nested rowConfig objects as YAML flow mappings', () => {
-    const yaml = buildOverlayYaml({
-      sessionsRoot: 's',
-      rowConfig: { prompt: { variant: { form: 'standard', emphasis: 2, flag: false, tags: ['a'] } } },
-    })
-    assert.match(yaml, /- id: "prompt"\n  config:\n    variant: \{"form":"standard","emphasis":2,"flag":false,"tags":\["a"\]\}/)
   })
 
   it('swaps in the multi-turn driver only when followups is supplied', () => {

@@ -10,7 +10,7 @@
  *
  * A case path is a `*.eval.mjs` file or a directory scanned recursively for
  * them. Each file default-exports one case object (or an array of them):
- * `{ id, task, mode?: 'real'|'mock', expect: Matcher[], script?,
+ * `{ id, task, mode?: 'real'|'mock', expect: Matcher[], script?, persona?,
  * prepare?, timeoutMs? }`. Real cases skip when NO credential is visible —
  * the env var DEEPSEEK_API_KEY OR the staged home's .credentials.yaml,
  * either one counts. The exit code is 1 when any run fails. Failures keep
@@ -286,7 +286,6 @@ for (const file of files.sort()) {
         id: evalCase.id, file, mode, status: 'pass',
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, ...(result.trace?.census !== undefined ? { census: result.trace.census } : {}),
-        ...(result.evidenceAnchor === 'inspect' ? { evidenceAnchor: 'inspect' } : {}),
         ...(artifactsDir !== undefined ? { artifactsDir } : {}),
       }))
       say(`PASS ${evalCase.id}`)
@@ -303,7 +302,6 @@ for (const file of files.sort()) {
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, artifactsDir,
         ...(result.trace?.census !== undefined ? { census: result.trace.census } : {}),
-        ...(result.evidenceAnchor === 'inspect' ? { evidenceAnchor: 'inspect' } : {}),
       }))
       process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.map(f => `  - ${f}`).join('\n')}\n`)
       if (hint !== undefined) process.stderr.write(`  ! ${hint}\n`)

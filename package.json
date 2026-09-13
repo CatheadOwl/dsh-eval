@@ -1,7 +1,7 @@
 {
   "name": "@catheadowl/dsh-eval",
   "description": "Agent eval framework over dsh headless runs: case runner, session-trace assertions, and a scripted mock-LLM layer for plugin intent tests.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -42,6 +42,6 @@
     "verify:experimental": "node scripts/verify-experimental-face.mjs",
     "verify:readme-i18n": "node scripts/verify-readme-i18n.mjs",
     "prepack": "node scripts/verify-manifest-face.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-readme-i18n.mjs && node scripts/verify-experimental-face.mjs",
-    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/cli-report.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/behavior.test.mjs tests/tool-validation.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs && node scripts/verify-readme-i18n.mjs && node scripts/verify-experimental-face.mjs"
+    "test": "node --test --test-isolation=none tests/trace.test.mjs tests/assertions.test.mjs tests/overlay.test.mjs tests/staging.test.mjs tests/runner.test.mjs tests/cli.test.mjs tests/cli-report.test.mjs tests/discovery.test.mjs tests/review.test.mjs tests/tool-validation.test.mjs tests/report.test.mjs tests/config.test.mjs tests/review-report.test.mjs && node scripts/verify-publish-readiness.mjs && node scripts/verify-manifest-face.mjs && node scripts/verify-readme-i18n.mjs && node scripts/verify-experimental-face.mjs"
   }
 }

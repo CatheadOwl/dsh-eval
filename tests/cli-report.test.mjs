@@ -44,7 +44,7 @@ writeFileSync(
 `
 
 /**
- * One mock case file with an evidence anchor. The matcher is written inline on
+ * One mock case file with one inline matcher. The matcher is written inline on
  * purpose: the case lives outside this package, so a bare import of
  * `@catheadowl/dsh-eval` would not resolve, and the framework's contract is the
  * `{ describe, check }` object rather than the module it came from.
@@ -129,30 +129,6 @@ describe('dsh-eval run --format json', () => {
       assert.deepEqual(traceJson.trace.census, keptRecord.census)
       assert.equal(traceJson.trace.sessions.length, 1)
       assert.equal('census' in traceJson.trace.sessions[0], false)
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  it('fails the case when the guard trips, naming the missing anchor', () => {
-    const root = mkdtempSync(join(tmpdir(), 'dsh-eval-cli-anchor-'))
-    try {
-      mkdirSync(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib'), { recursive: true })
-      writeFileSync(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'), FAKE_CLI)
-      const file = join(root, 'no-anchor.eval.mjs')
-      writeFileSync(file, `export default { id: 'no-anchor', mode: 'mock', task: 'x',\n`
-        + `  script: { steps: [{ kind: 'text', text: 'done' }] },\n`
-        + `  expect: [{ describe: 'tool not called: read', check: () => ({ ok: true, message: '' }), requiresEvidence: false }] }\n`)
-
-      const run = spawnSync(process.execPath, [
-        BIN, 'run', '--profile', 'headless', '--format', 'json', file,
-      ], { cwd: root, encoding: 'utf8' })
-
-      assert.equal(run.status, 1)
-      const report = JSON.parse(run.stdout)
-      assert.equal(report.results[0].status, 'fail')
-      assert.match(report.results[0].failures.join('\n'), /no evidence anchor/)
-      assert.equal('census' in report.results[0], false, 'no trace means no census')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

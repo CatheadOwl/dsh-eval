@@ -116,7 +116,6 @@ export default {
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig](docs/rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换、重述所需键） |
 | [cross-turn](docs/cross-turn.md) | `followups` 跨轮异步驱动契约（driver 行换装、子 agent settle 等待、mock 单 cursor 编排、有界重派断言） |
-| [experiments](docs/experiments.md) | 行为实验契约：臂 = case 字段覆写 × 重复 × 守卫 × 聚合（`defineBehaviorExperiment`、臂覆写深合并、INVALID 纪律、预注册 decisionRule） |
 | [intent-cases](docs/intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |
 | [report](docs/report.md) | 机器可读报告（`--format json` / `--report`）结构 |
 | [known-issues](docs/known-issues.md) | 已知问题与规避（如 staged home 的 REQUEST_EXTENSION） |

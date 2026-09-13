@@ -8,6 +8,7 @@
  * - always: `session-persistence-jsonl` re-rooted to the run dir, plaintext
  *   one-event-per-line layout (config override is whole-replace, so every
  *   field the backend needs is restated);
+ * - optional case persona: `system-prompt` persona override;
  * - optional `disableRows: ['<row-id>', ...]` case declaration: the listed
  *   loader rows are disabled, so e.g. a turn-close blocking gate plugin
  *   cannot splice feedback steps past the script's terminal step (the
@@ -33,7 +34,7 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectSessionTrace, listSessionLogFiles } from './trace.mjs'
-import { validateRowConfig, validateDisableRows, validateFollowups, validateEvidenceAnchor, evidenceAnchorKind } from './discovery.mjs'
+import { validateRowConfig, validateDisableRows, validateFollowups } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
 import { resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh } from './sandbox.mjs'
@@ -45,7 +46,7 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
  * Run one eval case end to end.
  *
  * Case shape: `{ id, task, mode?: 'real' | 'mock', expect: Matcher[],
- * script?: { steps: ChunkStep[] }, disableRows?: string[],
+ * script?: { steps: ChunkStep[] }, persona?: string, disableRows?: string[],
  * rowConfig?: Record<string, Record<string, unknown>>,
  * followups?: string[], settleTimeoutMs?: number,
  * prepare?: (workspace: string) => void | Promise<void>,
@@ -128,12 +129,10 @@ export async function runEvalCase(evalCase, options) {
     if (evalCase.followups !== undefined) {
       validateFollowups(evalCase.followups, `case '${evalCase.id}'`)
     }
-    if (Array.isArray(evalCase.expect)) {
-      validateEvidenceAnchor(evalCase.expect, `case '${evalCase.id}'`, evalCase)
-    }
     const overlayPath = join(runDir, 'eval-overlay.yml')
     writeFileSync(overlayPath, buildOverlayYaml({
       sessionsRoot,
+      persona: evalCase.persona,
       disableRows: evalCase.disableRows,
       rowConfig: evalCase.rowConfig,
       mock: mode === 'mock',
@@ -183,7 +182,6 @@ export async function runEvalCase(evalCase, options) {
     return {
       caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
       stdout, stderr, trace, traceGap, sessionLogs, inspectError, runDir,
-      evidenceAnchor: evidenceAnchorKind(evalCase),
     }
   } finally {
     teardownSandbox(runDir, { keep: process.env.DSH_EVAL_KEEP_TMP === '1' })
@@ -210,10 +208,6 @@ function collectSessionLogTexts(sessionsRoot) {
  *   `trace` is defined. The CLI prints it as the failure text.
  * @property {string[]} sessionLogs - raw session artifact texts, pre-cleanup.
  * @property {string | undefined} inspectError - the case's `inspect` failure text, when it threw.
- * @property {'matcher' | 'inspect' | 'none'} evidenceAnchor - which channel
- *   makes the case's assertions able to fail (`evidenceAnchorKind`). `'inspect'`
- *   is the declared-but-unverifiable one; the CLI records it on the case record
- *   so an unauditable evidence face stays visible.
  * @property {string} runDir - removed unless DSH_EVAL_KEEP_TMP=1.
  */
 

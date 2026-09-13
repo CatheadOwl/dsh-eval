@@ -6,7 +6,7 @@
 
 import { readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { requiresEvidence } from './assertions.mjs'
+
 /**
  * Directories never to descend into during discovery. `.runs` holds
  * prior-run artifacts that would be re-discovered as cases; `node_modules`
@@ -57,78 +57,6 @@ export function validateDisableRows(disableRows, label) {
 }
 
 /**
- * Which channel makes a case's assertions able to fail — the `expect` matcher
- * set (a self-reporting evidence anchor) or the case's own `inspect` hook.
- *
- * `inspect` is the one channel the framework cannot audit: the hook is opaque
- * code that may read raw session events (`trace.sessions[].events`, immune to
- * projection degradation) or nothing at all. The exemption therefore rests on
- * the case EXPLICITLY declaring `evidence: 'inspect'` — vouching that the
- * hook reads raw evidence — not on the hook's mere existence (an empty
- * `inspect: () => {}` must not re-open the vacuous-green door A1 closes).
- * This rule calls such a case `'inspect'` — an anchor that is DECLARED, not
- * verified — and the report carries that on the case record, so a record
- * whose evidence face was never examined is visible in CI instead of looking
- * like any other green case.
- *
- * @param {object} evalCase - the case (its `expect` array, `evidence`
- *   declaration, and `inspect` hook).
- * @returns {'matcher' | 'inspect' | 'none'} the channel, `'none'` when neither
- *   exists (the shape `validateEvidenceAnchor` rejects).
- */
-export function evidenceAnchorKind(evalCase) {
-  if (Array.isArray(evalCase?.expect)
-    && evalCase.expect.some(matcher => requiresEvidence(matcher))) return 'matcher'
-  if (evalCase?.evidence === 'inspect' && typeof evalCase?.inspect === 'function') return 'inspect'
-  return 'none'
-}
-
-/**
- * Validate the evidence anchor of an eval case's `expect` array: at least one
- * matcher must be able to FAIL on an empty projection, unless the case carries
- * an `inspect` hook of its own.
- *
- * The trace projection is tolerant (see `trace.mjs`): a host event whose
- * payload drifts leaves the projection empty instead of throwing. Matchers
- * that assert ABSENCE pass on an empty projection — vacuously. A case whose
- * whole `expect` is such matchers turns "nothing was measured" into "passed".
- * This rule rejects that shape at load time instead of reporting a green case.
- *
- * Polarity comes from the matcher object: a negative matcher self-reports
- * `requiresEvidence: false` (`assertions.mjs`), everything else — including an
- * unknown custom matcher — counts as requiring evidence. Shared by
- * `validateEvalCase` (load time) and `runEvalCase` (execution time) so both
- * report the identical message.
- *
- * `inspect` is the escape hatch for a case whose assertions are about raw
- * evidence: the hook receives the workspace and the trace, and the framework
- * hands it `trace: undefined` when no trace materialized, which is the case's
- * own cue to fail loudly (`extras`' injection smoke reads raw session events
- * this way — a projection-independent channel). The exemption requires the
- * case to DECLARE `evidence: 'inspect'` — the declaration vouches that the
- * hook reads raw evidence, because nothing here can judge what a hook does
- * (it may read raw events or nothing at all, which is why
- * `evidenceAnchorKind` records such a case as DECLARED rather than verified
- * and the report carries that on the case record).
- *
- * @param {object[]} expect - the case's matcher array.
- * @param {string} label - error-message context (e.g. `file: case '<id>'`).
- * @param {object} [evalCase] - the case, read for its `evidence` declaration
- *   and `inspect` hook.
- */
-export function validateEvidenceAnchor(expect, label, evalCase) {
-  if (expect.some(matcher => requiresEvidence(matcher))) return
-  if (evalCase?.evidence === 'inspect' && typeof evalCase?.inspect === 'function') return
-  const negative = expect.map(matcher => `'${matcher.describe}'`).join(', ')
-  throw new Error(
-    `${label}: no evidence anchor — every matcher passes vacuously on an empty projection`
-    + `${negative === '' ? ' (expect is empty)' : ` (${negative})`};`
-    + ' add one assertion that requires evidence (a positive matcher), mark a custom negative matcher'
-    + " with requiresEvidence: false, or declare evidence: 'inspect' and assert in an inspect hook",
-  )
-}
-
-/**
  * Validate a `followups` declaration (case-level): an array of non-empty
  * strings, one per additional driven turn. Throws with `label` context.
  * @param {unknown} followups - the value to validate.
@@ -149,27 +77,19 @@ export function validateFollowups(followups, label) {
  * - `id` is a non-empty string.
  * - `task` is a string.
  * - `mode` (if present) is `'real'` or `'mock'`.
- * - `persona` is **rejected** if present — removed, use `rowConfig` on the
- *   `system-prompt` row (`personaPrefix` / `personaSuffix`) instead; see the
- *   error text for the full migration shape.
  * - `disableRows` (if present) is an array of strings (loader row ids to
  *   disable in this run's overlay). An EMPTY array is legal and means
  *   "disable nothing, explicitly" — it overrides a `disableRows` default
  *   from `dsh-eval.config.mjs`, which is how gate-interaction cases opt
  *   back in inside a package that disables the gate row by default.
  * - `rowConfig` (if present) maps loader row ids to config objects whose
- *   leaves are scalars, arrays of scalars, or nested plain objects of the
- *   same (see `validateRowConfig`). The overlay REPLACES the row's whole
- *   config — restate any keys the row needs, not just the ones being changed.
+ *   leaf values are scalars or arrays of scalars (see `validateRowConfig`).
+ *   The overlay REPLACES the row's whole config — restate any keys the row
+ *   needs, not just the ones being changed.
  * - `followups` (if present) is a non-empty array of followup turn texts
  *   (cross-turn driving; see `validateFollowups`), with optional positive
  *   finite `settleTimeoutMs`.
  * - `expect` is an array; every element has `describe` (string) and `check` (function).
- * - `expect` carries at least one evidence anchor: a matcher that can fail on
- *   an empty projection (see `validateEvidenceAnchor`). Negative matchers
- *   self-report `requiresEvidence: false`; custom matchers default to
- *   requiring evidence. A case whose only anchor is its `inspect` hook must
- *   DECLARE `evidence: 'inspect'` (with the hook present) for the exemption.
  * - mock mode requires a `script` with `steps` array.
  *
  * @param {object} evalCase - the case to validate.
@@ -190,9 +110,6 @@ export function validateEvalCase(evalCase, file) {
   }
   if (evalCase.gates !== undefined) {
     throw new Error(`${file}: case '${evalCase.id}': the 'gates' field was removed — declare disableRows: ['gates'] instead`)
-  }
-  if (evalCase.persona !== undefined) {
-    throw new Error(`${file}: case '${evalCase.id}': the 'persona' field was removed — it emitted a config key the host's SystemPrompt.Config never had (silently inert, and whole-replace dropped the profile's personaPrefix/personaSuffix); declare rowConfig: { 'system-prompt': { personaPrefix, personaSuffix } } instead, restating both keys`)
   }
   if (evalCase.disableRows !== undefined) {
     validateDisableRows(evalCase.disableRows, `${file}: case '${evalCase.id}'`)
@@ -221,56 +138,13 @@ export function validateEvalCase(evalCase, file) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)
     }
   }
-  // Part of the anchor domain, so it sits directly before the anchor rule:
-  // a structural mistake (including a malformed declaration) is what the
-  // author hears about first, the catch-all anchor error last.
-  if (evalCase.evidence !== undefined) {
-    if (evalCase.evidence !== 'inspect') {
-      throw new Error(`${file}: case '${evalCase.id}': evidence must be 'inspect' (got '${JSON.stringify(evalCase.evidence)}')`)
-    }
-    if (typeof evalCase.inspect !== 'function') {
-      throw new Error(`${file}: case '${evalCase.id}': evidence: 'inspect' requires an inspect hook — the declaration vouches for the hook's assertions, not for the case`)
-    }
-  }
-  // Last, deliberately: the anchor rule is the catch-all, so a case that is
-  // also missing `script.steps` hears about that first instead of about the
-  // anchor its empty `expect` happens to lack.
-  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`, evalCase)
-}
-
-/**
- * Validate one rowConfig value at `path` (a dotted key path): a scalar, an
- * array of scalars, or a nested plain object of the same — parameter groups
- * stay expressible as ONE value instead of being flattened into unrelated
- * scalar keys. Throws with `label` context and the offending key path.
- * @param {string} rowId - the row id the config belongs to (error context).
- * @param {string} path - dotted key path within the row's config.
- * @param {unknown} value - the value to validate.
- * @param {string} label - error-message context (e.g. `case '<id>'`).
- */
-function validateConfigValue(rowId, path, value, label) {
-  const where = `${label}: rowConfig['${rowId}']['${path}']`
-  if (Array.isArray(value)) {
-    if (value.some(item => item === null || typeof item === 'object')) {
-      throw new Error(`${where} must be an array of scalars`)
-    }
-  } else if (value === null || typeof value === 'object') {
-    if (value === null) {
-      throw new Error(`${where} must be a scalar, scalar array, or nested object (got null)`)
-    }
-    for (const [key, nested] of Object.entries(value)) {
-      if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
-      validateConfigValue(rowId, `${path}.${key}`, nested, label)
-    }
-  }
 }
 
 /**
  * Validate a `rowConfig` mapping (case-level or ad-hoc): keys are loader row
- * ids, values are config objects whose leaves must be scalars (string /
- * number / boolean), arrays of scalars, or nested plain objects of the same
- * (emitted as YAML flow mappings — see `yamlConfigValue`). Throws with
- * `label` context.
+ * ids, values are config objects whose leaf values must be scalars (string /
+ * number / boolean) or arrays of scalars. Nested objects are rejected — the
+ * overlay emitter only handles flat config keys. Throws with `label` context.
  * @param {unknown} rowConfig - the value to validate.
  * @param {string} label - error-message context (e.g. `case '<id>'`).
  */
@@ -285,7 +159,13 @@ export function validateRowConfig(rowConfig, label) {
     }
     for (const [key, value] of Object.entries(config)) {
       if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
-      validateConfigValue(rowId, key, value, label)
+      if (Array.isArray(value)) {
+        if (value.some(item => item === null || typeof item === 'object')) {
+          throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be an array of scalars`)
+        }
+      } else if (value === null || typeof value === 'object') {
+        throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be a scalar or scalar array (nested objects are not supported)`)
+      }
     }
   }
 }

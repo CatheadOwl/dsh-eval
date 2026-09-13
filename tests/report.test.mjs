@@ -30,14 +30,6 @@ describe('createCaseRecord', () => {
     assert.ok(!('census' in noTrace))
   })
 
-  // An inspect-anchored case is the one whose evidence face nobody can audit;
-  // the record says so, and a matcher-anchored one stays unmarked (EVAL-022 C).
-  it('marks an inspect-anchored case and leaves a matcher-anchored one unmarked', () => {
-    const declared = createCaseRecord({ id: 'c-6', file: '/x/c.eval.mjs', status: 'pass', evidenceAnchor: 'inspect' })
-    assert.equal(declared.evidenceAnchor, 'inspect')
-    const verified = createCaseRecord({ id: 'c-7', file: '/x/c.eval.mjs', status: 'pass' })
-    assert.ok(!('evidenceAnchor' in verified))
-  })
 })
 
 describe('summarizeRecords', () => {

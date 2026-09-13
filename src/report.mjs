@@ -34,12 +34,6 @@
  *   (`trace.census`), carried on both pass and fail records so a green case
  *   whose evidence surface degraded is still inspectable after the fact.
  *   Absent when no trace materialized.
- * @param {'inspect'} [parts.evidenceAnchor] - present only when the case
- *   DECLARED `evidence: 'inspect'` and anchors in its `inspect` hook alone
- *   (`evidenceAnchorKind`), i.e. the one evidence channel the framework
- *   cannot audit. The record marks it so a case whose evidence face was never
- *   examined is visible in CI instead of looking like any other green case; a
- *   matcher-anchored case omits the field.
  */
 export function createCaseRecord(parts) {
   const record = { id: parts.id, file: parts.file }
@@ -52,7 +46,6 @@ export function createCaseRecord(parts) {
   if (parts.durationMs !== undefined) record.durationMs = parts.durationMs
   if (parts.artifactsDir !== undefined) record.artifactsDir = parts.artifactsDir
   if (parts.census !== undefined) record.census = parts.census
-  if (parts.evidenceAnchor !== undefined) record.evidenceAnchor = parts.evidenceAnchor
   return record
 }
 

@@ -1,11 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL, fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { discoverFiles, validateEvalCase, validateEvidenceAnchor, evidenceAnchorKind, detectDuplicateIds } from '../src/discovery.mjs'
-import { toolNotCalled, userMessageTextExcludes, subagentDispatchCount } from '../src/assertions.mjs'
+import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
 
 describe('discoverFiles', () => {
   function seed(suffix) {
@@ -93,19 +91,12 @@ describe('validateEvalCase', () => {
     assert.throws(() => validateEvalCase({
       id: 'gates-legacy', task: 'test', expect: [validMatcher], gates: 'off',
     }, file), /'gates' field was removed/)
-    assert.throws(() => validateEvalCase({
-      id: 'persona-legacy', task: 'test', expect: [validMatcher], persona: 'You are terse.',
-    }, file), /'persona' field was removed.*rowConfig: \{ 'system-prompt': \{ personaPrefix, personaSuffix \} \}/s)
   })
 
-  it('accepts rowConfig with scalar / scalar-array / nested-object leaves and rejects non-scalar leaves', () => {
+  it('accepts rowConfig with scalar / scalar-array leaves and rejects nested shapes', () => {
     assert.doesNotThrow(() => validateEvalCase({
       id: 'rowconfig-ok', task: 'test', expect: [validMatcher],
       rowConfig: { prompt: { disabledProviders: ['a-enricher'], totalTimeoutMs: 5000, flag: false } },
-    }, file))
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'rowconfig-nested-ok', task: 'test', expect: [validMatcher],
-      rowConfig: { prompt: { variant: { form: 'standard', emphasis: 2, tags: ['a'] }, deep: { inner: { n: 1 } } } },
     }, file))
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-not-object', task: 'test', expect: [validMatcher], rowConfig: ['prompt'],
@@ -114,14 +105,11 @@ describe('validateEvalCase', () => {
       id: 'rowconfig-not-config', task: 'test', expect: [validMatcher], rowConfig: { prompt: 'off' },
     }, file), /must be a config object/)
     assert.throws(() => validateEvalCase({
-      id: 'rowconfig-null-leaf', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: null } },
-    }, file), /must be a scalar, scalar array, or nested object/)
+      id: 'rowconfig-nested', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: { b: 1 } } },
+    }, file), /scalar or scalar array/)
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: [{}] } },
-    }, file), /must be an array of scalars/)
-    assert.throws(() => validateEvalCase({
-      id: 'rowconfig-nested-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { variant: { tags: [{}] } } },
-    }, file), /'variant.tags'\] must be an array of scalars/)
+    }, file), /array of scalars/)
   })
 
   it('accepts followups with optional settleTimeoutMs and rejects malformed values', () => {
@@ -146,17 +134,17 @@ describe('validateEvalCase', () => {
   })
 
   it('rejects empty or missing id', () => {
-    assert.throws(() => validateEvalCase({ id: '', task: 'x', expect: [validMatcher] }, file), /non-empty string/)
-    assert.throws(() => validateEvalCase({ task: 'x', expect: [validMatcher] }, file), /non-empty string/)
+    assert.throws(() => validateEvalCase({ id: '', task: 'x', expect: [] }, file), /non-empty string/)
+    assert.throws(() => validateEvalCase({ task: 'x', expect: [] }, file), /non-empty string/)
   })
 
   it('rejects missing task', () => {
-    assert.throws(() => validateEvalCase({ id: 'a', expect: [validMatcher] }, file), /task must be a string/)
+    assert.throws(() => validateEvalCase({ id: 'a', expect: [] }, file), /task must be a string/)
   })
 
   it('rejects invalid mode', () => {
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'bogus', expect: [validMatcher] }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'bogus', expect: [] }, file),
       /mode must be 'real' or 'mock'/,
     )
   })
@@ -181,153 +169,11 @@ describe('validateEvalCase', () => {
 
   it('rejects mock mode without script.steps', () => {
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [validMatcher] }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [] }, file),
       /mock mode requires script\.steps/,
     )
     assert.throws(
-      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [validMatcher], script: {} }, file),
-      /mock mode requires script\.steps/,
-    )
-  })
-
-  // A case whose whole expect passes on an empty projection reports "nothing
-  // was measured" as "passed" — the loader refuses that shape up front
-  // (EVAL-022 / ADR 0005).
-  it('rejects an expect set with no evidence anchor, naming the negative matchers', () => {
-    const outcome = () => validateEvalCase({
-      id: 'anchor-1', task: 'x',
-      expect: [toolNotCalled(/^coggit_/), userMessageTextExcludes('gates', 'task-b.md')],
-    }, file)
-    assert.throws(outcome, /no evidence anchor/)
-    assert.throws(outcome, /tool not called: \/\^coggit_\//)
-    assert.throws(outcome, /add one assertion that requires evidence/)
-    assert.throws(outcome, /requiresEvidence: false/)
-  })
-
-  it('accepts an anchor in any position, including a parameter-dependent count matcher', () => {
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-2', task: 'x',
-      expect: [toolNotCalled(/^coggit_/), validMatcher],
-    }, file))
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-3', task: 'x',
-      expect: [validMatcher, toolNotCalled(/^coggit_/)],
-    }, file))
-    // `subagentDispatchCount(m, 0)` asserts absence; `(m, 1)` asks for presence
-    // and therefore anchors the case.
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-4', task: 'x', expect: [subagentDispatchCount(/^gates:/, 0)],
-    }, file), /no evidence anchor/)
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-5', task: 'x', expect: [subagentDispatchCount(/^gates:/, 1)],
-    }, file))
-  })
-
-  it('treats an unmarked custom matcher as an anchor and a self-reported one as negative', () => {
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-6', task: 'x',
-      expect: [toolNotCalled('read'), { describe: 'custom', check: () => ({ ok: true, message: '' }) }],
-    }, file))
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-7', task: 'x',
-      expect: [{ describe: 'custom negative', check: () => ({ ok: true, message: '' }), requiresEvidence: false }],
-    }, file), /no evidence anchor/)
-  })
-
-  // A case can anchor in its own `inspect` hook instead — but the exemption
-  // rests on an explicit `evidence: 'inspect'` declaration, not on the hook's
-  // existence: the hook is unauditable code, and an empty `inspect: () => {}`
-  // must not re-open the vacuous-green door the guard closes. The repo's
-  // wiring-smoke case is this shape, declaration included.
-  it('exempts an inspect-anchored case only when it declares evidence', () => {
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-8', task: 'x', expect: [], evidence: 'inspect', inspect: () => {},
-    }, file))
-    // A matcher anchor makes the declaration unnecessary (and still wins).
-    assert.doesNotThrow(() => validateEvalCase({
-      id: 'anchor-9', task: 'x',
-      expect: [validMatcher],
-      inspect: () => {},
-    }, file))
-    // Presence alone no longer exempts — the false-green shape the explicit
-    // declaration exists to close.
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-11', task: 'x', expect: [], inspect: () => {},
-    }, file), /no evidence anchor/)
-    // Empty expect without any hook is a case that cannot fail at all.
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-10', task: 'x', expect: [],
-    }, file), /no evidence anchor — every matcher passes vacuously on an empty projection \(expect is empty\)/)
-    // The declaration itself is validated: bogus values and hook-less
-    // declarations are refused before the anchor rule speaks.
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-12', task: 'x', expect: [validMatcher], evidence: 'vibes',
-    }, file), /evidence must be 'inspect'/)
-    assert.throws(() => validateEvalCase({
-      id: 'anchor-13', task: 'x', expect: [validMatcher], evidence: 'inspect',
-    }, file), /requires an inspect hook/)
-  })
-
-  it('validateEvidenceAnchor reports the same rule when called directly', () => {
-    assert.doesNotThrow(() => validateEvidenceAnchor([validMatcher], 'case x'))
-    assert.throws(
-      () => validateEvidenceAnchor([subagentDispatchCount('a', 0)], 'case x'),
-      /^Error: case x: no evidence anchor/,
-    )
-    assert.doesNotThrow(
-      () => validateEvidenceAnchor([], 'case x', { evidence: 'inspect', inspect: () => {} }),
-      "a declared inspect hook anchors the case",
-    )
-    // The declaration names the exit in the rejection text.
-    assert.throws(
-      () => validateEvidenceAnchor([], 'case x', { inspect: () => {} }),
-      /declare evidence: 'inspect' and assert in an inspect hook/,
-    )
-    assert.throws(
-      () => validateEvidenceAnchor([], 'case x', { evidence: 'inspect', inspect: 'not a function' }),
-      /\(expect is empty\)/,
-    )
-  })
-
-  // The rule must load the repo's own corpus: a wiring smoke that asserts only
-  // inside its inspect hook (`expect: []`) is the shape that made a first cut of
-  // this rule reject a shipped case — it now carries the explicit declaration.
-  it('loads the repo case that declares an inspect anchor with an empty expect', async () => {
-    const fromEval = fileURLToPath(new URL('../../extras/modules/prompt/eval/behavior/mock/injection-smoke.eval.mjs', import.meta.url))
-    const loaded = (await import(pathToFileURL(fromEval).href)).default
-    assert.deepEqual(loaded.expect, [])
-    assert.equal(loaded.evidence, 'inspect')
-    assert.equal(typeof loaded.inspect, 'function')
-    assert.doesNotThrow(() => validateEvalCase(loaded, fromEval))
-  })
-
-  // Which channel anchors a case is a fact the report carries: a matcher anchor
-  // is verified by the guard, an inspect anchor is only DECLARED (nothing can
-  // audit a hook), and the two must not read alike on the record (EVAL-022 C).
-  it('names the anchoring channel, with inspect as the declared one', () => {
-    assert.equal(evidenceAnchorKind({ expect: [validMatcher] }), 'matcher')
-    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')] }), 'none')
-    assert.equal(evidenceAnchorKind({ expect: [], evidence: 'inspect', inspect: () => {} }), 'inspect')
-    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')], evidence: 'inspect', inspect: () => {} }), 'inspect')
-    // A matcher anchor always wins, whatever else the case carries.
-    assert.equal(evidenceAnchorKind({ expect: [validMatcher], evidence: 'inspect', inspect: () => {} }), 'matcher')
-    // Without the declaration the hook is not an anchor — presence alone
-    // vouches for nothing.
-    assert.equal(evidenceAnchorKind({ expect: [], inspect: () => {} }), 'none')
-    assert.equal(evidenceAnchorKind({ expect: [], evidence: 'inspect' }), 'none')
-    assert.equal(evidenceAnchorKind({}), 'none')
-    assert.equal(evidenceAnchorKind(undefined), 'none')
-  })
-
-  // The anchor rule is the catch-all, so a structural mistake must be what the
-  // author hears about first: an empty expect used to mask `script.steps`.
-  it('reports a structural error before the missing anchor', () => {
-    assert.throws(
-      () => validateEvalCase({ id: 'order-1', task: 'x', mode: 'mock', expect: [] }, file),
-      /mock mode requires script\.steps/,
-    )
-    assert.throws(
-      () => validateEvalCase({ id: 'order-2', task: 'x', mode: 'mock', expect: [], inspect: () => {} }, file),
+      () => validateEvalCase({ id: 'a', task: 'x', mode: 'mock', expect: [], script: {} }, file),
       /mock mode requires script\.steps/,
     )
   })

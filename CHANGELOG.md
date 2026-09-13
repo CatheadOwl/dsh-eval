@@ -12,40 +12,6 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
-- **Behavior experiment surface (experimental): arms × repeats × guard ×
-  aggregation.** `defineBehaviorExperiment` freezes an experiment whose arms
-  are case-field overrides (`task` / `expect` / `prepare` / `rowConfig` /
-  `disableRows` / `followups` / `settleTimeoutMs` / `timeoutMs` — no separate
-  per-arm config channel), `executeBehaviorExperiment` runs every arm × run
-  with framework-minted case ids, deep-merging arm `rowConfig` overrides onto
-  the case's own declaration (writing only the differing keys behaves exactly
-  like restating the whole config), and aggregates per-arm descriptive stats
-  over guard-clean runs only. The false-green shapes this replaces are
-  structurally impossible here: a run without a trace is a named row failure (never
-  silently dropped), and an arm with zero guard-clean runs is **INVALID**
-  with every failing row's reason — never an empty aggregation cell. The
-  preregistered `decisionRule` and a definition fingerprint ride every
-  result and summary; judgment and significance stay with the consumer (no
-  pass/fail exit-code semantics). `renderBehaviorSummary` /
-  `writeBehaviorArtifacts` produce the `summary.md` + `results.json` pair.
-  See `docs/experiments.md`.
-- **`evaluateMatchers` (experimental): the official programmatic evaluation
-  entry.** Runs a case's `expect` set against a trace with the evidence-anchor
-  rule inlined, so hand-rolled drivers no longer bypass the enforcement
-  inside `runEvalCase` (the tier seam `run-relates-ab`-style consumers used
-  to hit). Throws on a missing trace instead of evaluating against nothing.
-- **`rowConfig` values accept nested plain objects.** A parameter group (e.g.
-  `variant: { form: 'standard', emphasis: 2 }`) can now be declared as one
-  value instead of being flattened into unrelated scalar keys; nested objects
-  are emitted as YAML flow mappings, and leaves keep the same scalar /
-  scalar-array restriction at every depth. Arrays still reject non-scalar
-  items, and `null` leaves are still refused.
-- Case records carry `evidenceAnchor: 'inspect'` when the case's assertions rest
-  on its `inspect` hook alone — the one evidence channel the framework cannot
-  audit (a hook may read raw session events or nothing at all). The field marks a
-  case whose evidence face was declared rather than verified, so it is visible in
-  `--format json` instead of looking like any other green case; matcher-anchored
-  cases omit the field.
 - **Projection census** on every case that produced a session trace:
   `census.eventTypeCounts` (the main session log's events per type),
   `census.projectionLengths` (the five projection lengths) with
@@ -67,44 +33,8 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   number instead of projecting empty fields. `EvalRunResult.traceGap` carries
   the diagnosis to the CLI failure text.
 
-### Changed
-
-- **Every case now needs an evidence anchor.** A case whose `expect` contains
-  only matchers that pass on an empty projection is refused at load time
-  (`no evidence anchor`), because the trace projection is tolerant: when a host
-  event payload drifts the projection empties out instead of failing, and
-  absence-asserting matchers — `toolNotCalled`, `userMessageTextExcludes`, and
-  `subagentDispatchCount` / `subagentCompletedCount` with `expected === 0` —
-  then pass vacuously, reporting "nothing was measured" as "passed". Both
-  entry points enforce it (`dsh-eval` at load, `runEvalCase` at execution).
-  **Migrating a case that trips this**: add one matcher that requires evidence
-  (any positive matcher; for a case whose task forbids tool use, a text-existence
-  anchor such as `finalTextMatches(/\d/u)` works), or — for a custom matcher
-  whose semantics are negative — set `requiresEvidence: false` on the object it
-  returns, or declare `evidence: 'inspect'` and assert in an `inspect` hook
-  (which receives the workspace and the trace, so a check there is itself the
-  evidence — the declaration vouches that the hook reads it). **The `inspect`
-  exemption is by explicit declaration, not hook presence**: a case whose only
-  anchor is an `inspect` hook must carry `evidence: 'inspect'`; declaring it
-  without a hook, or carrying the hook without the declaration (and no matcher
-  anchor), is refused. `requiresEvidence(matcher)`
-  reports the verdict for a matcher. Cases with an empty `expect` and no
-  declared inspect anchor are refused: nothing could make them fail.
-  Out of the rule's scope: degenerate arguments (`toolSequence([])`,
-  `finalTextIncludes('')`, `finalTextMatches(/.*/u)`), half-degraded
-  `requestHeaders`, and a positive assertion about something unrelated to the
-  case.
-
 ### Removed
 
-- **The case-level `persona` field.** It emitted a `persona` config key the
-  host's `SystemPrompt.Config` schema never had, so the key was silently inert
-  — and because a row-config override whole-replaces the row, it also dropped
-  the profile's `personaPrefix` / `personaSuffix`. A case declaring `persona`
-  is now refused at load time. **Migrating a case that trips this**: declare
-  `rowConfig: { 'system-prompt': { personaPrefix: '...', personaSuffix: '...' } }`
-  instead, restating both keys the row still needs (the headless profile's
-  baseline ships a `personaSuffix`).
 - `loadTraceDir` (experimental): replaced by `collectSessionTrace`, which
   returns the trace together with the reason none was built. Migrate
   `loadTraceDir(root)` to `collectSessionTrace(root).trace`.
