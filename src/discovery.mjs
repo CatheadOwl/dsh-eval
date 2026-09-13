@@ -7,7 +7,6 @@
 import { readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { requiresEvidence } from './assertions.mjs'
-
 /**
  * Directories never to descend into during discovery. `.runs` holds
  * prior-run artifacts that would be re-discovered as cases; `node_modules`
@@ -58,6 +57,28 @@ export function validateDisableRows(disableRows, label) {
 }
 
 /**
+ * Which channel makes a case's assertions able to fail — the `expect` matcher
+ * set (a self-reporting evidence anchor) or the case's own `inspect` hook.
+ *
+ * `inspect` is the one channel the framework cannot audit: the hook is opaque
+ * code that may read raw session events (`trace.sessions[].events`, immune to
+ * projection degradation) or nothing at all. This rule therefore calls such a
+ * case `'inspect'` — an anchor that is DECLARED, not verified — and the report
+ * carries that on the case record, so a record whose evidence face was never
+ * examined is visible in CI instead of looking like any other green case.
+ *
+ * @param {object} evalCase - the case (its `expect` array and `inspect` hook).
+ * @returns {'matcher' | 'inspect' | 'none'} the channel, `'none'` when neither
+ *   exists (the shape `validateEvidenceAnchor` rejects).
+ */
+export function evidenceAnchorKind(evalCase) {
+  if (Array.isArray(evalCase?.expect)
+    && evalCase.expect.some(matcher => requiresEvidence(matcher))) return 'matcher'
+  if (typeof evalCase?.inspect === 'function') return 'inspect'
+  return 'none'
+}
+
+/**
  * Validate the evidence anchor of an eval case's `expect` array: at least one
  * matcher must be able to FAIL on an empty projection, unless the case carries
  * an `inspect` hook of its own.
@@ -74,11 +95,14 @@ export function validateDisableRows(disableRows, label) {
  * `validateEvalCase` (load time) and `runEvalCase` (execution time) so both
  * report the identical message.
  *
- * `inspect` is an evidence surface in its own right: it receives the workspace
- * and the trace, so a case that asserts there — a wiring smoke whose checks
- * live on raw events, for instance — is anchored even with an empty `expect`.
- * The framework hands it `trace: undefined` when no trace materialized, which
- * is the case's own cue to fail loudly.
+ * `inspect` is the escape hatch for a case whose assertions are about raw
+ * evidence: the hook receives the workspace and the trace, and the framework
+ * hands it `trace: undefined` when no trace materialized, which is the case's
+ * own cue to fail loudly (`extras`' injection smoke reads raw session events
+ * this way — a projection-independent channel). The exemption is by presence
+ * only: nothing here can judge what a hook does, which is why
+ * `evidenceAnchorKind` records such a case as DECLARED rather than verified and
+ * the report carries that on the case record.
  *
  * @param {object[]} expect - the case's matcher array.
  * @param {string} label - error-message context (e.g. `file: case '<id>'`).
@@ -177,12 +201,15 @@ export function validateEvalCase(evalCase, file) {
       throw new Error(`${file}: case '${evalCase.id}': expect[${i}] must have { describe: string, check: function }`)
     }
   }
-  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`, evalCase)
   if (evalCase.mode === 'mock') {
     if (evalCase.script === undefined || !Array.isArray(evalCase.script?.steps)) {
       throw new Error(`${file}: case '${evalCase.id}': mock mode requires script.steps`)
     }
   }
+  // Last, deliberately: the anchor rule is the catch-all, so a case that is
+  // also missing `script.steps` hears about that first instead of about the
+  // anchor its empty `expect` happens to lack.
+  validateEvidenceAnchor(evalCase.expect, `${file}: case '${evalCase.id}'`, evalCase)
 }
 
 /**

@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { parseSessionLog, buildTrace, isSessionLogFilename, collectSessionTrace, KNOWN_SESSION_FORMAT_VERSIONS } from '../src/trace.mjs'
-import { subagentDispatchCount } from '../src/assertions.mjs'
+import { subagentDispatchCount, toolNotCalled } from '../src/assertions.mjs'
 
 const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 
@@ -187,8 +187,9 @@ describe('buildTrace', () => {
     const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
     const child = parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8'))
     const merged = buildTrace([parent, child])
-    assert.equal(merged.census.subagent.projectionLength, 1)
+    assert.equal(merged.census.subagent.children.length, 1)
     assert.equal(merged.census.subagent.supportedDescriptors, 1)
+    assert.deepEqual(merged.census.projectionFieldGaps, {})
     assert.deepEqual(merged.census.subagent.children, [{
       sessionId: 'session-child',
       parentSession: 'session-parent',
@@ -199,6 +200,32 @@ describe('buildTrace', () => {
       mode: 'one-shot',
       provider: 'subagent-in-process',
     }])
+  })
+
+  // The 1:1 projections can never show up in `projectionSkipped.main` — the
+  // record lands whatever its fields say — so a moved payload field needs its
+  // own signal, or the census stays blind to the rename path it was built for.
+  it('census reports a kept record whose field went missing', () => {
+    const log = '{"type":"session","version":3,"id":"session-drift"}'
+      + '\n{"seq":1,"type":"tool/call","data":{"turn":1,"step":1,"toolName":"renamed","arguments":"{}"}}'
+      + '\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"user","content":[]}}}'
+      + '\n{"seq":3,"type":"request/header","data":{"header":{"reason":"initial","tools":[{"description":"no name"}]}}}'
+    const built = buildTrace([parseSessionLog(log)])
+    const census = built.census
+
+    assert.deepEqual(census.projectionFieldGaps, {
+      toolCallWithoutName: 1,
+      toolCallWithoutCallId: 1,
+      toolResultWithoutCallId: 1,
+      headerWithoutSystem: 1,
+      headerWithoutToolNames: 1,
+    })
+    // Length comparison alone sees nothing: every event landed in a projection.
+    assert.deepEqual(census.projectionSkipped.main, {})
+    assert.equal(census.projectionLengths.toolCalls, 1)
+    // The vacuity this signal exists to expose: the call is present, unnamed.
+    assert.equal(built.toolCalls[0].name, undefined)
+    assert.equal(toolNotCalled('renamed').check(built).ok, true)
   })
 
   it('census reports main-log drops, dropped child identity and unprojected event types apart', () => {

@@ -58,20 +58,23 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 ## 投影普查（`trace.census`）
 
-宽松投影（tolerant reader）的补救面：宿主事件 payload 演进时 `buildTrace` 不抛错，只把投影填成空数组。空投影会让负向断言真空通过——`toolNotCalled`、`userMessageTextExcludes`、以及 `subagentDispatchCount` / `subagentCompletedCount` 的 `expected === 0` 档都判 ok。**普查只报数，不判定**：它让「宿主日志里本来就没有这类事件」与「有事件但投影丢掉了」在报告里可分，是否降级由人判读。
+宽松投影（tolerant reader）的补救面：宿主事件 payload 演进时 `buildTrace` 不抛错，只把字段填成空值或丢掉整条记录。空投影会让负向断言真空通过——`toolNotCalled`、`userMessageTextExcludes`、以及 `subagentDispatchCount` / `subagentCompletedCount` 的 `expected === 0` 档都判 ok。**普查只报数，不判定**：它让「宿主日志里本来就没有这类事件」与「有事件但投影丢掉了」在报告里可分，是否降级由人判读。
 
-两个数据源，别混：
+三个信号，对应三种坏法：
 
-| 面 | 内容 |
+| 信号 | 看什么 |
 |---|---|
-| 主 session 事件（`eventTypeCounts` / `projectionLengths` / `projectionSkipped.main`） | 主日志（`buildTrace` 的投影输入）逐事件类型计数（任何类型，含插件扩展类型）；五个投影的长度；以及**每个投影上「计数 − 长度 > 0」的差额**（`projectionSkipped.main`，按投影字段名） |
-| 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数、其中 `version === 3` 的条数（`supportedDescriptors`）**以及折叠出的身份**（`label` / `mode` / `provider`）；`projectionLength` 是实际进入 `subagentChildren` 的条数；`projectionSkipped.children` 两个身份计数——`withoutIdentity`（三项全缺）与 `withoutLabel`（`label` 缺，哪怕 mode/provider 有）。**子日志不是主日志**，`eventTypeCounts` 不统计它们的 `subagent/descriptor` |
+| 主 session 事件（`eventTypeCounts` / `projectionLengths` / `projectionSkipped.main`） | 主日志（`buildTrace` 的投影输入）逐事件类型计数（任何类型，含插件扩展类型）；五个投影的长度；以及**每个投影上「计数 − 长度 > 0」的差额**（`projectionSkipped.main`，按投影字段名）——记录被丢了的档 |
+| **字段级缺口**（`projectionFieldGaps`） | 记录**留住了但字段读不到**的事件，按缺什么计数：`toolCallWithoutName` / `toolCallWithoutCallId` / `toolResultWithoutCallId` / `headerWithoutSystem` / `headerWithoutToolNames`。`tool/call`、`tool/result`、`request/header` 是 1:1 投影（计数 − 长度恒为 0），宿主搬字段时只在这里可见。**不计数**：`request/header` 的 `tools` 数组整个缺失（与真空列表投影一致） |
+| 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数、其中 `version === 3` 的条数（`supportedDescriptors`，**数事件不是数子会话**）**以及折叠出的身份**（`label` / `mode` / `provider`）；`projectionSkipped.children` 两个身份计数——`withoutIdentity`（三项全缺）与 `withoutLabel`（`label` 缺，哪怕 mode/provider 有）。`mainLogDescriptorEvents` 是**主日志自己**的 `subagent/descriptor` 事件数（现宿主把 descriptor 写进子日志，这个数通常为 0）。**子日志不是主日志**，`eventTypeCounts` 不统计它们 |
 
 判读要点：
 
 - **差额 ≠ 缺陷**。`assistant/message`、`user/message` 的**空文本消息是设计上整条丢弃**（保护「组装文本」投影语义），这类差额属合法，普查不替你做白名单；
-- **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空；但**只要 `label` 缺**（`withoutLabel`），按 label 匹配的 `*Count(label, 0)` 就会真空通过——哪怕 `supportedDescriptors` 看起来健康、mode/provider 都在。两个计数分开报就是为了这个档。
-- 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动）。失败文案目前不带计数。
+- **两类信号别混**：`projectionSkipped.main` 看「记录被丢了」，`projectionFieldGaps` 看「记录在、字段没了」。后者正是 `toolNotCalled` 最危险的形态——调用记录还在、`name` 为 `undefined`，`nameMatches` 对任何 matcher 都不命中，负向断言照绿；
+- **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空；但**只要 `label` 缺**（`withoutLabel`），按 label 匹配的 `*Count(label, 0)` 就会真空通过——哪怕 `supportedDescriptors` 看起来健康、mode/provider 都在。两个计数分开报就是为了这个档；
+- **子会话集合是启发式**：`subagentChildren` 收「header 带 `parentSession`」的日志，而宿主对 fork/resume/seed 日志也写这个字段——它们会以「无身份子记录」出现在普查里。这是集合的性质，不是本次降级（日志层无法复现宿主的 agent 链所有权判定）；
+- 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带；**无 trace 的记录没有**）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动），失败文案也不带计数。
 
 ## 证据锚（`requiresEvidence`）
 
@@ -89,6 +92,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 - **自定义 matcher**：语义为负向的，在返回对象上写 `requiresEvidence: false` 即可加入契约；其余不用管（缺省要求证据）。
 - `requiresEvidence(matcher)`：该判据的公开读取面（`true` = 它是证据锚）——校验与自定义封装可用它，不必复述字段名。
+- **`inspect` 豁免（声明式，非已验证）**：case 若带 `inspect` hook，加载期即豁免本规则——hook 收到 workspace 与 trace（**无 trace 时收到 `undefined`，由 case 自己响亮失败**），所以「断言写在 hook 里」的 case 不必再凑一条 matcher。但 hook 是**框架审计不了的代码**：它可能遍历原始 session 事件（`trace.sessions[].events`，绕过宽松投影、免疫降级），也可能什么都不读。因此豁免是**按存在性**给的，这类 case 在报告里被标成 `evidenceAnchor: 'inspect'`（唯一的声明式锚；matcher 锚的 case 不带该字段），让"证据面没被审过"在 CI 产物里可见，而不是看起来和别的绿灯一样。
 - **射程外**（不做过度承诺，写在这里以免误以为会被拦）：退化参数（`toolSequence([])`、`finalTextIncludes('')`、`finalTextMatches(/.*/u)` 形态正向、实际恒真）、半降级（`requestHeaders` 在而 `toolNames` 空）、以及"正向断言断言了一件与本 case 无关的事"（写作纪律，机械面覆盖不了）。
 - 典型迁移：一条只写 `toolNotCalled(/^coggit_/)` 的隔离 case，补一条存在性正向断言（例如 `finalTextMatches(/\d/u)`——任务要求给数字时必须给得出）。
 

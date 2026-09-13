@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { discoverFiles, validateEvalCase, validateEvidenceAnchor, detectDuplicateIds } from '../src/discovery.mjs'
+import { discoverFiles, validateEvalCase, validateEvidenceAnchor, evidenceAnchorKind, detectDuplicateIds } from '../src/discovery.mjs'
 import { toolNotCalled, userMessageTextExcludes, subagentDispatchCount } from '../src/assertions.mjs'
 
 describe('discoverFiles', () => {
@@ -269,6 +269,33 @@ describe('validateEvalCase', () => {
     assert.deepEqual(loaded.expect, [])
     assert.equal(typeof loaded.inspect, 'function')
     assert.doesNotThrow(() => validateEvalCase(loaded, fromEval))
+  })
+
+  // Which channel anchors a case is a fact the report carries: a matcher anchor
+  // is verified by the guard, an inspect anchor is only DECLARED (nothing can
+  // audit a hook), and the two must not read alike on the record (EVAL-022 C).
+  it('names the anchoring channel, with inspect as the declared one', () => {
+    assert.equal(evidenceAnchorKind({ expect: [validMatcher] }), 'matcher')
+    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')] }), 'none')
+    assert.equal(evidenceAnchorKind({ expect: [], inspect: () => {} }), 'inspect')
+    assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')], inspect: () => {} }), 'inspect')
+    // A matcher anchor always wins, whatever else the case carries.
+    assert.equal(evidenceAnchorKind({ expect: [validMatcher], inspect: () => {} }), 'matcher')
+    assert.equal(evidenceAnchorKind({}), 'none')
+    assert.equal(evidenceAnchorKind(undefined), 'none')
+  })
+
+  // The anchor rule is the catch-all, so a structural mistake must be what the
+  // author hears about first: an empty expect used to mask `script.steps`.
+  it('reports a structural error before the missing anchor', () => {
+    assert.throws(
+      () => validateEvalCase({ id: 'order-1', task: 'x', mode: 'mock', expect: [] }, file),
+      /mock mode requires script\.steps/,
+    )
+    assert.throws(
+      () => validateEvalCase({ id: 'order-2', task: 'x', mode: 'mock', expect: [], inspect: () => {} }, file),
+      /mock mode requires script\.steps/,
+    )
   })
 })
 

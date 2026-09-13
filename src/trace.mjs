@@ -19,19 +19,6 @@ import { basename, join } from 'node:path'
 /** Storage row types that pack `assistant/chunk` delta runs (see chunk-rows.ts). */
 const CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
 
-/**
- * Event types whose events project into a top-level trace field (see
- * {@link buildTrace}). The census compares these counts against projection
- * lengths, so a type missing here is invisible to the comparison.
- */
-const PROJECTED_EVENT_TYPES = new Set([
-  'tool/call',
-  'tool/result',
-  'assistant/message',
-  'user/message',
-  'request/header',
-])
-
 /** Projection field name per projected event type. */
 const PROJECTED_FIELD_BY_EVENT_TYPE = new Map([
   ['tool/call', 'toolCalls'],
@@ -154,9 +141,9 @@ function parseArguments(raw) {
  * Fold one child log's descriptor events exactly once: the identity
  * `projectChild` asserts on, plus the counts the census reports. Single source
  * on purpose — `projectChild` and `censusForChild` must agree on which
- * descriptor established the identity, and the "supported" predicate must
- * match the fold (a log whose only descriptors are unsupported yields both an
- * empty identity and `supportedDescriptors: 0`, which is the census signal).
+ * descriptor established the identity, and the "supported" predicate must match
+ * the fold (a log whose only descriptors are unsupported yields both an empty
+ * identity and `supportedDescriptors: 0`, which is the census signal).
  * @param {{ events: object[] }} log - one parsed child log.
  * @returns {{ label: string | undefined, mode: string | undefined, provider: string | undefined, descriptorEvents: number, supportedDescriptors: number }}
  */
@@ -253,12 +240,22 @@ function censusForChild(log) {
  * Projection census for one built trace (see {@link EvalTrace.census}).
  * Numbers only: this reports what the raw logs contained against what the
  * projections kept, and never decides whether the difference is a defect.
+ *
+ * Three signals, because one number cannot cover three shapes: length
+ * differences (`projectionSkipped.main`) see records the projection dropped,
+ * `projectionFieldGaps` sees records it kept while a field went missing
+ * (`tool/call` and friends project 1:1, so their count − length is structurally
+ * zero), and the subagent block sees the child-log data source, which no main-log
+ * count can reach.
+ *
  * @param {object[]} events - the MAIN log's events (the projection input).
  * @param {EvalTrace} trace - the built trace, read for projection lengths.
  * @param {object[]} childLogs - candidate child logs entering `subagentChildren`.
+ * @param {Record<string, number>} projectionFieldGaps - gaps the projection loop
+ *   recorded while reading fields, keyed by what was missing.
  * @returns {object} the census record.
  */
-function buildCensus(events, trace, childLogs) {
+function buildCensus(events, trace, childLogs, projectionFieldGaps) {
   const eventTypeCounts = countEventTypes(events)
   const projectionLengths = {
     toolCalls: trace.toolCalls.length,
@@ -278,6 +275,12 @@ function buildCensus(events, trace, childLogs) {
   // that folded no identity at all; `withoutLabel` is one that folded some
   // identity but no label — the only field the `subagent*Count` matchers can
   // match on, so its zero-count assertions are the vacuous ones.
+  //
+  // The child set is the parentSession heuristic (any log whose header carries
+  // `parentSession`, which the host also writes for fork/resume/seed logs), so a
+  // non-subagent fork log shows up here as an identity-less child. The census
+  // reports the set it was given; it cannot re-derive the host's agent-chain
+  // ownership check from a log alone.
   const withoutIdentity = children.filter(
     child => child.label === undefined && child.mode === undefined && child.provider === undefined,
   ).length
@@ -288,10 +291,10 @@ function buildCensus(events, trace, childLogs) {
     eventTypeCounts,
     projectionLengths,
     projectionSkipped,
+    projectionFieldGaps,
     subagent: {
       mainLogDescriptorEvents: eventTypeCounts['subagent/descriptor'] ?? 0,
       supportedDescriptors,
-      projectionLength: trace.subagentChildren.length,
       children,
     },
   }
@@ -322,11 +325,18 @@ export function buildTrace(logs) {
   const assistantEntries = []
   const userMessages = []
   const requestHeaders = []
+  const gaps = {}
+  const recordGap = key => { gaps[key] = (gaps[key] ?? 0) + 1 }
   for (const event of events) {
     if (event.type === 'request/header') {
       // The assembled model request header: system prompt + mounted tool
       // schemas. What the model is told it can do and how — the "did my
       // plugin's section inject?" projection.
+      if (typeof event.data?.header?.system !== 'string') recordGap('headerWithoutSystem')
+      if (Array.isArray(event.data?.header?.tools)
+        && !event.data.header.tools.some(tool => typeof tool?.name === 'string')) {
+        recordGap('headerWithoutToolNames')
+      }
       requestHeaders.push({
         seq: event.seq,
         reason: event.data?.reason,
@@ -336,6 +346,8 @@ export function buildTrace(logs) {
           : [],
       })
     } else if (event.type === 'tool/call') {
+      if (typeof event.data?.name !== 'string') recordGap('toolCallWithoutName')
+      if (typeof event.data?.callId !== 'string') recordGap('toolCallWithoutCallId')
       toolCalls.push({
         seq: event.seq,
         turn: event.data.turn,
@@ -346,6 +358,7 @@ export function buildTrace(logs) {
         parsedArguments: parseArguments(event.data.arguments),
       })
     } else if (event.type === 'tool/result') {
+      if (typeof event.data?.message?.source?.callId !== 'string') recordGap('toolResultWithoutCallId')
       toolResults.push({
         seq: event.seq,
         turn: event.data.turn,
@@ -402,7 +415,7 @@ export function buildTrace(logs) {
     finalText: assistantTexts.at(-1) ?? '',
     census: undefined,
   }
-  result.census = buildCensus(events, result, childLogs)
+  result.census = buildCensus(events, result, childLogs, gaps)
   return result
 }
 
@@ -549,14 +562,21 @@ export function collectSessionTrace(sessionsRoot) {
  *   records where count minus length is positive, per projection, plus the two
  *   child-identity counters. Undefined only on a hand-built trace; a nested log
  *   under `sessions` carries none because the parsers never add one.
- * @property {{ mainLogDescriptorEvents: number, supportedDescriptors: number, projectionLength: number, children: object[] }} census.subagent
+ * @property {Record<string, number>} census.projectionFieldGaps
+ *   - events the projection kept while a field it reads went missing, keyed by
+ *     what was missing (`toolCallWithoutName`, `toolCallWithoutCallId`,
+ *     `toolResultWithoutCallId`, `headerWithoutSystem`, `headerWithoutToolNames`).
+ *     This is the 1:1-projection signal: for `tool/call`, `tool/result` and
+ *     `request/header`, count − length is structurally zero, so a moved field
+ *     shows up only here. An absent `request/header.tools` array is NOT counted
+ *     (it projects to the same empty list as an empty one).
+ * @property {{ mainLogDescriptorEvents: number, supportedDescriptors: number, children: object[] }} census.subagent
  *   - the child-log data source the main-log counts cannot reach.
  *     `mainLogDescriptorEvents` counts `subagent/descriptor` events in the MAIN
  *     log itself (the current host writes them into the child log, so this is
- *     usually 0); `projectionLength` is how many children entered
- *     `subagentChildren`; `supportedDescriptors` sums the per-child counts
- *     below, i.e. it counts DESCRIPTOR EVENTS, not child sessions — one child
- *     may fold its identity from a single descriptor while logging several.
+ *     usually 0); `supportedDescriptors` sums the per-child counts below, i.e.
+ *     it counts DESCRIPTOR EVENTS, not child sessions — one child may fold its
+ *     identity from a single descriptor while logging several.
  * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number, label: string | undefined, mode: string | undefined, provider: string | undefined }[]} census.subagent.children
  *   - the accepted child logs, each with the identity `projectChild` folded
  *     from them; `descriptorEvents === 0` means the log states no identity at

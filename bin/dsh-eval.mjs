@@ -285,6 +285,7 @@ for (const file of files.sort()) {
         id: evalCase.id, file, mode, status: 'pass',
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, ...(result.trace?.census !== undefined ? { census: result.trace.census } : {}),
+        ...(result.evidenceAnchor === 'inspect' ? { evidenceAnchor: 'inspect' } : {}),
         ...(artifactsDir !== undefined ? { artifactsDir } : {}),
       }))
       say(`PASS ${evalCase.id}`)
@@ -301,6 +302,7 @@ for (const file of files.sort()) {
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, artifactsDir,
         ...(result.trace?.census !== undefined ? { census: result.trace.census } : {}),
+        ...(result.evidenceAnchor === 'inspect' ? { evidenceAnchor: 'inspect' } : {}),
       }))
       process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.map(f => `  - ${f}`).join('\n')}\n`)
       if (hint !== undefined) process.stderr.write(`  ! ${hint}\n`)

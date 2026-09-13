@@ -12,15 +12,25 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
-- **Projection census** on every case record: `census.eventTypeCounts` (the
-  main session log's events per type), `census.projectionLengths` (the five
-  projection lengths) with `census.projectionSkipped` naming where a count
-  exceeds its projection length, and `census.subagent` (the child logs behind
-  `subagentChildren`: their `subagent/descriptor` event counts and how many
-  carry the supported descriptor version). The census reports numbers only and
-  never decides whether a difference is a defect — it makes "the host log
-  carried no such event" and "the projection dropped it" separable in
-  `--format json` and in `.runs/<id>/trace.json`.
+- Case records carry `evidenceAnchor: 'inspect'` when the case's assertions rest
+  on its `inspect` hook alone — the one evidence channel the framework cannot
+  audit (a hook may read raw session events or nothing at all). The field marks a
+  case whose evidence face was declared rather than verified, so it is visible in
+  `--format json` instead of looking like any other green case; matcher-anchored
+  cases omit the field.
+- **Projection census** on every case that produced a session trace:
+  `census.eventTypeCounts` (the main session log's events per type),
+  `census.projectionLengths` (the five projection lengths) with
+  `census.projectionSkipped` naming where a count exceeds its projection length,
+  `census.projectionFieldGaps` naming the events that projected while a field
+  they carry went missing (the `tool/call` / `tool/result` / `request/header`
+  projections are 1:1, so a moved field never shows up as a length difference),
+  and `census.subagent` (the child logs behind `subagentChildren`: their
+  `subagent/descriptor` event counts, how many carry the supported descriptor
+  version, and the folded identity). The census reports numbers only and never
+  decides whether a difference is a defect — it makes "the host log carried no
+  such event" and "the projection dropped it" separable in `--format json` and
+  in `.runs/<id>/trace.json`. Cases with no trace carry no census.
 - Session-seam boundary assertions: `collectSessionTrace` reports which
   candidate artifact files were actually present when no session trace
   materializes (behavior failures name the host artifact naming instead of a

@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectSessionTrace, listSessionLogFiles } from './trace.mjs'
-import { validateRowConfig, validateDisableRows, validateFollowups, validateEvidenceAnchor } from './discovery.mjs'
+import { validateRowConfig, validateDisableRows, validateFollowups, validateEvidenceAnchor, evidenceAnchorKind } from './discovery.mjs'
 import { CLI_RELATIVE_PATH } from './cli.mjs'
 import { buildOverlayYaml } from './overlay.mjs'
 import { resolveRealDshHome, stageSandboxHome, teardownSandbox, spawnHeadlessDsh } from './sandbox.mjs'
@@ -188,6 +188,7 @@ export async function runEvalCase(evalCase, options) {
     return {
       caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
       stdout, stderr, trace, traceGap, sessionLogs, inspectError, runDir,
+      evidenceAnchor: evidenceAnchorKind(evalCase),
     }
   } finally {
     teardownSandbox(runDir, { keep: process.env.DSH_EVAL_KEEP_TMP === '1' })
@@ -214,6 +215,10 @@ function collectSessionLogTexts(sessionsRoot) {
  *   `trace` is defined. The CLI prints it as the failure text.
  * @property {string[]} sessionLogs - raw session artifact texts, pre-cleanup.
  * @property {string | undefined} inspectError - the case's `inspect` failure text, when it threw.
+ * @property {'matcher' | 'inspect' | 'none'} evidenceAnchor - which channel
+ *   makes the case's assertions able to fail (`evidenceAnchorKind`). `'inspect'`
+ *   is the declared-but-unverifiable one; the CLI records it on the case record
+ *   so an unauditable evidence face stays visible.
  * @property {string} runDir - removed unless DSH_EVAL_KEEP_TMP=1.
  */
 
