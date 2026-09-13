@@ -162,6 +162,81 @@ describe('buildTrace', () => {
   it('projects an empty subagentChildren list without child logs', () => {
     assert.deepEqual(trace.subagentChildren, [])
   })
+
+  // The census exists so that "the host log carried no such event" and "the
+  // projection dropped it" are different facts on the report surface. It never
+  // judges which one it is (EVAL-022 / ADR 0005).
+  it('census lines up the main log event counts with the projection lengths', () => {
+    assert.equal(trace.census.eventTypeCounts['tool/call'], 2)
+    assert.equal(trace.census.eventTypeCounts['assistant/message'], 2)
+    assert.equal(trace.census.eventTypeCounts['turn/start'], 1)
+    assert.deepEqual(trace.census.projectionLengths, {
+      toolCalls: 2,
+      toolResults: 2,
+      assistantTexts: 2,
+      userMessages: 0,
+      requestHeaders: 0,
+    })
+    assert.deepEqual(trace.census.projectionSkipped, { main: {}, children: {} })
+    assert.equal(trace.census.subagent.supportedDescriptors, 0)
+    assert.deepEqual(trace.census.subagent.children, [])
+  })
+
+  it('census separates an empty main log from the child logs it projected', () => {
+    const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
+    const child = parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8'))
+    const merged = buildTrace([parent, child])
+    assert.equal(merged.census.subagent.projectionLength, 1)
+    assert.equal(merged.census.subagent.supportedDescriptors, 1)
+    assert.deepEqual(merged.census.subagent.children, [{
+      sessionId: 'session-child',
+      parentSession: 'session-parent',
+      delegationDepth: 1,
+      descriptorEvents: 1,
+      supportedDescriptors: 1,
+    }])
+  })
+
+  it('census reports main-log drops, dropped child identity and unprojected event types apart', () => {
+    const main = '{"type":"session","version":3,"id":"session-main"}'
+      + '\n{"seq":1,"type":"user/message","data":{"message":{"role":"user","content":[]}}}'
+      + '\n{"seq":2,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-1","toolName":"renamed"}}'
+      + '\n{"seq":3,"type":"step/end","data":{"turn":1,"step":1}}'
+    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+      + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":2,"label":"legacy"}}'
+    const census = buildTrace([parseSessionLog(main), parseSessionLog(child)]).census
+
+    // Empty text drops by design, yet the count still differs — the census says
+    // the difference exists, not whether it is legal.
+    assert.equal(census.eventTypeCounts['user/message'], 1)
+    assert.equal(census.projectionLengths.userMessages, 0)
+    assert.deepEqual(census.projectionSkipped.main, { userMessages: 1 })
+
+    // The identity-loss path the five main-log projections cannot see: the
+    // child entered `subagentChildren` with no label, mode or provider.
+    assert.deepEqual(census.projectionSkipped.children, { withoutIdentity: 1 })
+    assert.deepEqual(census.subagent.children, [{
+      sessionId: 'session-child',
+      parentSession: 'session-main',
+      delegationDepth: undefined,
+      descriptorEvents: 1,
+      supportedDescriptors: 0,
+    }])
+
+    // An event type no projection reads still shows up in the count.
+    assert.equal(census.eventTypeCounts['step/end'], 1)
+    // The child log's descriptor is not a MAIN-log event: it belongs to the
+    // subagent census, not to `eventTypeCounts`.
+    assert.equal(census.subagent.mainLogDescriptorEvents, 0)
+    assert.equal('subagent/descriptor' in census.eventTypeCounts, false)
+  })
+
+  it('keeps the census on the run trace only, never on a nested session log', () => {
+    const parent = parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8'))
+    const merged = buildTrace([parent])
+    assert.ok(merged.census !== undefined)
+    assert.equal(merged.sessions.every(session => session.census === undefined), true)
+  })
 })
 
 describe('collectSessionTrace — collection', () => {

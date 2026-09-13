@@ -20,6 +20,28 @@ import { basename, join } from 'node:path'
 const CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
 
 /**
+ * Event types whose events project into a top-level trace field (see
+ * {@link buildTrace}). The census compares these counts against projection
+ * lengths, so a type missing here is invisible to the comparison.
+ */
+const PROJECTED_EVENT_TYPES = new Set([
+  'tool/call',
+  'tool/result',
+  'assistant/message',
+  'user/message',
+  'request/header',
+])
+
+/** Projection field name per projected event type. */
+const PROJECTED_FIELD_BY_EVENT_TYPE = new Map([
+  ['tool/call', 'toolCalls'],
+  ['tool/result', 'toolResults'],
+  ['assistant/message', 'assistantTexts'],
+  ['user/message', 'userMessages'],
+  ['request/header', 'requestHeaders'],
+])
+
+/**
  * Session format generations this parser accepts. Mirror of the generation
  * chain the vendored host ships codecs for
  * (`session-format-catalog/src/generated.ts`: codecs v0–v3,
@@ -170,6 +192,100 @@ function projectChild(log) {
 }
 
 /**
+ * Count events by type, plug-in event types included (the only live registry is
+ * `SessionEventMap`, so no closed list exists).
+ * @param {object[]} events - parsed event records.
+ * @returns {Record<string, number>} count per event type, insertion-ordered.
+ */
+function countEventTypes(events) {
+  const counts = {}
+  for (const event of events) {
+    if (typeof event?.type !== 'string') continue
+    counts[event.type] = (counts[event.type] ?? 0) + 1
+  }
+  return counts
+}
+
+/**
+ * Census for one candidate child log: whether its `subagent/descriptor`
+ * events exist, how many, and how many carry the supported descriptor
+ * version. `projectChild` folds the first supported one into identity; a log
+ * with no supported non-zero count means the child entered
+ * `subagentChildren` with empty identity — the signature of the identity-loss
+ * degradation the census exists to make visible.
+ * @param {{ header: object, events: object[] }} log - one parsed child candidate.
+ * @returns {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number }}
+ */
+function censusForChild(log) {
+  let descriptorEvents = 0
+  let supportedDescriptors = 0
+  for (const event of log.events) {
+    if (event.type !== 'subagent/descriptor') continue
+    descriptorEvents += 1
+    const data = event.data
+    if (data !== null && typeof data === 'object' && data.version === 3) supportedDescriptors += 1
+  }
+  return {
+    sessionId: log.header.id,
+    parentSession: log.header.parentSession,
+    delegationDepth: log.header.delegationDepth,
+    descriptorEvents,
+    supportedDescriptors,
+  }
+}
+
+/**
+ * Projection census for one built trace (see {@link EvalTrace.census}).
+ * Numbers only: this reports what the raw logs contained against what the
+ * projections kept, and never decides whether the difference is a defect.
+ * @param {object[]} events - the MAIN log's events (the projection input).
+ * @param {EvalTrace} trace - the built trace, read for projection lengths.
+ * @param {object[]} childLogs - candidate child logs entering `subagentChildren`.
+ * @returns {object} the census record.
+ */
+function buildCensus(events, trace, childLogs) {
+  const eventTypeCounts = countEventTypes(events)
+  const projectionLengths = {
+    toolCalls: trace.toolCalls.length,
+    toolResults: trace.toolResults.length,
+    assistantTexts: trace.assistantTexts.length,
+    userMessages: trace.userMessages.length,
+    requestHeaders: trace.requestHeaders.length,
+  }
+  const projectionSkipped = { main: {}, children: {} }
+  for (const [type, field] of PROJECTED_FIELD_BY_EVENT_TYPE) {
+    const missing = (eventTypeCounts[type] ?? 0) - projectionLengths[field]
+    if (missing > 0) projectionSkipped.main[field] = missing
+  }
+  const descriptorEvents = eventTypeCounts['subagent/descriptor'] ?? 0
+  let supportedDescriptors = 0
+  for (const log of childLogs) {
+    for (const event of log.events) {
+      if (event.type !== 'subagent/descriptor') continue
+      const data = event.data
+      if (data !== null && typeof data === 'object' && data.version === 3) supportedDescriptors += 1
+    }
+  }
+  for (const child of trace.subagentChildren) {
+    if (child.label === undefined && child.mode === undefined && child.provider === undefined) {
+      projectionSkipped.children.withoutIdentity
+        = (projectionSkipped.children.withoutIdentity ?? 0) + 1
+    }
+  }
+  return {
+    eventTypeCounts,
+    projectionLengths,
+    projectionSkipped,
+    subagent: {
+      mainLogDescriptorEvents: descriptorEvents,
+      supportedDescriptors,
+      projectionLength: trace.subagentChildren.length,
+      children: childLogs.map(censusForChild),
+    },
+  }
+}
+
+/**
  * Build one assertable trace from parsed session logs. Child sessions surface
  * only through the parent's tool events, so the MAIN log (no `origin:
  * 'subagent'` header) owns the tool/final-text projections; subagent children
@@ -185,9 +301,9 @@ export function buildTrace(logs) {
   const mains = logs.filter(log => log.header.origin !== 'subagent')
   const main = [...mains].sort((a, b) => b.events.length - a.events.length)[0]
   const events = main?.events ?? []
-  const subagentChildren = logs
+  const childLogs = logs
     .filter(log => log.header.origin === 'subagent' || log.header.parentSession !== undefined)
-    .map(projectChild)
+  const subagentChildren = childLogs.map(projectChild)
 
   const toolCalls = []
   const toolResults = []
@@ -261,7 +377,7 @@ export function buildTrace(logs) {
     : assistantEntries.filter(entry => entry.seq < firstInjectionSeq)
   const answerText = answerEntries.at(-1)?.text ?? ''
 
-  return {
+  const result = {
     sessions: logs,
     sessionId: main?.header.id,
     toolCalls,
@@ -272,7 +388,13 @@ export function buildTrace(logs) {
     requestHeaders,
     subagentChildren,
     finalText: assistantTexts.at(-1) ?? '',
+    census: undefined,
   }
+  result.census = buildCensus(events, result, childLogs)
+  // Only the run's own trace carries a census: a nested child log would
+  // report its events as its parent's main session.
+  for (const session of logs) delete session.census
+  return result
 }
 
 /**
@@ -408,4 +530,18 @@ export function collectSessionTrace(sessionsRoot) {
  *     last assistant text ('' when it produced none — dispatched but not
  *     answered).
  * @property {string} finalText - the last assembled assistant text ('' when none).
+ * @property {object | undefined} census - what the raw logs contained against
+ *   what the projections kept (numbers only, never a verdict). Two data
+ *   sources: `eventTypeCounts` counts the MAIN log's events by type (any type,
+ *   plug-in ones included), and `subagent` censuses the child logs that enter
+ *   `subagentChildren` (their `subagent/descriptor` event counts and how many
+ *   carry the supported `version === 3`). `projectionLengths` are the five
+ *   main-log projections' lengths after empty-text drops; `projectionSkipped`
+ *   records where count minus length is positive, per projection. Undefined
+ *   only on a hand-built trace; the nested logs under `sessions` never carry
+ *   their own census.
+ * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, descriptorEvents: number, supportedDescriptors: number }[]} census.subagent.children
+ *   - the accepted child logs; `descriptorEvents === 0` means the log states no
+ *     identity at all, and a non-zero count with `supportedDescriptors === 0`
+ *     means every descriptor was outside the supported version.
  */

@@ -30,6 +30,10 @@
  * @param {boolean} [parts.timedOut]
  * @param {number} [parts.durationMs] - wall time of the run, when it ran.
  * @param {string} [parts.artifactsDir] - where post-mortem artifacts landed, when written.
+ * @param {object} [parts.census] - the run trace's projection census
+ *   (`trace.census`), carried on both pass and fail records so a green case
+ *   whose evidence surface degraded is still inspectable after the fact.
+ *   Absent when no trace materialized.
  */
 export function createCaseRecord(parts) {
   const record = { id: parts.id, file: parts.file }
@@ -41,6 +45,7 @@ export function createCaseRecord(parts) {
   if (parts.timedOut !== undefined) record.timedOut = parts.timedOut
   if (parts.durationMs !== undefined) record.durationMs = parts.durationMs
   if (parts.artifactsDir !== undefined) record.artifactsDir = parts.artifactsDir
+  if (parts.census !== undefined) record.census = parts.census
   return record
 }
 

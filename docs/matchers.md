@@ -1,5 +1,5 @@
 ---
-description: trace matcher 与 mock helper 全集——工具面/文本面/输入面/派发面断言语义（toolCalled 到 subagentCompletedCount）与 toolCallStep/textStep 脚本构件
+description: trace matcher 与 mock helper 全集——工具面/文本面/输入面/派发面断言语义（toolCalled 到 subagentCompletedCount）、投影普查（trace.census）与 toolCallStep/textStep 脚本构件
 ---
 
 # Trace matchers 与 mock helpers
@@ -19,6 +19,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
 | `requestHeaders` | `{ seq, reason, system, toolNames }[]`（组装后 system prompt + 挂载工具名） |
 | `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
+| `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, subagent: { mainLogDescriptorEvents, supportedDescriptors, projectionLength, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
 | `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
 
 `runEvalCase` 返回的 `result.trace` 即此形状（无 session 日志时为 `undefined`；字段语义见 [runner-api.md](runner-api.md)）。
@@ -54,6 +55,23 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - `subagentCompletedCount(label, expected)`：匹配 label 且**跑完**（产出非空 assistant 文本）的子 agent 恰为 `expected` 个。`subagentCompleted` 任一跑完即过；本 matcher 钉死每个派发的结局——「已派发 ⇒ 可观测结局」的跨轮 case 里，任一被截断的子 agent 都判负。
 
 边界：子会话产物（独立 JSONL）经 `subagentChildren` 记录进入断言面（身份 + 子自身文本）；子会话内部的工具调用**不**并入主投影的 `toolCalls`/`toolResults`（那属于主会话行为面），需要时经 `sessions` 原始日志自行投影。
+
+## 投影普查（`trace.census`）
+
+宽松投影（tolerant reader）的补救面：宿主事件 payload 演进时 `buildTrace` 不抛错，只把投影填成空数组。空投影会让负向断言真空通过——`toolNotCalled`、`userMessageTextExcludes`、以及 `subagentDispatchCount` / `subagentCompletedCount` 的 `expected === 0` 档都判 ok。**普查只报数，不判定**：它让「宿主日志里本来就没有这类事件」与「有事件但投影丢掉了」在报告里可分，是否降级由人判读。
+
+两个数据源，别混：
+
+| 面 | 内容 |
+|---|---|
+| 主 session 事件（`eventTypeCounts` / `projectionLengths` / `projectionSkipped.main`） | 主日志（`buildTrace` 的投影输入）逐事件类型计数（任何类型，含插件扩展类型）；五个投影的长度；以及**每个投影上「计数 − 长度 > 0」的差额**（`projectionSkipped.main`，按投影字段名） |
+| 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数与其中 `version === 3` 的条数（`supportedDescriptors`）；`projectionLength` 是实际进入 `subagentChildren` 的条数；`projectionSkipped.children.withoutIdentity` 数身份（label/mode/provider 全缺）为空的子记录。**子日志不是主日志**，`eventTypeCounts` 不统计它们的 `subagent/descriptor` |
+
+判读要点：
+
+- **差额 ≠ 缺陷**。`assistant/message`、`user/message` 的**空文本消息是设计上整条丢弃**（保护「组装文本」投影语义），这类差额属合法，普查不替你做白名单；
+- **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空——`*Count(label, 0)` 在这种日志上真空通过，而五个主投影面全部正常；
+- 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动）。失败文案目前不带计数。
 
 ## Mock script helpers
 

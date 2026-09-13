@@ -17,6 +17,18 @@ describe('createCaseRecord', () => {
     assert.ok(!('mode' in record))
     assert.deepEqual(record.failures, ['load error'])
   })
+
+  // The census rides BOTH outcomes: a green case whose evidence surface
+  // degraded is the exact case the report has to keep inspectable (EVAL-022).
+  it('carries the projection census on pass and fail records, and omits it without one', () => {
+    const census = { eventTypeCounts: { 'tool/call': 1 }, projectionLengths: { toolCalls: 0 } }
+    const pass = createCaseRecord({ id: 'c-3', file: '/x/c.eval.mjs', status: 'pass', census })
+    assert.deepEqual(pass.census, census)
+    const fail = createCaseRecord({ id: 'c-4', file: '/x/c.eval.mjs', status: 'fail', failures: ['x'], census })
+    assert.deepEqual(fail.census, census)
+    const noTrace = createCaseRecord({ id: 'c-5', file: '/x/c.eval.mjs', status: 'fail', failures: ['x'] })
+    assert.ok(!('census' in noTrace))
+  })
 })
 
 describe('summarizeRecords', () => {
