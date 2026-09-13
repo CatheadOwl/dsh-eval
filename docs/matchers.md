@@ -19,7 +19,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
 | `requestHeaders` | `{ seq, reason, system, toolNames }[]`（组装后 system prompt + 挂载工具名） |
 | `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
-| `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, subagent: { mainLogDescriptorEvents, supportedDescriptors, projectionLength, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
+| `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, projectionFieldGaps, subagent: { mainLogDescriptorEvents, supportedDescriptors, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
 | `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
 
 `runEvalCase` 返回的 `result.trace` 即此形状（无 session 日志时为 `undefined`；字段语义见 [runner-api.md](runner-api.md)）。
