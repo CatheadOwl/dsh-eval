@@ -147,9 +147,9 @@ export function validateFollowups(followups, label) {
  *   from `dsh-eval.config.mjs`, which is how gate-interaction cases opt
  *   back in inside a package that disables the gate row by default.
  * - `rowConfig` (if present) maps loader row ids to config objects whose
- *   leaf values are scalars or arrays of scalars (see `validateRowConfig`).
- *   The overlay REPLACES the row's whole config — restate any keys the row
- *   needs, not just the ones being changed.
+ *   leaves are scalars, arrays of scalars, or nested plain objects of the
+ *   same (see `validateRowConfig`). The overlay REPLACES the row's whole
+ *   config — restate any keys the row needs, not just the ones being changed.
  * - `followups` (if present) is a non-empty array of followup turn texts
  *   (cross-turn driving; see `validateFollowups`), with optional positive
  *   finite `settleTimeoutMs`.
@@ -213,10 +213,38 @@ export function validateEvalCase(evalCase, file) {
 }
 
 /**
+ * Validate one rowConfig value at `path` (a dotted key path): a scalar, an
+ * array of scalars, or a nested plain object of the same — parameter groups
+ * stay expressible as ONE value instead of being flattened into unrelated
+ * scalar keys. Throws with `label` context and the offending key path.
+ * @param {string} rowId - the row id the config belongs to (error context).
+ * @param {string} path - dotted key path within the row's config.
+ * @param {unknown} value - the value to validate.
+ * @param {string} label - error-message context (e.g. `case '<id>'`).
+ */
+function validateConfigValue(rowId, path, value, label) {
+  const where = `${label}: rowConfig['${rowId}']['${path}']`
+  if (Array.isArray(value)) {
+    if (value.some(item => item === null || typeof item === 'object')) {
+      throw new Error(`${where} must be an array of scalars`)
+    }
+  } else if (value === null || typeof value === 'object') {
+    if (value === null) {
+      throw new Error(`${where} must be a scalar, scalar array, or nested object (got null)`)
+    }
+    for (const [key, nested] of Object.entries(value)) {
+      if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
+      validateConfigValue(rowId, `${path}.${key}`, nested, label)
+    }
+  }
+}
+
+/**
  * Validate a `rowConfig` mapping (case-level or ad-hoc): keys are loader row
- * ids, values are config objects whose leaf values must be scalars (string /
- * number / boolean) or arrays of scalars. Nested objects are rejected — the
- * overlay emitter only handles flat config keys. Throws with `label` context.
+ * ids, values are config objects whose leaves must be scalars (string /
+ * number / boolean), arrays of scalars, or nested plain objects of the same
+ * (emitted as YAML flow mappings — see `yamlConfigValue`). Throws with
+ * `label` context.
  * @param {unknown} rowConfig - the value to validate.
  * @param {string} label - error-message context (e.g. `case '<id>'`).
  */
@@ -231,13 +259,7 @@ export function validateRowConfig(rowConfig, label) {
     }
     for (const [key, value] of Object.entries(config)) {
       if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
-      if (Array.isArray(value)) {
-        if (value.some(item => item === null || typeof item === 'object')) {
-          throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be an array of scalars`)
-        }
-      } else if (value === null || typeof value === 'object') {
-        throw new Error(`${label}: rowConfig['${rowId}']['${key}'] must be a scalar or scalar array (nested objects are not supported)`)
-      }
+      validateConfigValue(rowId, key, value, label)
     }
   }
 }

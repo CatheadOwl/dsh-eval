@@ -5,9 +5,10 @@
  * per-run overlay files; sharing one emitter keeps quoting rules and
  * row-patch syntax (`- id: <row>` / `disabled: true`) identical everywhere.
  *
- * YAML strategy: JSON double-quoted strings are valid YAML scalars, so the
- * emitters lean on JSON.stringify — zero dependencies, identical quoting
- * across scalar and array leaves.
+ * YAML strategy: JSON double-quoted strings are valid YAML scalars, and JSON
+ * arrays / objects are valid YAML flow sequences / mappings, so the emitters
+ * lean on JSON.stringify — zero dependencies, identical quoting across
+ * scalar, array, and nested-object leaves.
  */
 
 import { join } from 'node:path'
@@ -29,12 +30,14 @@ function yamlScalar(value) {
 }
 
 /**
- * One rowConfig leaf: a scalar, or an array of scalars emitted as a YAML flow
- * sequence (a JSON array is valid YAML flow syntax, and keeps quoting rules
- * identical to `yamlScalar`).
+ * One rowConfig leaf or branch: a scalar, an array of scalars emitted as a
+ * YAML flow sequence, or a nested plain object emitted as a YAML flow mapping
+ * (a JSON object is valid YAML flow syntax, and keeps quoting rules identical
+ * to `yamlScalar` — numbers and booleans stay YAML-native either way).
  */
 function yamlConfigValue(value) {
   if (Array.isArray(value)) return JSON.stringify(value.map(item => typeof item === 'string' ? item : String(item)))
+  if (value !== null && typeof value === 'object') return JSON.stringify(value)
   return yamlScalar(value)
 }
 

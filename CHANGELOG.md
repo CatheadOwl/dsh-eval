@@ -12,6 +12,12 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
+- **`rowConfig` values accept nested plain objects.** A parameter group (e.g.
+  `variant: { form: 'standard', emphasis: 2 }`) can now be declared as one
+  value instead of being flattened into unrelated scalar keys; nested objects
+  are emitted as YAML flow mappings, and leaves keep the same scalar /
+  scalar-array restriction at every depth. Arrays still reject non-scalar
+  items, and `null` leaves are still refused.
 - Case records carry `evidenceAnchor: 'inspect'` when the case's assertions rest
   on its `inspect` hook alone — the one evidence channel the framework cannot
   audit (a hook may read raw session events or nothing at all). The field marks a

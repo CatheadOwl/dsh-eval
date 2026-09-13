@@ -95,10 +95,14 @@ describe('validateEvalCase', () => {
     }, file), /'gates' field was removed/)
   })
 
-  it('accepts rowConfig with scalar / scalar-array leaves and rejects nested shapes', () => {
+  it('accepts rowConfig with scalar / scalar-array / nested-object leaves and rejects non-scalar leaves', () => {
     assert.doesNotThrow(() => validateEvalCase({
       id: 'rowconfig-ok', task: 'test', expect: [validMatcher],
       rowConfig: { prompt: { disabledProviders: ['a-enricher'], totalTimeoutMs: 5000, flag: false } },
+    }, file))
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'rowconfig-nested-ok', task: 'test', expect: [validMatcher],
+      rowConfig: { prompt: { variant: { form: 'standard', emphasis: 2, tags: ['a'] }, deep: { inner: { n: 1 } } } },
     }, file))
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-not-object', task: 'test', expect: [validMatcher], rowConfig: ['prompt'],
@@ -107,11 +111,14 @@ describe('validateEvalCase', () => {
       id: 'rowconfig-not-config', task: 'test', expect: [validMatcher], rowConfig: { prompt: 'off' },
     }, file), /must be a config object/)
     assert.throws(() => validateEvalCase({
-      id: 'rowconfig-nested', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: { b: 1 } } },
-    }, file), /scalar or scalar array/)
+      id: 'rowconfig-null-leaf', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: null } },
+    }, file), /must be a scalar, scalar array, or nested object/)
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: [{}] } },
-    }, file), /array of scalars/)
+    }, file), /must be an array of scalars/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-nested-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { variant: { tags: [{}] } } },
+    }, file), /'variant.tags'\] must be an array of scalars/)
   })
 
   it('accepts followups with optional settleTimeoutMs and rejects malformed values', () => {

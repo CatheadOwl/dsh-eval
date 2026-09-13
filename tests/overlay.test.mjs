@@ -51,6 +51,14 @@ describe('buildOverlayYaml', () => {
     assert.match(yaml, /name: "x y"/)
   })
 
+  it('emits nested rowConfig objects as YAML flow mappings', () => {
+    const yaml = buildOverlayYaml({
+      sessionsRoot: 's',
+      rowConfig: { prompt: { variant: { form: 'standard', emphasis: 2, flag: false, tags: ['a'] } } },
+    })
+    assert.match(yaml, /- id: "prompt"\n  config:\n    variant: \{"form":"standard","emphasis":2,"flag":false,"tags":\["a"\]\}/)
+  })
+
   it('swaps in the multi-turn driver only when followups is supplied', () => {
     const yaml = buildOverlayYaml({ sessionsRoot: 's', followups: ['rescan now'] })
     assert.match(yaml, /- id: headless-runner\n  disabled: true/)

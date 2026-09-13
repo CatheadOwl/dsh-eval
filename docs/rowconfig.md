@@ -17,8 +17,8 @@ cordis patch 层的 config 覆写是**整段替换**，不是深合并：`rowCon
 
 ## 形状限制
 
-- 叶值只支持**标量**（string / number / boolean）或**标量数组**（如 `disabledProviders: ['a', 'b']`，YAML flow 序列发射）；
-- 嵌套对象不支持（`validateRowConfig` 拒绝）——需要嵌套 config 的行请走自己的 profile patch，不进 case；
+- 叶值支持**标量**（string / number / boolean）、**标量数组**（如 `disabledProviders: ['a', 'b']`）与**嵌套 plain object**（同样递归限制，任意深度）——参数组（如 `variant: { form, emphasis }`）作为**一个值**表达，不必拍平成互不相关的标量键；嵌套对象以 YAML flow mapping 发射；
+- 数组元素仍须是标量（数组内对象拒绝）；`null` 叶值拒绝；
 - 校验双点：discovery 加载期与 `runEvalCase` 执行期同一份 `validateRowConfig`。
 
 ## 与 disableRows 的分工
@@ -32,8 +32,9 @@ cordis patch 层的 config 覆写是**整段替换**，不是深合并：`rowCon
 ## 校验示例
 
 ```js
-// 合法
-rowConfig: { prompt: { disabledProviders: ['breadcrumb-description-enricher'], totalTimeoutMs: 5000 } }
-// 非法：嵌套对象
-rowConfig: { prompt: { a: { b: 1 } } }   // validateRowConfig 拒绝
+// 合法：标量 / 标量数组 / 嵌套参数组
+rowConfig: { prompt: { disabledProviders: ['breadcrumb-description-enricher'], totalTimeoutMs: 5000, variant: { form: 'standard', emphasis: 2 } } }
+// 非法：数组内对象 / null 叶值
+rowConfig: { prompt: { a: [{}] } }        // validateRowConfig 拒绝
+rowConfig: { prompt: { a: null } }        // validateRowConfig 拒绝
 ```
