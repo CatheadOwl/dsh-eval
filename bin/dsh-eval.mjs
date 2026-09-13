@@ -11,9 +11,10 @@
  * A case path is a `*.eval.mjs` file or a directory scanned recursively for
  * them. Each file default-exports one case object (or an array of them):
  * `{ id, task, mode?: 'real'|'mock', expect: Matcher[], script?,
- * prepare?, timeoutMs? }`. Real cases skip when DEEPSEEK_API_KEY is absent;
- * the exit code is 1 when any run fails. Failures keep their artifacts under
- * `<case file dir>/.runs/<case id>/`.
+ * prepare?, timeoutMs? }`. Real cases skip when NO credential is visible —
+ * the env var DEEPSEEK_API_KEY OR the staged home's .credentials.yaml,
+ * either one counts. The exit code is 1 when any run fails. Failures keep
+ * their artifacts under `<case file dir>/.runs/<case id>/`.
  *
  * Output formats:
  * - `--format text` (default): unchanged human output on stdout/stderr.
