@@ -186,9 +186,9 @@ export function defineBehaviorExperiment(definition) {
  *   `runEvalCase`; arm `rowConfig` merges are validated up front so a bad
  *   override fails before any spawn).
  * @param {object} options - `runEvalCase` options (`profile` required; give
- *   `cliPath` — a `resolveDshCliChain` result — or legacy `dshRepoDir`;
- *   optional forced `mode`; optional `artifactsDir` for per-run artifacts;
- *   optional `onRow(row)` progress callback).
+ *   `cliPath` — a `resolveDshCliChain` result; optional forced `mode`;
+ *   optional `artifactsDir` for per-run artifacts; optional `onRow(row)`
+ *   progress callback).
  * @returns {Promise<object>} the experiment result: `{ experimentId, caseId,
  *   hypothesis, decisionRule, definitionSha256, arms, rows }` — `arms`
  *   carries per-arm aggregation (clean counts, per-metric rate/median,
@@ -205,8 +205,8 @@ export async function executeBehaviorExperiment(experiment, evalCase, options) {
   if (typeof options?.profile !== 'string' || options.profile === '') {
     throw new TypeError('executeBehaviorExperiment needs options.profile')
   }
-  if (options.cliPath === undefined && options.dshRepoDir === undefined) {
-    throw new TypeError('executeBehaviorExperiment needs options.cliPath (a resolveDshCliChain result) or options.dshRepoDir')
+  if (options.cliPath === undefined) {
+    throw new TypeError('executeBehaviorExperiment needs options.cliPath (a resolveDshCliChain result)')
   }
 
   for (const arm of experiment.arms) {
@@ -227,8 +227,7 @@ export async function executeBehaviorExperiment(experiment, evalCase, options) {
       }
       const runOptions = {
         profile: options.profile,
-        ...(options.cliPath === undefined ? {} : { cliPath: options.cliPath }),
-        ...(options.dshRepoDir === undefined ? {} : { dshRepoDir: options.dshRepoDir }),
+        cliPath: options.cliPath,
         ...(options.mode === undefined ? {} : { mode: options.mode }),
         ...(options.artifactsDir === undefined ? {} : { artifactsDir: join(options.artifactsDir, arm.id, String(index)) }),
       }

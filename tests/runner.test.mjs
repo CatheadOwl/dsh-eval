@@ -7,15 +7,19 @@ import { runEvalCase } from '../src/runner.mjs'
 import { toolCalled } from '../src/assertions.mjs'
 
 /**
- * Build a minimal fake deepseek-harness repo — just enough for
- * `looksLikeDshRepo` to accept it. The CLI bin is never actually
- * spawned because `prepare` (or mock validation) throws first.
+ * Build a fake compiled CLI entry, shaped like a `resolveDshCliChain`
+ * result. The CLI is never actually spawned because `prepare` (or mock
+ * validation) throws first.
  */
 function createFakeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-fake-repo-'))
   mkdirSync(join(dir, 'apps', 'cli', 'lib'), { recursive: true })
   writeFileSync(join(dir, 'apps', 'cli', 'lib', 'bin.js'), '')
   return dir
+}
+
+function fakeCliPath(repoDir) {
+  return join(repoDir, 'apps', 'cli', 'lib', 'bin.js')
 }
 
 describe('runEvalCase cleanup', () => {
@@ -34,7 +38,7 @@ describe('runEvalCase cleanup', () => {
     }
 
     try {
-      await runEvalCase(evalCase, { profile: 'test', dshRepoDir: repoDir })
+      await runEvalCase(evalCase, { profile: 'test', cliPath: fakeCliPath(repoDir) })
       assert.fail('should have thrown')
     } catch (error) {
       assert.match(error.message, /prepare exploded/)
@@ -61,7 +65,7 @@ describe('runEvalCase cleanup', () => {
     }
 
     try {
-      await runEvalCase(evalCase, { profile: 'test', dshRepoDir: repoDir, mode: 'mock' })
+      await runEvalCase(evalCase, { profile: 'test', cliPath: fakeCliPath(repoDir), mode: 'mock' })
       assert.fail('should have thrown')
     } catch (error) {
       assert.match(error.message, /mock mode requires a script/)
@@ -69,6 +73,15 @@ describe('runEvalCase cleanup', () => {
 
     assert.equal(existsSync(capturedRunDir), false, 'runDir should be cleaned up after mock validation failure')
     rmSync(repoDir, { recursive: true, force: true })
+  })
+})
+
+describe('runEvalCase options contract', () => {
+  it('refuses to run without cliPath (the legacy dshRepoDir form is gone)', async () => {
+    await assert.rejects(
+      runEvalCase({ id: 'no-cli-path', task: 'test', expect: [] }, { profile: 'test' }),
+      /runEvalCase needs options\.cliPath/,
+    )
   })
 })
 

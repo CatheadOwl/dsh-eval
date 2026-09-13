@@ -17,10 +17,9 @@ const result = await runEvalCase(evalCase, { profile: 'headless', cliPath, mode:
 | 键 | 类型 | 语义 |
 |---|---|---|
 | `profile` | `string` | 必填。承载被测插件的 dsh profile（沙箱会暂存其 store，不污染真实 home）。 |
-| `cliPath` | `string` | 编译好的 dsh CLI 入口（`apps/cli/lib/bin.js`）绝对路径；优先于 `dshRepoDir`。程序化取值见下节。 |
+| `cliPath` | `string` | 必填。编译好的 dsh CLI 入口（`apps/cli/lib/bin.js`）绝对路径（`resolveDshCliChain` 结果）。程序化取值见下节。 |
 | `mode` | `'real' \| 'mock'` | 覆写 case 自带的 mode；mock 需 `script.steps`。 |
 | `artifactsDir` | `string` | 提供则把 stdout/stderr/trace/session 日志拷贝到该目录（自动创建）。 |
-| `dshRepoDir` | `string` | **已弃用**：宿主 checkout 目录（从中拼出 CLI 路径）。下个 minor 删除——迁移到 `cliPath`。 |
 
 ## `cliPath` 从哪来：跨档关系（读我）
 

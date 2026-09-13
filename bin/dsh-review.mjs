@@ -95,11 +95,11 @@ const { config } = await loadEvalConfig(process.cwd())
 const profile = options.profile ?? config.profile ?? 'headless'
 // CLI resolution (C6): `--repo` flag > resolution layer (node_modules) >
 // config repo key (legacy). Dry-run never boots the CLI, so resolve lazily.
-let cli = { cliPath: undefined, repoDir: undefined }
+let cli = { cliPath: undefined }
 if (!options.dryRun) {
   try {
     const resolved = resolveDshCliChain({ repoFlag: options.repo, configRepo: config.repo })
-    cli = { cliPath: resolved.cli, repoDir: resolved.repo }
+    cli = { cliPath: resolved.cli }
   } catch (error) {
     usage(`error: ${error.message}`)
   }
@@ -127,7 +127,6 @@ for (const file of files) {
     const result = await runDshReviewExperiment(experiment, {
       profile,
       cliPath: cli.cliPath,
-      dshRepoDir: cli.repoDir,
       runs: options.runs,
       timeoutMs: options.timeoutMs,
       keepPluginRows: options.keepPluginRows,

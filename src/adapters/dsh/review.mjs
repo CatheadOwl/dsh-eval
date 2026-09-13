@@ -1,10 +1,9 @@
 /** dsh-headless execution adapter for model-independent review experiments. */
 
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { executeReviewExperiment } from '../../experiment/review.mjs'
-import { CLI_RELATIVE_PATH } from '../../cli.mjs'
 import { overlayDisableRows } from '../../overlay.mjs'
 import {
   resolveRealDshHome, stageSandboxHome, stagedPluginRows, teardownSandbox, spawnHeadlessDsh,
@@ -70,23 +69,14 @@ function buildReviewOverlayYaml(pluginRows, { keepPluginRows }) {
   return overlayDisableRows([...disabled])
 }
 
-/** Resolve and validate the compiled dsh CLI entry point. */
-export function resolveDshCli(dshRepoDir) {
-  const repoDir = resolve(dshRepoDir)
-  const cli = join(repoDir, ...CLI_RELATIVE_PATH.split(/[\\/]/))
-  if (!existsSync(cli)) {
-    throw new Error(`no compiled dsh CLI at '${cli}' (build deepseek-harness first)`)
-  }
-  return cli
-}
-
-/** The CLI entry for an executor: explicit cliPath (C6 chain result) wins;
- * otherwise fall back to the legacy repo form. Neither being set is a caller
- * bug the CLI bins already catch — this guard serves direct API consumers. */
+/** The CLI entry for an executor: the explicit cliPath (a `resolveDshCliChain`
+ * result). Its absence is a caller bug the CLI bins already catch — this
+ * guard serves direct API consumers. */
 function executorCli(options) {
-  if (options.cliPath !== undefined) return resolve(options.cliPath)
-  if (options.dshRepoDir !== undefined) return resolveDshCli(options.dshRepoDir)
-  throw new Error('review adapter needs a CLI location: pass cliPath (C6 chain result) or dshRepoDir')
+  if (options.cliPath === undefined) {
+    throw new Error('review adapter needs options.cliPath (a resolveDshCliChain result)')
+  }
+  return resolve(options.cliPath)
 }
 
 /**

@@ -8,7 +8,7 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-## [Unreleased]
+## [0.3.0] — 2026-09-13
 
 ### Added
 
@@ -108,6 +108,13 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 - `loadTraceDir` (experimental): replaced by `collectSessionTrace`, which
   returns the trace together with the reason none was built. Migrate
   `loadTraceDir(root)` to `collectSessionTrace(root).trace`.
+- **`options.dshRepoDir`** on `runEvalCase` (and the same legacy option on
+  the review executor and `executeBehaviorExperiment`): the CLI location is
+  now `options.cliPath` only. **Migrating a case that trips this**: resolve
+  once with `resolveDshCliChain` (the `/experimental` export) and pass its
+  `cli` result as `cliPath` — the `dsh-eval` / `dsh-review` CLIs already do
+  this via `--repo`, the `node_modules` resolution layer, or the config
+  `repo` key.
 
 ### Fixed
 
@@ -186,6 +193,7 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `@deepseek-ai/dsh-llm` is a peerDependency provided by the host
   ecosystem.
 
+[0.3.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.3.0
 [0.2.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.1
 [0.2.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.0
 [0.1.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.1.0

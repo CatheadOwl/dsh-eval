@@ -235,7 +235,7 @@ for (const file of files.sort()) {
     const runStartedAt = Date.now()
     let result
     try {
-      result = await runEvalCase(evalCase, { profile, cliPath, dshRepoDir: repoDir, mode })
+      result = await runEvalCase(evalCase, { profile, cliPath, mode })
     } catch (error) {
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'fail',

@@ -61,21 +61,18 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
  * @param {object} evalCase - the case under test.
  * @param {object} options
  * @param {string} options.profile - the dsh profile booting the run (plugin installed there).
- * @param {string} [options.dshRepoDir] - the deepseek-harness checkout (legacy CLI
- *   location; ignored when cliPath is given).
- * @deprecated options.dshRepoDir — pass the C6 chain result via cliPath
- *   instead; this legacy option is removed in the next minor release.
- * @param {string} [options.cliPath] - explicit compiled CLI entry (C6 chain result;
- *   takes precedence over dshRepoDir).
+ * @param {string} options.cliPath - the compiled dsh CLI entry (a
+ *   `resolveDshCliChain` result); required.
  * @param {'real' | 'mock'} [options.mode] - force a mode over the case's own.
  * @param {string} [options.artifactsDir] - copy stdout/stderr/trace/session logs here (created).
  * @returns {Promise<EvalRunResult>}
  */
 export async function runEvalCase(evalCase, options) {
   const mode = options.mode ?? evalCase.mode ?? 'real'
-  const binPath = options.cliPath !== undefined
-    ? resolve(options.cliPath)
-    : join(resolve(options.dshRepoDir), ...CLI_RELATIVE_PATH.split(/[\\/]/))
+  if (options.cliPath === undefined) {
+    throw new TypeError('runEvalCase needs options.cliPath (a resolveDshCliChain result)')
+  }
+  const binPath = resolve(options.cliPath)
   const timeoutMs = evalCase.timeoutMs ?? 180_000
 
   const runDir = mkdtempSync(join(tmpdir(), 'dsh-eval-'))
