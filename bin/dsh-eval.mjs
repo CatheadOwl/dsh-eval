@@ -14,7 +14,10 @@
  * prepare?, timeoutMs? }`. Real cases skip when NO credential is visible —
  * the env var DEEPSEEK_API_KEY OR the staged home's .credentials.yaml,
  * either one counts. The exit code is 1 when any run fails. Failures keep
- * their artifacts under `<case file dir>/.runs/<case id>/`.
+ * their artifacts under `<case file dir>/.runs/<case id>/`; each write
+ * starts fresh (one run's evidence, `trace.json` carries `startedAt`), and
+ * a passing run removes its own stale dir unless `--keep-artifacts` is set
+ * — the dir existing means the case's LAST run failed (or was kept).
  *
  * Output formats:
  * - `--format text` (default): unchanged human output on stdout/stderr.
@@ -24,7 +27,7 @@
  *   in either format — the aggregation/CI consumption path.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -130,11 +133,16 @@ function skipReason(evalCase, modeFilter) {
 function writeArtifacts(evalCase, result, mode) {
   const artifactsDir = join(dirname(evalCase.__file), '.runs', evalCase.id)
   try {
+    // Fresh-run semantics: wipe before writing, so the dir holds exactly one
+    // run's evidence — a prior run's files (fewer session-*.jsonl this time,
+    // an older trace.json) never survive into this post-mortem.
+    rmSync(artifactsDir, { recursive: true, force: true })
     mkdirSync(artifactsDir, { recursive: true })
     writeFileSync(join(artifactsDir, 'stdout.txt'), result.stdout)
     writeFileSync(join(artifactsDir, 'stderr.txt'), result.stderr)
     writeFileSync(join(artifactsDir, 'trace.json'), JSON.stringify({
       caseId: evalCase.id, mode, task: evalCase.task,
+      startedAt: result.startedAt,
       exitCode: result.exitCode, timedOut: result.timedOut,
       traceGap: result.traceGap, trace: result.trace,
     }, undefined, 2))
@@ -143,6 +151,16 @@ function writeArtifacts(evalCase, result, mode) {
     })
   } catch { /* artifact persistence is best-effort */ }
   return artifactsDir
+}
+
+/**
+ * Remove a passing case's stale post-mortem dir: after this, `.runs/<id>/`
+ * existing means the case's LAST run failed (or was kept with
+ * `--keep-artifacts`) — a green rerun never leaves the previous failure's
+ * evidence looking current.
+ */
+function removeStaleArtifacts(evalCase) {
+  rmSync(join(dirname(evalCase.__file), '.runs', evalCase.id), { recursive: true, force: true })
 }
 
 const startedAt = new Date().toISOString()
@@ -282,6 +300,7 @@ for (const file of files.sort()) {
 
     if (failures.length === 0) {
       const artifactsDir = options.keepArtifacts ? writeArtifacts(evalCase, result, mode) : undefined
+      if (artifactsDir === undefined) removeStaleArtifacts(evalCase)
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'pass',
         exitCode: result.exitCode, timedOut: result.timedOut,

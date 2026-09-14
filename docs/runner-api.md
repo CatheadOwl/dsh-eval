@@ -30,6 +30,7 @@ const result = await runEvalCase(evalCase, { profile: 'headless', cliPath, mode:
 | 字段 | 语义 |
 |---|---|
 | `caseId` / `mode` / `task` | 回显 case 标识。 |
+| `startedAt` | 本次 run 开始的 ISO 时间戳；同入 `trace.json` 产物——事后证据自证轮次，不依赖文件 mtime。 |
 | `exitCode` | headless CLI 退出码（0 = turn 完成）。 |
 | `timedOut` | 是否超时被杀。 |
 | `stdout` / `stderr` | CLI 原始输出（stdout 含最终 assistant 文本与启动 chatter）。 |

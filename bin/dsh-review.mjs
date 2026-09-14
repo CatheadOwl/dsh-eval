@@ -7,7 +7,7 @@
  * `.runs/<experiment id>/`.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { materializeReviewExperiment } from '../src/experiment/review.mjs'
@@ -68,6 +68,10 @@ function artifactDir(experiment) {
 
 function writeMaterialized(experiment, materialized, extra = {}, reviewResult = undefined) {
   const output = artifactDir(experiment)
+  // Fresh-run semantics: wipe before writing, so an execution with fewer runs
+  // never leaves a previous execution's run-N files looking current. The dir
+  // holds generated artifacts only (review rule: 生成物不做 SSOT).
+  rmSync(output, { recursive: true, force: true })
   mkdirSync(output, { recursive: true })
   writeFileSync(join(output, 'task.txt'), materialized.task, 'utf8')
   writeFileSync(join(output, 'observations.md'), materialized.observations, 'utf8')

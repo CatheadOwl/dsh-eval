@@ -28,7 +28,7 @@
  * module is the orchestration only.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -68,6 +68,7 @@ const FRAMEWORK_ROOT = fileURLToPath(new URL('..', import.meta.url))
  * @returns {Promise<EvalRunResult>}
  */
 export async function runEvalCase(evalCase, options) {
+  const startedAt = new Date().toISOString()
   const mode = options.mode ?? evalCase.mode ?? 'real'
   if (options.cliPath === undefined) {
     throw new TypeError('runEvalCase needs options.cliPath (a resolveDshCliChain result)')
@@ -164,6 +165,10 @@ export async function runEvalCase(evalCase, options) {
     }
 
     if (options.artifactsDir !== undefined) {
+      // Fresh-run semantics: an artifact dir holds exactly ONE run's evidence.
+      // Wipe before writing — a prior run's files (e.g. its sessions/ when
+      // this one materialized none) must never mix into this run's post-mortem.
+      rmSync(options.artifactsDir, { recursive: true, force: true })
       mkdirSync(options.artifactsDir, { recursive: true })
       writeFileSync(join(options.artifactsDir, 'stdout.txt'), stdout)
       writeFileSync(join(options.artifactsDir, 'stderr.txt'), stderr)
@@ -171,6 +176,7 @@ export async function runEvalCase(evalCase, options) {
         caseId: evalCase.id,
         mode,
         task: evalCase.task,
+        startedAt,
         exitCode,
         timedOut,
         trace,
@@ -181,7 +187,7 @@ export async function runEvalCase(evalCase, options) {
     }
 
     return {
-      caseId: evalCase.id, mode, task: evalCase.task, exitCode, timedOut,
+      caseId: evalCase.id, mode, task: evalCase.task, startedAt, exitCode, timedOut,
       stdout, stderr, trace, traceGap, sessionLogs, inspectError, runDir,
       evidenceAnchor: evidenceAnchorKind(evalCase),
     }
@@ -200,6 +206,9 @@ function collectSessionLogTexts(sessionsRoot) {
  * @property {string} caseId
  * @property {'real' | 'mock'} mode
  * @property {string} task
+ * @property {string} startedAt - ISO timestamp of the run's start; rides the
+ *   result and the `trace.json` artifact so post-mortem evidence identifies
+ *   its own run without relying on file mtimes.
  * @property {number} exitCode - the headless CLI's exit code (0 = turn completed).
  * @property {boolean} timedOut
  * @property {string} stdout - printed final assistant text (plus any startup chatter).

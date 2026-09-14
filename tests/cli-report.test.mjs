@@ -6,7 +6,7 @@
  * `createCaseRecord` and `buildTrace` separately, and a mutation dropping
  * `census` from the bin's records is invisible to both.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -153,6 +153,46 @@ describe('dsh-eval run --format json', () => {
       assert.equal(report.results[0].status, 'fail')
       assert.match(report.results[0].failures.join('\n'), /no evidence anchor/)
       assert.equal('census' in report.results[0], false, 'no trace means no census')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps .runs/<id>/ honest across successive runs: fresh write, startedAt, pass cleanup', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-eval-cli-stale-'))
+    try {
+      mkdirSync(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib'), { recursive: true })
+      writeFileSync(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'), FAKE_CLI)
+      // The matcher reads PROBE_WANT at check time, so the SAME case file can
+      // fail and pass across two invocations of the bin.
+      const file = join(root, 'staleness.eval.mjs')
+      writeFileSync(file, `export default { id: 'artifact-staleness', mode: 'mock', task: 'x',\n`
+        + `  script: { steps: [{ kind: 'text', text: 'done' }] },\n`
+        + `  expect: [{ describe: 'final text includes want',\n`
+        + `    check: trace => trace.finalText.includes(process.env.PROBE_WANT ?? 'never')\n`
+        + `      ? { ok: true, message: '' }\n`
+        + `      : { ok: false, message: 'wanted ' + process.env.PROBE_WANT } }] }\n`)
+
+      // Plant a stray file from a "previous run": a fresh write must never
+      // mix it into this run's post-mortem.
+      const runsDir = join(root, '.runs', 'artifact-staleness')
+      mkdirSync(runsDir, { recursive: true })
+      writeFileSync(join(runsDir, 'stray-from-previous-run.txt'), 'stale')
+
+      const fail = spawnSync(process.execPath, [BIN, 'run', '--profile', 'headless', file], {
+        cwd: root, encoding: 'utf8', env: { ...process.env, PROBE_WANT: 'impossible' },
+      })
+      assert.equal(fail.status, 1)
+      assert.equal(existsSync(join(runsDir, 'stray-from-previous-run.txt')), false, 'a fresh write must not keep a previous run\'s files')
+      const traceJson = JSON.parse(readFileSync(join(runsDir, 'trace.json'), 'utf8'))
+      assert.match(traceJson.startedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, 'trace.json must identify its own run without mtimes')
+
+      // Same case, now passing: the previous failure's post-mortem must go.
+      const pass = spawnSync(process.execPath, [BIN, 'run', '--profile', 'headless', file], {
+        cwd: root, encoding: 'utf8', env: { ...process.env, PROBE_WANT: 'done' },
+      })
+      assert.equal(pass.status, 0, `stdout: ${pass.stdout}\nstderr: ${pass.stderr}`)
+      assert.equal(existsSync(runsDir), false, 'a passing run removes its stale artifact dir')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
