@@ -22,7 +22,11 @@ const SIDECAR = 'README.i18n.yaml'
 const writeMode = process.argv.includes('--write')
 
 function sha256(file) {
-  return createHash('sha256').update(readFileSync(join(pkgRoot, file))).digest('hex')
+  // Hash the LF-normalized text: a checkout (or an editor) rewriting the file
+  // to CRLF must not flip the record — the record anchors the CONTENT, not
+  // the on-disk byte encoding. (.gitattributes additionally pins eol=lf.)
+  const text = readFileSync(join(pkgRoot, file), 'utf8').replace(/\r\n/g, '\n')
+  return createHash('sha256').update(text).digest('hex')
 }
 
 function fail(message) {
