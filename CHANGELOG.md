@@ -86,6 +86,21 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   instead, restating both keys the row still needs (the headless profile's
   baseline ships a `personaSuffix`).
 
+### Fixed
+
+- **`.runs/` post-mortem artifacts now identify their own run and never mix
+  across runs.** Artifact dirs are wiped before each write, so one dir holds
+  exactly one run's evidence (previously a run that materialized fewer
+  session logs left the previous run's `session-*.jsonl` — or its whole
+  `sessions/` tree — mixed into the new post-mortem). `trace.json` carries
+  `startedAt`, and `EvalRunResult` exposes it, so evidence says which run it
+  belongs to without relying on file mtimes. **Behavior change**: a passing
+  run now removes its own stale `.runs/<case id>/` dir (unless
+  `--keep-artifacts` is set) — the dir existing means the case's LAST run
+  failed or was kept, instead of "some past run failed". `dsh-review` wipes
+  its `.runs/<experiment id>/` at the start of each execution for the same
+  reason (a shorter rerun no longer leaves stale `run-N.*` files behind).
+
 ## [0.3.0] — 2026-09-13
 
 ### Added
@@ -126,18 +141,6 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Fixed
 
-- **`.runs/` post-mortem artifacts now identify their own run and never mix
-  across runs.** Artifact dirs are wiped before each write, so one dir holds
-  exactly one run's evidence (previously a run that materialized fewer
-  session logs left the previous run's `session-*.jsonl` — or its whole
-  `sessions/` tree — mixed into the new post-mortem). `trace.json` carries
-  `startedAt`, and `EvalRunResult` exposes it, so evidence says which run it
-  belongs to without relying on file mtimes. **Behavior change**: a passing
-  run now removes its own stale `.runs/<case id>/` dir (unless
-  `--keep-artifacts` is set) — the dir existing means the case's LAST run
-  failed or was kept, instead of "some past run failed". `dsh-review` wipes
-  its `.runs/<experiment id>/` at the start of each execution for the same
-  reason (a shorter rerun no longer leaves stale `run-N.*` files behind).
 - **Mock mode against host 0.1.5-rc.2: the scripted adapter now carries its
   own `prepareCall`.** The host's LLM service dispatches every model call
   through `registration.adapter.prepareCall(...)`, a wire-contract step the
