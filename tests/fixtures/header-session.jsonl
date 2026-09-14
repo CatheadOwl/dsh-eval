@@ -1,3 +1,4 @@
 {"type":"session","version":3,"id":"session-fixture-2","origin":"main"}
-{"seq":0,"type":"request/header","data":{"reason":"initial","header":{"system":"You are an AI agent.\n\nUse the subagent_at tool when a task must run against a different directory.","tools":[{"name":"read"},{"name":"subagent_at"}]}}}
-{"seq":1,"type":"assistant/message","data":{"message":{"content":[{"type":"text","text":"done"}]}}}
+{"seq":0,"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"You are an AI agent.\n\nUse the subagent_at tool when a task must run against a different directory."}]}},"surfaceOp":"append"}
+{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"eval-mock","model":"eval-mock"},"tools":[{"name":"read"},{"name":"subagent_at"}]}}}
+{"seq":2,"type":"assistant/message","data":{"message":{"content":[{"type":"text","text":"done"}]}}}

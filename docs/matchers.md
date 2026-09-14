@@ -6,7 +6,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 全部从包根导入：`import { toolCalled, … } from '@catheadowl/dsh-eval'`。
 
-断言对象是 dsh session 事件投影（`EvalTrace`），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具（输入面），`systemMessages` / `systemPrompt` 投影组装后 system prompt（v3 面事件折叠；前 v3 代在 `requestHeaders[].system`），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
+断言对象是 dsh session 事件投影（`EvalTrace`，**仅会话格式 v3**——旧代际在解析入口拒绝），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具（输入面），`systemMessages` / `systemPrompt` 投影组装后 system prompt（v3 面事件折叠），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
 
 ## EvalTrace 形状（谓词与 `result.trace` 共用）
 
@@ -17,8 +17,8 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `assistantTexts` | `string[]` 非空组装 assistant 文本，按日志序 |
 | `finalText` | 最后一个组装 assistant 文本（无则 `''`） |
 | `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
-| `requestHeaders` | `{ seq, reason, system, toolNames }[]`（挂载工具名 + system prompt——**system 仅前 v3 代携带**，v3 起该字段恒空串，prompt 移至 `systemMessages`） |
-| `systemMessages` / `systemPrompt` | v3 的 system prompt 面：`{ seq, text }[]` 存活 `system/message` 节点（append/replace 面折叠、按面序）+ 有效 prompt（存活节点最后一个非空，无则 `''`）。前 v3 代两者为空——读 `requestHeaders[].system` |
+| `requestHeaders` | `{ seq, reason, toolNames }[]`（挂载工具名与 request reason；v3 起 header **不带** system 字段，prompt 一律读 `systemMessages` / `systemPrompt`） |
+| `systemMessages` / `systemPrompt` | v3 的 system prompt 面：`{ seq, text }[]` 存活 `system/message` 节点（append/replace 面折叠、按面序）+ 有效 prompt（存活节点最后一个非空，无则 `''`） |
 | `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
 | `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, projectionFieldGaps, subagent: { mainLogDescriptorEvents, supportedDescriptors, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
 | `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
@@ -42,7 +42,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 ## 模型可见面（输入侧）
 
-- `systemPromptIncludes(substring)`：组装后的 system prompt 含子串。**按会话格式代取渠道**：v3 日志读 `system/message` 面事件折叠（`systemPrompt`）；前 v3 日志回退读 `requestHeaders[].system`。两条渠道**都不存在**时响亮失败（渠道空置，不读作「prompt 缺子串」）——守卫因此能区分「没写进 prompt」与「根本看不到 prompt」；
+- `systemPromptIncludes(substring)`：组装后的 system prompt 含子串，读 v3 `system/message` 面事件折叠（`systemPrompt`）。面事件**不存在**时响亮失败（渠道空置，不读作「prompt 缺子串」）——守卫因此能区分「没写进 prompt」与「根本看不到 prompt」；
 - `toolMounted(name)`：工具出现在某个 request/header 的挂载列表；
 - `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `plugin` 名（如 steer 生产方），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（插件 steer 为 `{ kind: 'plugin', plugin: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
 
@@ -66,7 +66,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | 信号 | 看什么 |
 |---|---|
 | 主 session 事件（`eventTypeCounts` / `projectionLengths` / `projectionSkipped.main`） | 主日志（`buildTrace` 的投影输入）逐事件类型计数（任何类型，含插件扩展类型）；六个投影的长度；以及**每个投影上「计数 − 长度 > 0」的差额**（`projectionSkipped.main`，按投影字段名）——记录被丢了的档 |
-| **字段级缺口**（`projectionFieldGaps`） | 记录**留住了但字段读不到**的事件，按缺什么计数：`toolCallWithoutName` / `toolCallWithoutCallId` / `toolResultWithoutCallId` / `headerWithoutSystem`（**仅前 v3 代**——v3 起 header 无 system 是设计，不计数）/ `headerWithoutToolNames`；外加渠道级 `promptSurfaceAbsent`：有 request 而两条 prompt 渠道都不存在（无 `system/message` 事件且无 header system）——「根本看不到 prompt」的形态。`tool/call`、`tool/result`、`request/header` 是 1:1 投影（计数 − 长度恒为 0），宿主搬字段时只在这里可见。**不计数**：`request/header` 的 `tools` 数组整个缺失（与真空列表投影一致） |
+| **字段级缺口**（`projectionFieldGaps`） | 记录**留住了但字段读不到**的事件，按缺什么计数：`toolCallWithoutName` / `toolCallWithoutCallId` / `toolResultWithoutCallId` / `headerWithoutToolNames`；外加渠道级 `promptSurfaceAbsent`：有 request 而无 `system/message` 事件——「根本看不到 prompt」的形态。`tool/call`、`tool/result`、`request/header` 是 1:1 投影（计数 − 长度恒为 0），宿主搬字段时只在这里可见。**不计数**：`request/header` 的 `tools` 数组整个缺失（与真空列表投影一致） |
 | 子会话（`census.subagent`） | `subagentChildren` 的输入面：`children[]` 逐条给该子日志的 `subagent/descriptor` 事件数、其中 `version === 3` 的条数（`supportedDescriptors`，**数事件不是数子会话**）**以及折叠出的身份**（`label` / `mode` / `provider`）；`projectionSkipped.children` 两个身份计数——`withoutIdentity`（三项全缺）与 `withoutLabel`（`label` 缺，哪怕 mode/provider 有）。`mainLogDescriptorEvents` 是**主日志自己**的 `subagent/descriptor` 事件数（现宿主把 descriptor 写进子日志，这个数通常为 0）。**子日志不是主日志**，`eventTypeCounts` 不统计它们 |
 
 判读要点：

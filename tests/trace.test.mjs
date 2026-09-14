@@ -38,17 +38,21 @@ describe('parseSessionLog', () => {
   })
 
   // The header stamp is the host's declaration of the artifact's generation.
-  // An unknown one is seam drift: refuse it here so the projection never
-  // degrades to empty arrays silently (EVAL-020).
-  it('accepts every known generation and refuses an unknown one by its number', () => {
+  // The parser is format-v3 only: an older stamp is refused exactly like an
+  // unknown one (EVAL-020 admission + the v3-only design rule — no
+  // legacy-format compatibility).
+  it('accepts v3 and refuses older or unknown generations by their number', () => {
     const header = version => `{"type":"session","version":${version},"id":"s"}\n`
     for (const version of KNOWN_SESSION_FORMAT_VERSIONS) {
       assert.doesNotThrow(() => parseSessionLog(header(version)), `v${version} must be accepted`)
     }
-    assert.throws(
-      () => parseSessionLog(header(4)),
-      /session header version v4 is not a known generation \(known: v0, v1, v2, v3\); the host session format may have changed generation/,
-    )
+    for (const version of [0, 1, 2, 4]) {
+      assert.throws(
+        () => parseSessionLog(header(version)),
+        new RegExp(`session header version v${version} is not a known generation \\(known: v3\\); the host session format may have changed generation`),
+        `v${version} must be refused`,
+      )
+    }
   })
 
   it('refuses a session header with no generation stamp', () => {
@@ -69,12 +73,14 @@ describe('buildTrace', () => {
     assert.equal(trace.toolCalls[0].callId, 'call-1')
   })
 
-  it('projects request/header system prompts and mounted tools', () => {
+  it('projects request headers (mounted tools) and drops the removed header system field', () => {
     const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
     assert.equal(headerTrace.requestHeaders.length, 1)
     assert.equal(headerTrace.requestHeaders[0].reason, 'initial')
-    assert.ok(headerTrace.requestHeaders[0].system.includes('subagent_at'))
+    assert.equal('system' in headerTrace.requestHeaders[0], false, 'the pre-v3 header.system channel is gone from the projection')
     assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'subagent_at'])
+    // The prompt itself is read from the v3 system/message fold.
+    assert.ok(headerTrace.systemPrompt.includes('subagent_at'))
   })
 
   // Format v3 moved the assembled prompt out of request/header into streaming
@@ -86,7 +92,7 @@ describe('buildTrace', () => {
     assert.ok(promptTrace.systemMessages[0].text.includes('cognition-link directive'))
     assert.equal(promptTrace.systemPrompt, promptTrace.systemMessages[0].text)
     // The v3 header carries no system field and that is NOT a gap.
-    assert.equal(promptTrace.requestHeaders[0].system, '')
+    assert.equal('system' in promptTrace.requestHeaders[0], false)
     assert.deepEqual(promptTrace.census.projectionFieldGaps, {})
   })
 
@@ -128,18 +134,17 @@ describe('buildTrace', () => {
     assert.equal(built.systemPrompt, 'node zero')
   })
 
-  it('census: a v3 run with requests but no prompt surface records promptSurfaceAbsent, not headerWithoutSystem', () => {
+  it('census: a v3 run with requests but no prompt surface records promptSurfaceAbsent', () => {
     const log = '{"type":"session","version":3,"id":"session-noprompt"}'
       + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
     const built = buildTrace([parseSessionLog(log)])
     assert.deepEqual(built.census.projectionFieldGaps, { promptSurfaceAbsent: 1 })
   })
 
-  it('census: headerWithoutSystem stays a pre-v3 moved-field signal', () => {
+  it('refuses a pre-v3 log at admission instead of projecting it', () => {
     const v0 = '{"type":"session","version":0,"id":"session-v0"}'
       + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
-    const built = buildTrace([parseSessionLog(v0)])
-    assert.deepEqual(built.census.projectionFieldGaps, { headerWithoutSystem: 1, promptSurfaceAbsent: 1 })
+    assert.throws(() => buildTrace([parseSessionLog(v0)]), /is not a known generation \(known: v3\)/)
   })
 
   it('projects an empty requestHeaders list when no request/header event exists', () => {
@@ -272,10 +277,9 @@ describe('buildTrace', () => {
   // record lands whatever its fields say — so a moved payload field needs its
   // own signal, or the census stays blind to the rename path it was built for.
   it('census reports a kept record whose field went missing', () => {
-    // v2 stamp: `header.system` is a pre-v3 field, so a header missing it on
-    // a generation that should carry it is the moved-field signal. (On v3 the
-    // absence is by design and only promptSurfaceAbsent could fire.)
-    const log = '{"type":"session","version":2,"id":"session-drift"}'
+    // On v3 a header never carries `system`; the moved-field signals here are
+    // the tool-face renames plus the nameless mounted tool entry.
+    const log = '{"type":"session","version":3,"id":"session-drift"}'
       + '\n{"seq":1,"type":"tool/call","data":{"turn":1,"step":1,"toolName":"renamed","arguments":"{}"}}'
       + '\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"user","content":[]}}}'
       + '\n{"seq":3,"type":"request/header","data":{"header":{"reason":"initial","tools":[{"description":"no name"}]}}}'
@@ -286,7 +290,6 @@ describe('buildTrace', () => {
       toolCallWithoutName: 1,
       toolCallWithoutCallId: 1,
       toolResultWithoutCallId: 1,
-      headerWithoutSystem: 1,
       headerWithoutToolNames: 1,
       promptSurfaceAbsent: 1,
     })

@@ -10,6 +10,19 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+### Changed
+
+- **Session-log parsing is format-v3 only.** `KNOWN_SESSION_FORMAT_VERSIONS`
+  collapses to `v3`: older generations (v0–v2) are refused at the
+  `parseSessionLog` admission exactly like unknown ones — no legacy-format
+  compatibility is carried (the repo's no-legacy-compat design rule). The
+  pre-v3 read channels are gone with them: `requestHeaders[].system` is
+  removed from the trace shape (read `systemMessages` / `systemPrompt`),
+  `systemPromptIncludes` loses its pre-v3 fallback, and the census gap
+  `headerWithoutSystem` (a pre-v3 moved-field signal) is removed —
+  `promptSurfaceAbsent` is the prompt-channel signal. **Migrating a consumer
+  that read `requestHeaders[].system`**: switch to `trace.systemPrompt`.
+
 ### Fixed
 
 - **`systemPromptIncludes` was dead on format-v3 hosts.** The matcher read

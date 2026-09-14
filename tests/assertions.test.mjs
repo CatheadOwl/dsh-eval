@@ -229,7 +229,7 @@ describe('assistantTextIncludes', () => {
 })
 
 describe('systemPromptIncludes', () => {
-  it('matches a substring of any request header system prompt', () => {
+  it('matches a substring of the folded v3 system prompt', () => {
     assert.equal(systemPromptIncludes('subagent_at tool when a task must run').check(headerTrace).ok, true)
     assert.equal(systemPromptIncludes('Use the read tool').check(headerTrace).ok, false)
   })

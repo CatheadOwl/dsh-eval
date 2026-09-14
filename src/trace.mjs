@@ -33,20 +33,20 @@ const PROJECTED_FIELD_BY_EVENT_TYPE = new Map([
 ])
 
 /**
- * Session format generations this parser accepts. Mirror of the generation
- * chain the vendored host ships codecs for
- * (`session-format-catalog/src/generated.ts`: codecs v0–v3,
+ * Session format generations this parser accepts. The host's generation
+ * chain ships codecs v0–v3 (`session-format-catalog/src/generated.ts`,
  * `currentVersion: 3` = `SESSION_FORMAT_VERSION` in
- * `core/session/src/types.ts`). The projection is written and verified
- * against the current generation; older ones parse tolerantly. A stamp
- * outside this set means the host moved to a generation whose payload this
- * projection was never verified against — fail at the seam instead of
- * projecting empty fields, and bump this set only together with the
- * re-verification the docs' maintenance trigger describes.
+ * `core/session/src/types.ts`); this projection is format-v3 ONLY — older
+ * generations are rejected exactly like unknown ones, no legacy-format
+ * compatibility is carried (the repo's no-legacy-compat design rule). A
+ * stamp outside this set means the log's payload this projection was never
+ * verified against — fail at the seam instead of projecting empty fields,
+ * and bump this set only together with the re-verification the docs'
+ * maintenance trigger describes.
  */
-export const KNOWN_SESSION_FORMAT_VERSIONS = new Set([0, 1, 2, 3])
+export const KNOWN_SESSION_FORMAT_VERSIONS = new Set([3])
 
-/** Known generations rendered for an error message: `v0, v1, v2, v3`. */
+/** Known generations rendered for an error message: `v3`. */
 function knownGenerationsLabel() {
   return [...KNOWN_SESSION_FORMAT_VERSIONS].sort((a, b) => a - b).map(version => `v${version}`).join(', ')
 }
@@ -109,9 +109,8 @@ function messageText(message) {
  * shadows the node range it covers while the replacing event takes over at
  * the end (`core/session/src/surface.ts`; surface order is seq order). The
  * first request always commits node 0 (`SystemPromptProjection` in
- * `core/agent-loop`), even for an empty prompt. Pre-v3 logs carry neither
- * system/message events nor surface ops — the fold is a no-op there and the
- * prompt lives in `request/header.data.header.system` instead.
+ * `core/agent-loop`), even for an empty prompt. Logs of older generations
+ * are refused at admission — this fold only ever sees v3 payloads.
  * @param {{ seq: number, text: string }[]} nodes - surviving nodes so far, in surface order.
  * @param {object} event - one parsed event record.
  * @returns {void} mutates `nodes`.
@@ -361,18 +360,12 @@ export function buildTrace(logs) {
   const systemNodes = []
   const gaps = {}
   const recordGap = key => { gaps[key] = (gaps[key] ?? 0) + 1 }
-  // `request/header.system` is a pre-v3 field (the v2→v3 migration promoted
-  // it into streaming system/message events), so its absence is a moved-field
-  // signal only on generations that were supposed to carry it.
-  const headerSystemExpected = typeof main?.header.version === 'number' && main.header.version < 3
   for (const event of events) {
     foldSystemPromptSurface(systemNodes, event)
     if (event.type === 'request/header') {
-      // The assembled model request header: mounted tool schemas plus, on
-      // pre-v3 generations only, the system prompt. What the model is told
-      // it can do and how — the "did my plugin's section inject?" projection
-      // reads the prompt itself from the system/message fold.
-      if (headerSystemExpected && typeof event.data?.header?.system !== 'string') recordGap('headerWithoutSystem')
+      // The assembled model request header: mounted tool schemas. What the
+      // model is told to do lives in the system/message fold (`systemPrompt`)
+      // — format v3 dropped the header `system` field by design.
       if (Array.isArray(event.data?.header?.tools)
         && !event.data.header.tools.some(tool => typeof tool?.name === 'string')) {
         recordGap('headerWithoutToolNames')
@@ -380,7 +373,6 @@ export function buildTrace(logs) {
       requestHeaders.push({
         seq: event.seq,
         reason: event.data?.reason,
-        system: event.data?.header?.system ?? '',
         toolNames: Array.isArray(event.data?.header?.tools)
           ? event.data.header.tools.map(tool => tool?.name).filter(name => typeof name === 'string')
           : [],
@@ -427,11 +419,10 @@ export function buildTrace(logs) {
     }
   }
 
-  // Channel-level gap: requests happened, yet neither prompt surface exists.
+  // Channel-level gap: requests happened, yet no prompt surface exists.
   // Every v3 request commits at least one system/message node, so this is the
   // "cannot see the prompt at all" shape — not "the prompt lacks something".
-  if (requestHeaders.length > 0 && systemNodes.length === 0
-    && !requestHeaders.some(header => header.system !== '')) {
+  if (requestHeaders.length > 0 && systemNodes.length === 0) {
     recordGap('promptSurfaceAbsent')
   }
 
@@ -601,19 +592,18 @@ export function collectSessionTrace(sessionsRoot) {
  *     context) with their verbatim `source` (`kind` + plugin-specific fields),
  *     in log order. Steer has no dedicated event type; matchers filter by
  *     `source`.
- * @property {{ seq: number, reason: string, system: string, toolNames: string[] }[]} requestHeaders
- *   - projected `request/header` events. On pre-v3 generations `system`
- *   carries the assembled prompt; format v3 dropped the field (the prompt
- *   moved to streaming system/message events — see `systemMessages`).
+ * @property {{ seq: number, reason: string, toolNames: string[] }[]} requestHeaders
+ *   - projected `request/header` events: mounted tool schemas and the request
+ *     reason. The assembled prompt is NOT here — format v3 dropped the header
+ *     `system` field (the prompt lives in streaming system/message events,
+ *     see `systemMessages` / `systemPrompt`).
  * @property {{ seq: number, text: string }[]} systemMessages
  *   - the SURVIVING `system/message` nodes of the format-v3 system-prompt
  *     surface, folded in surface (seq) order: appends add a node, a replace
- *     surfaceOp (any event type) shadows its range. Empty on pre-v3 logs,
- *     where the prompt lives in `requestHeaders[].system`.
+ *     surfaceOp (any event type) shadows its range.
  * @property {string} systemPrompt
  *   - the effective assembled prompt: the newest non-empty surviving system
- *     node ('' when none). Pre-v3 traces keep '' here — read the headers'
- *     `system` fields for those generations (the matcher does).
+ *     node ('' when none).
  * @property {{ sessionId: string | undefined, parentSession: string | undefined, delegationDepth: number | undefined, label: string | undefined, mode: string | undefined, provider: string | undefined, assistantTexts: string[], finalText: string }[]} subagentChildren
  *   - one record per subagent child log (`origin: 'subagent'` header, or a
  *     header carrying `parentSession`). Identity comes from the first
@@ -635,16 +625,13 @@ export function collectSessionTrace(sessionsRoot) {
  * @property {Record<string, number>} census.projectionFieldGaps
  *   - events the projection kept while a field it reads went missing, keyed by
  *     what was missing (`toolCallWithoutName`, `toolCallWithoutCallId`,
- *     `toolResultWithoutCallId`, `headerWithoutSystem`, `headerWithoutToolNames`).
+ *     `toolResultWithoutCallId`, `headerWithoutToolNames`).
  *     This is the 1:1-projection signal: for `tool/call`, `tool/result` and
  *     `request/header`, count − length is structurally zero, so a moved field
  *     shows up only here. An absent `request/header.tools` array is NOT counted
- *     (it projects to the same empty list as an empty one). `headerWithoutSystem`
- *     is recorded on pre-v3 generations only — format v3 dropped the header
- *     field by design, so its absence there is not a gap. `promptSurfaceAbsent`
- *     is the channel-level companion: requests exist yet neither prompt
- *     surface does (no system/message events and no header `system`), the
- *     "cannot see the prompt at all" shape.
+ *     (it projects to the same empty list as an empty one).
+ *     `promptSurfaceAbsent` is the channel-level companion: requests exist yet
+ *     no system/message events do — the "cannot see the prompt at all" shape.
  * @property {{ mainLogDescriptorEvents: number, supportedDescriptors: number, children: object[] }} census.subagent
  *   - the child-log data source the main-log counts cannot reach.
  *     `mainLogDescriptorEvents` counts `subagent/descriptor` events in the MAIN
