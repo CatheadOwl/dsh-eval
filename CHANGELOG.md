@@ -8,7 +8,7 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-## [Unreleased]
+## [0.4.1] — 2026-09-14
 
 ### Changed
 
@@ -29,18 +29,17 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   only the pre-v3 `request/header.system` channel, which v3 dropped by design
   (the prompt moved to streaming `system/message` surface events), so any
   prompt-surface guard could never pass on a v3 session. It now reads the
-  folded v3 surface first and, when neither channel exists, fails loud as a
-  channel absence instead of reading as "the prompt lacks the substring".
+  folded v3 surface and, when no prompt surface exists at all, fails loud as
+  a channel absence instead of reading as "the prompt lacks the substring".
 
 ### Added
 
 - **`EvalTrace.systemMessages` / `EvalTrace.systemPrompt`: the format-v3
   system-prompt surface.** Surviving `system/message` nodes folded over
   append/replace surface ops (surface order), plus the effective prompt (the
-  newest non-empty node). Pre-v3 traces keep these empty — read the headers'
-  `system` field there; the matcher falls back automatically. Census gains
-  the channel-level `promptSurfaceAbsent` gap; `headerWithoutSystem` is now
-  recorded for pre-v3 generations only.
+  newest non-empty node). Census gains the channel-level `promptSurfaceAbsent`
+  gap: requests exist yet no `system/message` nodes do — the "cannot see the
+  prompt at all" shape.
 
 ## [0.4.0] — 2026-09-14
 
