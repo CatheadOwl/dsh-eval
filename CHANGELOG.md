@@ -10,6 +10,8 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-14
+
 ### Added
 
 - **Behavior experiment surface (experimental): arms × repeats × guard ×
