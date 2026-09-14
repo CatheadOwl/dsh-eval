@@ -239,6 +239,26 @@ describe('systemPromptIncludes', () => {
     assert.equal(outcome.ok, false)
     assert.match(outcome.message, /request\/header event/)
   })
+
+  // Format v3: the prompt surface is the folded system/message nodes; the
+  // header channel no longer exists to read (2026-09-14 seam).
+  it('matches a substring of the folded v3 system prompt', () => {
+    const promptTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'system-prompt-session.jsonl'), 'utf8'))])
+    assert.equal(systemPromptIncludes('cognition-link directive').check(promptTrace).ok, true)
+    const miss = systemPromptIncludes('a directive that was never injected').check(promptTrace)
+    assert.equal(miss.ok, false)
+    assert.match(miss.message, /system\/message node/)
+  })
+
+  it('fails loud as a channel absence when no prompt surface exists at all', () => {
+    const log = '{"type":"session","version":3,"id":"s"}'
+      + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+    const bare = buildTrace([parseSessionLog(log)])
+    const outcome = systemPromptIncludes('anything').check(bare)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no system prompt surface/)
+    assert.match(outcome.message, /channel is absent/)
+  })
 })
 
 describe('toolMounted', () => {

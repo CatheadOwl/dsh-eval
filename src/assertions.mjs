@@ -334,19 +334,46 @@ export function finalTextMatches(regex) {
   }
 }
 
-/** The assembled system prompt of a request contains `substring`. */
+/**
+ * The effective assembled system prompt contains `substring`. Format v3
+ * persists the prompt as streaming `system/message` surface events and the
+ * request header no longer carries it: the matcher reads the folded
+ * `systemPrompt` there and falls back to the pre-v3 `request/header.system`
+ * channel when no system/message events exist. A trace with NO prompt
+ * surface at all fails as a channel absence — "cannot see the prompt" is
+ * refused to read as "the prompt lacks the substring".
+ */
 export function systemPromptIncludes(substring) {
   return {
     describe: `system prompt includes: '${substring}'`,
     check(trace) {
-      const headers = trace.requestHeaders
+      const systemMessages = trace.systemMessages ?? []
+      if (systemMessages.length > 0) {
+        const prompt = trace.systemPrompt ?? ''
+        return prompt.includes(substring)
+          ? { ok: true, message: '' }
+          : {
+            ok: false,
+            message: `effective system prompt (last non-empty of ${systemMessages.length} surviving system/message node(s))`
+              + ` does not include '${substring}'; prompt: ${JSON.stringify(prompt.slice(0, 400))}`,
+          }
+      }
+      const headers = trace.requestHeaders ?? []
+      if (headers.some(header => header.system !== '')) {
+        const hit = headers.some(header => header.system.includes(substring))
+        return hit
+          ? { ok: true, message: '' }
+          : { ok: false, message: `no request/header system prompt contains '${substring}' (${headers.length} header(s) seen)` }
+      }
       if (headers.length === 0) {
         return { ok: false, message: 'expected a request/header event; the run produced none' }
       }
-      const hit = headers.some(header => header.system.includes(substring))
-      return hit
-        ? { ok: true, message: '' }
-        : { ok: false, message: `no request/header system prompt contains '${substring}' (${headers.length} header(s) seen)` }
+      return {
+        ok: false,
+        message: 'no system prompt surface in the trace: no system/message events and no request/header system field'
+          + ' — the prompt-surface channel is absent (the host predates format v3, or the seam moved);'
+          + ' refusing to read this as "the prompt lacks the substring"',
+      }
     },
   }
 }

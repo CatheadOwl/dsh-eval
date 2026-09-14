@@ -107,6 +107,7 @@ describe('dsh-eval run --format json', () => {
         assistantTexts: 1,
         userMessages: 0,
         requestHeaders: 0,
+        systemMessages: 0,
       })
       // A kept record whose field moved, and a legal empty-text drop — the two
       // signals the census keeps apart.

@@ -1,0 +1,7 @@
+{"type":"session","version":3,"id":"session-fixture-system","origin":"main"}
+{"seq":1,"type":"turn/start","data":{"turn":1}}
+{"seq":2,"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"You are an AI agent.\n\nAdopt the cognition-link directive: cite the source of every claim."}],"source":{"kind":"plugin","plugin":"@deepseek-ai/dsh-system-prompt"}}},"surfaceOp":"append"}
+{"seq":3,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"eval-mock","model":"eval-mock"},"tools":[{"name":"read"}]}}}
+{"seq":4,"type":"user/message","data":{"content":[{"type":"text","text":"inspect your own instructions"}],"source":{"kind":"user"},"role":"user"},"surfaceOp":"append"}
+{"seq":5,"type":"assistant/message","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"Mock evaluation complete."}],"source":{"kind":"model","provider":"eval-mock","model":"eval-mock"}}},"surfaceOp":"append"}
+{"seq":6,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

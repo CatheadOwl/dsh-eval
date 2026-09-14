@@ -1,5 +1,5 @@
 ---
-description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置、本包对宿主 session seam 的四处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
+description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置、本包对宿主 session seam 的五处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面 / v3 system prompt 面事件），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
 ---
 
 # 安装与宿主接线
@@ -56,7 +56,7 @@ node -e "console.log(require('fs').existsSync('node_modules/@deepseek-ai/dsh/lib
 
 `false` = 解析层缺 CLI：先把上述 junction 重建为指向宿主检出；仍 `false` 则宿主检出未构建（先构建宿主）。这类 junction 维护是机器相关的开发环境事务，不入库，由各开发环境自行承接（同上文 peer 接线的 gitignore 纪律）。behavior 与 review 的真实运行都从定位到的 CLI spawn dsh 本体。
 
-## 宿主 session seam：本包硬断言的四处，坏了多是具名失败
+## 宿主 session seam：本包硬断言的五处，坏了多是具名失败
 
 behavior 与 review 的证据都取自**真实 dsh 会话的产物与进程内日志**，因此本包直接断言宿主的几处 session seam。它们随宿主演进时不会有编译期提示，所以每一处都配一行**执法面**（表里的符号就是）；宿主检出更新后、动本包引用它们的文档前，先按本节对源码重新验证：
 
@@ -66,10 +66,11 @@ behavior 与 review 的证据都取自**真实 dsh 会话的产物与进程内�
 | 会话 header 的 `version` 戳是宿主对逻辑代际的声明（当前 v3） | 同上；已发布的代际链见 `session-format-catalog/src/generated.ts`（codecs v0–v3、`currentVersion: 3`） | `KNOWN_SESSION_FORMAT_VERSIONS`（`parseSessionLog` 入口准入） | 未知代际 ⇒ 解析当场拒绝并报出版本号（`session header version vN is not a known generation`），不再把各投影字段静默降级成空数组 |
 | 会话日志是**拼接帧容器**（宿主默认 zstd），须逐帧扫描 | `session-persistence-jsonl/src/zstd.ts` 的帧扫描 | eval overlay 固定 `compression: none` + `packChunks: false`（`src/overlay.mjs`） | 整文件一次解压 ⇒ `ZSTD_error_prefix_unknown`（第二帧魔数被当输入） |
 | 进程内读 durable 事件的 API 是 `Session#snapshotEvents()`（不可变冻结快照）；早期的 `session.events` getter 已被删除 | `core/session/src/index.ts` 的 `snapshotEvents` | driver 行（`src/driver/multi-turn-driver.mjs`）直接调用，没有回退路径 | 属性访问得到 `undefined` ⇒ 进程内消费者抛 `agent.session.events is not iterable`，整个 headless run 直接死 |
+| v3 起组装后 system prompt 落 `system/message` **面事件**（流式：append 加节点、replace 换节点；首请求必 commit 节点 0，即使 prompt 为空），`request/header` **不再带** `system` 字段；有效 prompt = 存活节点中最后一个非空 | `core/agent-loop/src/runtime-context.ts` 的 `SystemPromptProjection`（首请求必 commit）+ `core/session/src/surface.ts` 的面折叠 + `core/session/src/types.ts` 的 `EpochHeader`（无 system）+ `session-format-v2-to-v3/src/migration.ts`（streaming system-prompt promotion） | `buildTrace` 的 system/message 面 fold + `systemMessages` / `systemPrompt` 投影 + census `promptSurfaceAbsent`（`src/trace.mjs`）；`systemPromptIncludes` 渠道空置响亮失败 | 投影只读 header.system（前 v3 形状）⇒ v3 日志上 `systemPromptIncludes` 恒 false（coggit treatment 臂 10/10 守卫全败形态），census 逐 run 记 `promptSurfaceAbsent` |
 
-命名行与代际行的读取面由本包的 eval overlay 固定（`compression: none` + `packChunks: false`），所以每轮 run 的 artifact 是**明文逐事件**布局；命名判定、代际准入与收集入口都在 `src/trace.mjs`（`isSessionLogFilename` / `KNOWN_SESSION_FORMAT_VERSIONS` / `collectSessionTrace`），behavior runner 与 review adapter 共用同一个收集入口，缺 artifact 时各自把 `traceGap` 带进失败文案与产物记账。帧容器行走 overlay 固定；最后一行是 driver 行读日志时直接依赖的方法。
+命名行与代际行的读取面由本包的 eval overlay 固定（`compression: none` + `packChunks: false`），所以每轮 run 的 artifact 是**明文逐事件**布局；命名判定、代际准入与收集入口都在 `src/trace.mjs`（`isSessionLogFilename` / `KNOWN_SESSION_FORMAT_VERSIONS` / `collectSessionTrace`），behavior runner 与 review adapter 共用同一个收集入口，缺 artifact 时各自把 `traceGap` 带进失败文案与产物记账。帧容器行走 overlay 固定；倒数第二行是 driver 行读日志时直接依赖的方法；末行是投影读 prompt 面的入口（前 v3 日志回退读 `request/header.system`）。
 
-> **维护触发器**：宿主 session 格式、持久化命名或 `Session` 读取面变更 ⇒ 先按上表对 vendored 检出重新验证断言，再更新本篇与引用它们的源码/认知。前两行现在是**机械的**——命名或代际戳变了，跑一条 case 就红在具名文案上（候选文件名 / 版本号）；后两行仍只有真跑一条 case 才会暴露。
+> **维护触发器**：宿主 session 格式、持久化命名或 `Session` 读取面变更 ⇒ 先按上表对 vendored 检出重新验证断言，再更新本篇与引用它们的源码/认知。前两行现在是**机械的**——命名或代际戳变了，跑一条 case 就红在具名文案上（候选文件名 / 版本号）；其余三行仍只有真跑一条 case 才会暴露。
 
 ### 宿主 LLM adapter 线上契约（mock 模式专用）
 

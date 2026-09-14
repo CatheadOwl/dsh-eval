@@ -77,6 +77,71 @@ describe('buildTrace', () => {
     assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'subagent_at'])
   })
 
+  // Format v3 moved the assembled prompt out of request/header into streaming
+  // system/message surface events; the projection folds them instead of
+  // reading a header field that no longer exists (2026-09-14 seam).
+  it('folds v3 system/message nodes and takes the last non-empty as the effective prompt', () => {
+    const promptTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'system-prompt-session.jsonl'), 'utf8'))])
+    assert.deepEqual(promptTrace.systemMessages.map(node => node.seq), [2])
+    assert.ok(promptTrace.systemMessages[0].text.includes('cognition-link directive'))
+    assert.equal(promptTrace.systemPrompt, promptTrace.systemMessages[0].text)
+    // The v3 header carries no system field and that is NOT a gap.
+    assert.equal(promptTrace.requestHeaders[0].system, '')
+    assert.deepEqual(promptTrace.census.projectionFieldGaps, {})
+  })
+
+  it('folds an in-history append: the newest non-empty node is the effective prompt', () => {
+    const log = '{"type":"session","version":3,"id":"session-history"}'
+      + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v1"}]}},"surfaceOp":"append"}'
+      + '\n{"seq":2,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+      + '\n{"seq":4,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v2 with directive"}]}},"surfaceOp":"append"}'
+    const built = buildTrace([parseSessionLog(log)])
+    assert.deepEqual(built.systemMessages.map(node => node.seq), [1, 4])
+    assert.ok(built.systemPrompt.includes('prompt v2'))
+  })
+
+  it('folds a replacing system/message: the shadowed node stops surviving', () => {
+    const log = '{"type":"session","version":3,"id":"session-replace"}'
+      + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v1"}]}},"surfaceOp":"append"}'
+      + '\n{"seq":2,"type":"request/header","data":{"reason":"change","header":{"config":{"provider":"p","model":"m"}}}}'
+      + '\n{"seq":4,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v2"}]}},"surfaceOp":{"op":"replace","startSeq":1,"endSeq":1},"sourceEventSeqs":[1]}'
+    const built = buildTrace([parseSessionLog(log)])
+    assert.deepEqual(built.systemMessages, [{ seq: 4, text: 'prompt v2' }])
+    assert.equal(built.systemPrompt, 'prompt v2')
+    // The cleared-prompt shape: a replace to empty text leaves the node alive
+    // but empty, so the effective prompt degenerates to ''.
+    const cleared = buildTrace([parseSessionLog(log.replace('prompt v2', ''))])
+    assert.deepEqual(cleared.systemMessages.map(node => node.seq), [4])
+    assert.equal(cleared.systemPrompt, '')
+  })
+
+  it('folds a compaction replace from a non-system event shadowing a later system node', () => {
+    const log = '{"type":"session","version":3,"id":"session-compaction"}'
+      + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"node zero"}]}},"surfaceOp":"append"}'
+      + '\n{"seq":2,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"later in-history node"}]}},"surfaceOp":"append"}'
+      + '\n{"seq":3,"type":"user/message","data":{"content":[{"type":"text","text":"task"}],"source":{"kind":"user"},"role":"user"},"surfaceOp":"append"}'
+      + '\n{"seq":4,"type":"assistant/message","data":{"message":{"role":"assistant","content":[{"type":"text","text":"summary"}]}},"surfaceOp":{"op":"replace","startSeq":2,"endSeq":3},"sourceEventSeqs":[2,3]}'
+    const built = buildTrace([parseSessionLog(log)])
+    // Node zero survives (the host protects it from compaction); the later
+    // system node was shadowed by the assistant summary.
+    assert.deepEqual(built.systemMessages, [{ seq: 1, text: 'node zero' }])
+    assert.equal(built.systemPrompt, 'node zero')
+  })
+
+  it('census: a v3 run with requests but no prompt surface records promptSurfaceAbsent, not headerWithoutSystem', () => {
+    const log = '{"type":"session","version":3,"id":"session-noprompt"}'
+      + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+    const built = buildTrace([parseSessionLog(log)])
+    assert.deepEqual(built.census.projectionFieldGaps, { promptSurfaceAbsent: 1 })
+  })
+
+  it('census: headerWithoutSystem stays a pre-v3 moved-field signal', () => {
+    const v0 = '{"type":"session","version":0,"id":"session-v0"}'
+      + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+    const built = buildTrace([parseSessionLog(v0)])
+    assert.deepEqual(built.census.projectionFieldGaps, { headerWithoutSystem: 1, promptSurfaceAbsent: 1 })
+  })
+
   it('projects an empty requestHeaders list when no request/header event exists', () => {
     assert.deepEqual(trace.requestHeaders, [])
   })
@@ -177,6 +242,7 @@ describe('buildTrace', () => {
       assistantTexts: 2,
       userMessages: 0,
       requestHeaders: 0,
+      systemMessages: 0,
     })
     assert.deepEqual(trace.census.projectionSkipped, { main: {}, children: {} })
     assert.equal(trace.census.subagent.supportedDescriptors, 0)
@@ -206,7 +272,10 @@ describe('buildTrace', () => {
   // record lands whatever its fields say — so a moved payload field needs its
   // own signal, or the census stays blind to the rename path it was built for.
   it('census reports a kept record whose field went missing', () => {
-    const log = '{"type":"session","version":3,"id":"session-drift"}'
+    // v2 stamp: `header.system` is a pre-v3 field, so a header missing it on
+    // a generation that should carry it is the moved-field signal. (On v3 the
+    // absence is by design and only promptSurfaceAbsent could fire.)
+    const log = '{"type":"session","version":2,"id":"session-drift"}'
       + '\n{"seq":1,"type":"tool/call","data":{"turn":1,"step":1,"toolName":"renamed","arguments":"{}"}}'
       + '\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"user","content":[]}}}'
       + '\n{"seq":3,"type":"request/header","data":{"header":{"reason":"initial","tools":[{"description":"no name"}]}}}'
@@ -219,6 +288,7 @@ describe('buildTrace', () => {
       toolResultWithoutCallId: 1,
       headerWithoutSystem: 1,
       headerWithoutToolNames: 1,
+      promptSurfaceAbsent: 1,
     })
     // Length comparison alone sees nothing: every event landed in a projection.
     assert.deepEqual(census.projectionSkipped.main, {})
