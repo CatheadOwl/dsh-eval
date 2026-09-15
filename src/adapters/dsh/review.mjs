@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { executeReviewExperiment } from '../../experiment/review.mjs'
-import { overlayDisableRows } from '../../overlay.mjs'
+import { overlayDisableRows, overlaySessionLogRow } from '../../overlay.mjs'
 import {
   resolveRealDshHome, stageSandboxHome, stagedPluginRows, teardownSandbox, spawnHeadlessDsh,
 } from '../../sandbox.mjs'
@@ -55,18 +55,26 @@ const REVIEW_REQUIRED_ROWS = new Set([
 ])
 
 /**
- * Serialize the blank-environment overlay: disable every plugin row the
+ * Serialize the blank-environment overlay: the shared session-log determinism
+ * row (root pinned to the collection root, compression off, chunks unpacked —
+ * without it the host default writes `session.vN.jsonl.zstd`, which
+ * `isSessionLogFilename` cannot collect and the tool-boundary check
+ * degrades to a constant not-executed), then disable every plugin row the
  * staged profile composes beyond the host templates (`stagedPluginRows` —
  * out-of-tree bundle rows + profile patch rows), UNION the static host tool
  * rows, MINUS the model/session wiring the reviewer needs.  With
  * `keepPluginRows` (explicit opt-in to study the host plugin face itself)
- * the enumeration is skipped and only the static tool lockdown remains.
+ * the enumeration is skipped and only the static tool lockdown remains — the
+ * session-log pin applies in BOTH modes: it is artifact determinism, not part
+ * of the plugin face under study.
  */
-function buildReviewOverlayYaml(pluginRows, { keepPluginRows }) {
+function buildReviewOverlayYaml(pluginRows, { keepPluginRows, sessionsRoot }) {
+  const lines = [overlaySessionLogRow(sessionsRoot)]
   const disabled = new Set(keepPluginRows ? [] : pluginRows)
   for (const row of REVIEW_DISABLED_TOOL_ROWS) disabled.add(row)
   for (const row of REVIEW_REQUIRED_ROWS) disabled.delete(row)
-  return overlayDisableRows([...disabled])
+  lines.push(overlayDisableRows([...disabled]).trimEnd())
+  return `${lines.join('\n')}\n`
 }
 
 /** The CLI entry for an executor: the explicit cliPath (a `resolveDshCliChain`
@@ -126,7 +134,7 @@ export function createDshHeadlessReviewExecutor(options) {
     const overlayPath = join(runDir, 'review-overlay.yml')
     writeFileSync(overlayPath, buildReviewOverlayYaml(
       stagedPluginRows(dshHome, profile),
-      { keepPluginRows },
+      { keepPluginRows, sessionsRoot: join(dshHome, 'sessions') },
     ), 'utf8')
 
     try {

@@ -1,9 +1,10 @@
 /**
  * Overlay (cordis patch) serialization — the ONLY hand-rolled YAML emitter
  * in the package. Both the behavior runner (buildOverlayYaml) and the dsh
- * review adapter (overlayDisableRows for its tool-less overlay) generate
- * per-run overlay files; sharing one emitter keeps quoting rules and
- * row-patch syntax (`- id: <row>` / `disabled: true`) identical everywhere.
+ * review adapter (overlayDisableRows + the shared session-log row for its
+ * blank-environment overlay) generate per-run overlay files; sharing one
+ * emitter keeps quoting rules and row-patch syntax (`- id: <row>` /
+ * `disabled: true`) identical everywhere.
  *
  * YAML strategy: JSON double-quoted strings are valid YAML scalars, and JSON
  * arrays / objects are valid YAML flow sequences / mappings, so the emitters
@@ -53,6 +54,24 @@ export function overlayDisableRows(rowIds) {
 }
 
 /**
+ * The session-log determinism row every eval-staged host carries: log root
+ * pinned to the collection root, chunks unpacked, compression off — the exact
+ * artifact shape `isSessionLogFilename` / `parseSessionLog` consume. Shared by
+ * the behavior overlay and the dsh review adapter's blank-environment overlay:
+ * the review face never pinning it is how zstd-generation artifacts
+ * (`session.v3.jsonl.zstd`) escaped collection (EVAL-021 degrading to a
+ * constant not-executed).
+ * @param {string} sessionsRoot - absolute path the runner collects from.
+ * @returns {string} overlay entry (no trailing newline).
+ */
+export function overlaySessionLogRow(sessionsRoot) {
+  return '- id: session-persistence-jsonl\n  config:\n'
+    + `    root: ${yamlScalar(sessionsRoot)}\n`
+    + '    packChunks: false\n'
+    + '    compression: none'
+}
+
+/**
  * Serialize the per-run overlay patch list for one eval case.
  * @param {object} parts - overlay ingredients (see runEvalCase):
  *   `sessionsRoot` (required), optional `disableRows`,
@@ -62,11 +81,7 @@ export function overlayDisableRows(rowIds) {
  */
 export function buildOverlayYaml(parts) {
   const lines = []
-  lines.push('- id: session-persistence-jsonl')
-  lines.push('  config:')
-  lines.push(`    root: ${yamlScalar(parts.sessionsRoot)}`)
-  lines.push('    packChunks: false')
-  lines.push('    compression: none')
+  lines.push(overlaySessionLogRow(parts.sessionsRoot))
   if (parts.disableRows !== undefined && parts.disableRows.length > 0) {
     lines.push(overlayDisableRows(parts.disableRows).trimEnd())
   }

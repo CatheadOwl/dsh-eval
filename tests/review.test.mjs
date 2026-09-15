@@ -179,6 +179,43 @@ test('blank environment by default: staged plugin rows are disabled, wiring rows
   }
 })
 
+test('pins the session-log artifact shape: root at the collection root, no compression, no chunk packing', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-review-persistence-test-'))
+  try {
+    const realHome = join(root, 'real-home')
+    mkdirSync(realHome, { recursive: true })
+    // Fake CLI reports its DSH_HOME AND the overlay it was handed, so the
+    // root pin can be asserted against the exact home that will boot.
+    const cli = join(root, 'fake-cli.mjs')
+    writeFileSync(cli, [
+      "import { readFileSync } from 'node:fs'",
+      'const overlay = readFileSync(process.argv[5], "utf8")',
+      'console.log(JSON.stringify({ home: process.env.DSH_HOME, overlay }))',
+      '',
+    ].join('\n'))
+
+    const execute = createDshHeadlessReviewExecutor({
+      cliPath: cli,
+      dshHome: realHome,
+      timeoutMs: 10_000,
+    })
+    const result = await execute('task')
+    const output = JSON.parse(result.stdout)
+
+    // The behavior overlay's determinism contract, now on the review face
+    // too: without the pin the host default (zstd) writes
+    // session.vN.jsonl.zstd, `isSessionLogFilename` collects nothing, and the
+    // tool-boundary check degrades to a constant not-executed.
+    assert.match(output.overlay, /- id: session-persistence-jsonl\n  config:\n    root: /)
+    assert.match(output.overlay, /packChunks: false/)
+    assert.match(output.overlay, /compression: none/)
+    const pinnedRoot = JSON.parse(output.overlay.match(/    root: ("(?:[^"\\]|\\.)*")/)[1])
+    assert.equal(pinnedRoot, join(output.home, 'sessions'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('keepPluginRows opts back into the host plugin face', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-review-keepprofiles-test-'))
   try {
@@ -208,6 +245,10 @@ test('keepPluginRows opts back into the host plugin face', async () => {
 
     assert.doesNotMatch(overlay.stdout, /- id: "gates"/)
     assert.match(overlay.stdout, /- id: "tool-fs"\n  disabled: true/)
+    // The session-log pin is artifact determinism, not part of the plugin
+    // face under study — it stays in the keepPluginRows mode too.
+    assert.match(overlay.stdout, /- id: session-persistence-jsonl\n  config:\n    root: /)
+    assert.match(overlay.stdout, /compression: none/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

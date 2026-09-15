@@ -8,6 +8,19 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Fixed
+
+- **Review runs no longer degrade to a constant `not-executed` tool-boundary
+  verdict on zstd-writing hosts.** The review adapter's blank-environment
+  overlay never pinned the session-log config, so the host default (zstd
+  compression) wrote `session.vN.jsonl.zstd`, which the artifact collector
+  cannot match — every run reported `tool boundary: NOT EXECUTED`. Both eval
+  overlays (behavior and review) now share one `overlaySessionLogRow` that
+  pins `root` to the collection root, `packChunks: false`, and
+  `compression: none`; the pin applies in `--keep-plugin-rows` mode too.
+
 ## [0.4.1] — 2026-09-14
 
 ### Changed
