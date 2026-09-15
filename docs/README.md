@@ -6,7 +6,7 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 
 | 文档 | 主题 |
 |---|---|
-| [host-wiring.md](host-wiring.md) | 安装与宿主接线：peer 依赖（dsh-llm）、构建 CLI、profile、凭证、spawn 要求 |
+| [host-wiring.md](host-wiring.md) | 安装与宿主接线：peer 依赖（dsh-llm）、构建 CLI、profile、模型选择（real 模型来源链与钉版）、凭证、spawn 要求 |
 | [review.md](review.md) | comprehension review：实验定义、空白环境 reviewer、产物清单、六条评审规则 |
 | [matchers.md](matchers.md) | trace matcher 与 mock helper 全集 |
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |

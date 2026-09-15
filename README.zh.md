@@ -69,7 +69,7 @@ dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 
 命令需要知道用哪个 dsh profile：显式传 `--profile <name>`，或放一份 `dsh-eval.config.mjs` 到包根（见下节「统一配置」）。
 
-真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。
+真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring.md](docs/host-wiring.md) 的「模型选择」一节。
 
 ## 规范目录
 
@@ -110,7 +110,7 @@ export default {
 
 | 文档 | 主题 |
 |---|---|
-| [host-wiring](docs/host-wiring.md) | peer 接线（含 npm 古董 peer 坑）、构建 CLI、profile、凭证、spawn 要求 |
+| [host-wiring](docs/host-wiring.md) | peer 接线（含 npm 古董 peer 坑）、构建 CLI、profile、模型选择、凭证、spawn 要求 |
 | [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则 |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |

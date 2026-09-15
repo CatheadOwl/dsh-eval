@@ -1,5 +1,5 @@
 ---
-description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/凭证/spawn 三类运行前置、本包对宿主 session seam 的五处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面 / v3 system prompt 面事件），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
+description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/模型/凭证/spawn 运行前置、模型选择链（real 模型 = profile 合成的 agent-default-model 行；settings 用户层不进暂存 home、默认不钉版本、钉版三法）、本包对宿主 session seam 的五处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面 / v3 system prompt 面事件），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
 ---
 
 # 安装与宿主接线
@@ -87,6 +87,25 @@ mock 模式经 `eval-mock-llm` 插件（`src/mock/mock-adapter.mjs`）注册 `Ev
 - 被测插件须已装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`；
 - 每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run——不污染真实 profile store；
 - review 默认空白环境：任意 profile 均可，树外插件行由 overlay 枚举禁用（详见 [review.md](review.md)）。
+
+## 模型选择
+
+real 层的模型配置面**全在 dsh profile，本包零模型知识**：runner 与 review executor 都不传模型参数，生成的 overlay 也不碰模型行。实际模型 = 所启动 profile 各层（bundle 链 + profile patch + 本次 eval overlay）合成的 `agent-default-model` loader 行——宿主一发式 headless runner 与本包多轮 driver（`src/driver/multi-turn-driver.mjs`）都经 `agentDefaultModel` 服务的 `currentSelection()` 读它；review 的空白环境同样保留该行（`src/adapters/dsh/review.mjs` 的 `REVIEW_REQUIRED_ROWS`）。profile 不覆写该行时，即 bundle 链的出厂默认（典型为 dsh-base 默认，随宿主演进而变）。
+
+两个反直觉点：
+
+- **不是「你 dsh 当前选的模型」**。每条 case 的暂存 home 只复制 profile store 与托管凭证文档（`stageSandboxHome`），不含 `$DSH_HOME/settings.yaml`——交互 / web 会话的模型选择与多 provider 配置（`llm-deepseek:` / `llm-pi-ai:` settings 节）住在那里，不进 eval。eval 的模型严格等于 profile 行配置。
+- **默认不钉版本**。profile 继承 base 默认时，宿主改 base 默认，下次 run 静默跟着换模型。查某次 run 实际用了什么：`--keep-artifacts` 落盘的 session 日志里第一个 `request/header` 事件的 `data.header.config.provider/model` 是权威证据（机器可读报告不携带模型字段）。
+
+要钉住模型，按作用面三选一：
+
+| 做法 | 作用面 | 说明 |
+|---|---|---|
+| profile patch 覆写 `agent-default-model` 行 | 该 profile 的全部 run（含正常使用） | `- id: agent-default-model` + `config` 里重述 `provider` / `model`（dsh patch 整段替换语义） |
+| case 级 `rowConfig: { 'agent-default-model': { provider, model } }` | 单条 case | 见 [rowconfig.md](rowconfig.md)；该行仅这两个键，重述即完整 |
+| `mode: 'mock'` | 单条 case | overlay 强制 `provider` / `model` 为 `eval-mock`（见上文 mock 契约节），与真实模型无关 |
+
+前提：所选 provider 路由须在启动 composition 中已注册。出厂仅 `deepseek-official` 一个活跃路由；`llm-pi-ai` 多 provider 适配器默认 dormant、靠 settings 文档的 `llm-pi-ai:` 节激活——而 settings 不进暂存 home，所以非 DeepSeek 路由需要 profile 自带注册该 provider 的插件行（mock 的 `eval-mock-llm` overlay insert 就是这个形状的先例）。
 
 ## 凭证
 

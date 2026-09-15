@@ -69,7 +69,7 @@ dsh-review --dry-run eval/comprehension     # model-free dry run of the review l
 
 The command needs to know which dsh profile to use: pass `--profile <name>` explicitly, or drop a `dsh-eval.config.mjs` at the package root (see "Unified config" below).
 
-Real runs use `dsh-eval run --profile <p> --repo <harness checkout> <case path>`; all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials.
+Real runs use `dsh-eval run --profile <p> --repo <harness checkout> <case path>`; all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in the "Model selection" section of [docs/host-wiring.md](docs/host-wiring.md).
 
 ## Canonical layout
 
@@ -110,7 +110,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 
 | Doc | Topic |
 |---|---|
-| [host-wiring](docs/host-wiring.md) | peer wiring (incl. the npm antique-peer trap), building the CLI, profiles, credentials, spawn requirements |
+| [host-wiring](docs/host-wiring.md) | peer wiring (incl. the npm antique-peer trap), building the CLI, profiles, model selection, credentials, spawn requirements |
 | [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules |
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
 | [disablerows](docs/disablerows.md) | `disableRows` and the turn-close gate boundary contract |
