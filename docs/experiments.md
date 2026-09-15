@@ -67,4 +67,5 @@ writeBehaviorArtifacts(result, '.runs/relates-ab-20260913/')
 
 - **判读与显著性不上收**：`decisionRule` 是文本 + 指纹，不是可执行判据；显著性计算、效应量、人工判读都留消费侧——真模型实验不伪装成全自动测试，也不进 `pnpm test`/gates 路径（real 模式凭证 + spawn 约束）；
 - **指标语义不上收**：`metrics` 是消费者闭包，框架只做描述统计（`rate` / `median`）；
+- **跨 session 状态污染不在表达域**：每个 run（case 或实验臂）都 spawn 一个全新 headless 宿主进程、跑恰好一个 session——「同一进程内 session 1 的渲染状态影响 session 2」一类缺陷（provider 的 process-global 闭包缓存先到者静音后到者）在本框架结构性表达不了，带此类状态的声明者的绿灯结果不覆盖这一面；需要该拓扑的回归请在消费侧用宿主 API 直接构造（in-process 装配下连续创建两个 agent 依次驱动）；
 - 退出码语义归消费侧脚本（操作失败——invalid 臂、执行错误——由消费脚本决定如何计）。
