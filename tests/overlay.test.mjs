@@ -8,8 +8,8 @@ describe('buildOverlayYaml', () => {
     const yaml = buildOverlayYaml({ sessionsRoot: 'C:\\tmp\\run\\sessions', mock: false })
     assert.match(yaml, /- id: session-persistence-jsonl/)
     assert.match(yaml, /root: "C:\\\\tmp\\\\run\\\\sessions"/)
-    assert.match(yaml, /packChunks: false/)
     assert.match(yaml, /compression: none/)
+    assert.ok(!yaml.includes('packChunks')) // not a host config key; emitting it would be schema noise
     assert.ok(!yaml.includes('eval-mock'))
   })
 

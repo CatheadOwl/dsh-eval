@@ -55,8 +55,8 @@ export function overlayDisableRows(rowIds) {
 
 /**
  * The session-log determinism row every eval-staged host carries: log root
- * pinned to the collection root, chunks unpacked, compression off — the exact
- * artifact shape `isSessionLogFilename` / `parseSessionLog` consume. Shared by
+ * pinned to the collection root, compression off — the exact artifact shape
+ * `isSessionLogFilename` / `parseSessionLog` consume. Shared by
  * the behavior overlay and the dsh review adapter's blank-environment overlay:
  * the review face never pinning it is how zstd-generation artifacts
  * (`session.v3.jsonl.zstd`) escaped collection (EVAL-021 degrading to a
@@ -67,7 +67,6 @@ export function overlayDisableRows(rowIds) {
 export function overlaySessionLogRow(sessionsRoot) {
   return '- id: session-persistence-jsonl\n  config:\n'
     + `    root: ${yamlScalar(sessionsRoot)}\n`
-    + '    packChunks: false\n'
     + '    compression: none'
 }
 

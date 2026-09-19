@@ -1,7 +1,7 @@
 /**
  * Session-trace parsing for dsh agent eval. The evidence source is the JSONL
  * session artifact written by `@deepseek-ai/dsh-session-persistence-jsonl`
- * (configured `compression: none`, `packChunks: false` by the eval overlay):
+ * (configured `compression: none` by the eval overlay):
  * one `type: 'session'` header line, then one JSON record per `SessionEvent`.
  * Event shapes follow `deepseek-harness/packages/core/session/src/types.ts`
  * (`SessionEventMap`); packed `*-chunks` storage rows are tolerated and

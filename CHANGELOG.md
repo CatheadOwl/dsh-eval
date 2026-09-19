@@ -18,8 +18,8 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   compression) wrote `session.vN.jsonl.zstd`, which the artifact collector
   cannot match — every run reported `tool boundary: NOT EXECUTED`. Both eval
   overlays (behavior and review) now share one `overlaySessionLogRow` that
-  pins `root` to the collection root, `packChunks: false`, and
-  `compression: none`; the pin applies in `--keep-plugin-rows` mode too.
+  pins `root` to the collection root and `compression: none`; the pin
+  applies in `--keep-plugin-rows` mode too.
 
 ## [0.4.1] — 2026-09-14
 

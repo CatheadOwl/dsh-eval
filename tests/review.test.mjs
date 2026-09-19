@@ -207,8 +207,8 @@ test('pins the session-log artifact shape: root at the collection root, no compr
     // session.vN.jsonl.zstd, `isSessionLogFilename` collects nothing, and the
     // tool-boundary check degrades to a constant not-executed.
     assert.match(output.overlay, /- id: session-persistence-jsonl\n  config:\n    root: /)
-    assert.match(output.overlay, /packChunks: false/)
     assert.match(output.overlay, /compression: none/)
+    assert.ok(!output.overlay.includes('packChunks')) // not a host config key
     const pinnedRoot = JSON.parse(output.overlay.match(/    root: ("(?:[^"\\]|\\.)*")/)[1])
     assert.equal(pinnedRoot, join(output.home, 'sessions'))
   } finally {
