@@ -8,7 +8,7 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-## [Unreleased]
+## [0.4.2] — 2026-09-19
 
 ### Fixed
 
