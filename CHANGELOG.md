@@ -16,7 +16,7 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   verdict on zstd-writing hosts.** The review adapter's blank-environment
   overlay never pinned the session-log config, so the host default (zstd
   compression) wrote `session.vN.jsonl.zstd`, which the artifact collector
-  cannot match — every run reported `tool boundary: NOT EXECUTED`. Both eval
+  cannot match — every run reported `tool boundary: NOT EXECUTED on run(s) N`. Both eval
   overlays (behavior and review) now share one `overlaySessionLogRow` that
   pins `root` to the collection root and `compression: none`; the pin
   applies in `--keep-plugin-rows` mode too.
@@ -262,6 +262,8 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `@deepseek-ai/dsh-llm` is a peerDependency provided by the host
   ecosystem.
 
+[0.4.2]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.2
+[0.4.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.1
 [0.3.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.3.0
 [0.2.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.1
 [0.2.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.0
