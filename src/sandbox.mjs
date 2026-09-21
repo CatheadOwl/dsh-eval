@@ -231,6 +231,10 @@ export function teardownSandbox(runDir, { keep = false } = {}) {
  * @param {object} options
  * @param {string} options.cli - the compiled CLI entry (bin.js).
  * @param {string[]} options.cliArgs - CLI arguments (profile/patch/task...).
+ * @param {string} [options.input] - stdin payload for the child (the headless
+ *   app's `-` positional reads the task from stdin; passing large tasks via
+ *   argv hits the Windows command-line ceiling and dies ENAMETOOLONG before
+ *   the CLI even boots).
  * @param {string} options.cwd - working directory for the child.
  * @param {object} options.env - FULL child environment (caller assembles).
  * @param {number} options.timeoutMs - SIGTERM deadline.
@@ -241,6 +245,14 @@ export async function spawnHeadlessDsh(options) {
     cwd: options.cwd,
     env: options.env,
   })
+
+  if (options.input !== undefined) {
+    // A child that exits before draining stdin raises EPIPE on the write
+    // side; the exit path below already accounts the failure, so the write
+    // error must not surface as an unhandled 'error' event.
+    child.stdin.on('error', () => {})
+    child.stdin.end(options.input)
+  }
 
   let stdout = ''
   let stderr = ''

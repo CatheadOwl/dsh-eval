@@ -25,6 +25,23 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   subpath (`buildJudgeTask` / `executeReviewJudge` / `parseJudgeOutput` /
   `loadRubricText` / `JUDGE_OUTPUT_SECTIONS`).
 
+### Fixed
+
+- **Review runs no longer fail the tool-boundary check on host 0.1.6 plan
+  mode.** The base template's `plan-mode` row keeps `exit_plan_mode` in the
+  request tool catalog "across modes for request-cache stability", and the
+  blank-environment static disable list (host template rows never appear in the
+  out-of-tree enumeration) did not cover it — on such hosts every review run
+  died as a tool-boundary violation. The list now includes `plan-mode`.
+
+### Changed
+
+- **Review tasks ride stdin** (`-` positional, natively supported by the host
+  headless app) instead of the command line: the judge dispatch's task — rubric
+  + observations + every reviewer answer — exceeds the Windows command-line
+  ceiling and dies `ENAMETOOLONG` before the CLI even boots. `spawnHeadlessDsh`
+  gains an optional `input`; reviewer and judge dispatches now share one path.
+
 ## [0.4.2] — 2026-09-19
 
 ### Fixed

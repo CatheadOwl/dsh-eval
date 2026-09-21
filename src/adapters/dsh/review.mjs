@@ -37,6 +37,12 @@ const REVIEW_DISABLED_TOOL_ROWS = [
   'tool-subagent-fork',
   'tool-subagent-report',
   'tool-workflow',
+  // Host 0.1.6 plan mode: the bundle lists `exit_plan_mode` in the request
+  // tool catalog "across modes for request-cache stability", so the tool
+  // boundary check sees it on EVERY review run even though the reviewer
+  // never left answer mode (discovered by the first real --judge run —
+  // both reviewer runs failed as boundary violations before it).
+  'plan-mode',
 ]
 
 /**
@@ -140,7 +146,12 @@ export function createDshHeadlessReviewExecutor(options) {
     try {
       const { stdout, stderr, exitCode, timedOut } = await spawnHeadlessDsh({
         cli,
-        cliArgs: ['--profile', profile, '--patch', overlayPath, task],
+        // The task rides stdin (`-` positional): the judge dispatch's task —
+        // rubric + observations + every reviewer answer — exceeds the Windows
+        // argv ceiling (spawn ENAMETOOLONG before the CLI even boots).
+        // Reviewer tasks go the same way for one uniform path.
+        cliArgs: ['--profile', profile, '--patch', overlayPath, '-'],
+        input: task,
         cwd: options.cwd ?? runDir,
         env: {
           ...process.env,

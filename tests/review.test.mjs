@@ -81,7 +81,11 @@ test('dsh adapter gives every reviewer an isolated DSH_HOME', async () => {
     writeFileSync(join(profileDir, 'package.json'), '{"type":"module"}')
     writeFileSync(join(profileDir, 'cordis.yml'), 'plugins: []\n')
     const cli = join(root, 'fake-cli.mjs')
-    writeFileSync(cli, 'console.log(JSON.stringify({ home: process.env.DSH_HOME, args: process.argv.slice(2) }))\n')
+    writeFileSync(cli, [
+      'let input = \'\'',
+      'for await (const chunk of process.stdin) input += chunk',
+      'console.log(JSON.stringify({ home: process.env.DSH_HOME, args: process.argv.slice(2), stdin: input }))',
+    ].join('\n'))
 
     const execute = createDshHeadlessReviewExecutor({
       cliPath: cli,
@@ -97,7 +101,10 @@ test('dsh adapter gives every reviewer an isolated DSH_HOME', async () => {
     assert.notEqual(firstOutput.home, secondOutput.home)
     assert.deepEqual(firstOutput.args.slice(0, 3), ['--profile', 'test-profile', '--patch'])
     assert.match(firstOutput.args[3], /[\\/]review-overlay\.yml$/)
-    assert.equal(firstOutput.args[4], 'first task')
+    // The task rides stdin (`-` positional) — argv stays under every platform's
+    // command-line ceiling no matter how large the task grows.
+    assert.equal(firstOutput.args[4], '-')
+    assert.equal(firstOutput.stdin, 'first task')
     assert.equal(existsSync(first.runDir), false)
     assert.equal(existsSync(second.runDir), false)
   } finally {
