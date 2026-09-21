@@ -19,7 +19,6 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 | `runner-api.md` | `src/runner.mjs`（`runEvalCase` options / `EvalRunResult`）、`src/cli.mjs`（跨档取 `cliPath` 一节） | options/result 字段或 CLI 解析链变更同 commit 更新 |
 | `experimental.md` | `src/experimental.mjs`、`scripts/verify-experimental-face.mjs` | experimental 门面加/撤符号即改清单（verify-experimental-face 闸强制符号级对账）；档位语义变更查警告横幅措辞 |
 | `intent-cases.md` | 意图面 e2e 方法论（开发仓手册 agent-tools-dev「意图面 e2e」，按名引用） | 触发表/失败启发集演进 → 同步内联表——本篇的表是**规范版**，不是摘要 |
-| `README.md` 定位段与四层表、`docs/review.md` 六条规则的 rationale 行 | agent-eval 方法论 KB（概念 SSOT：部署范式两分 / 粒度三分 / 判定形态 / 「纪律+理由」规则形式；按名引用不链接，概念映射与重查口径由开发流程侧承载、不随包发布） | KB 范式判据或规则形式演进 → 重查定位段两范式措辞、四层表粒度轴、review 规则的术语与 rationale 行 |
 | `review.md` / `disablerows.md` / `report.md` | 本包框架源码 | 契约变更同 commit 更新（闸门对账 facade 导出；CLI flags 变更查 review/report 两篇） |
 | 全篇涉及的宿主 seam 断言（退出语义 / JSONL 布局 / overlay 顺序） | dsh 宿主源码（vendored 检出） | 宿主 seam 源码演进 → 先对宿主源码重新验证断言，再动引用它的文档 |
 
