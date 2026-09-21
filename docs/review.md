@@ -74,9 +74,11 @@ dsh-review \
 
 ## 六条评审规则
 
-1. **冻结输入，实时投影输出。** fixture 保存 raw SDK result、合成知识库或调用参数；`observe()` 必须调用当前构建产物。不要提交一份会随实现漂移的 projected-output 快照。
-2. **盲 prompt 与隐藏 rubric 分离。** `prompt.md` 只能含问题和 `{{EVAL_OBSERVATIONS}}`；答案键、预期 next action、intentional design 只在 `rubric.md`。
-3. **一次物化，多次独立评审。** 同一批运行共享完全相同的 task，避免把 fixture 波动误判成模型分歧；每次调用新的 headless 进程和隔离的临时 `DSH_HOME`，但暂存所选 profile 的配置与依赖链接。
-4. **主动标准化非语义噪声。** 临时绝对路径、时间戳等应在 plugin 的 observation projection 中替换或移除，同时保留真实字段名与语义。
-5. **显式登记 intentional design。** reviewer 提出的 red flag 只有不在该清单中时才是新发现，避免反复争论已接受取舍。
-6. **生成物不做 SSOT。** `.runs/` 只用于当次人工审阅，gitignore 使用无路径前缀的 `.runs/`，覆盖任意深度。
+每条形如「纪律 + 理由」，理由是废弃键——理由不再成立时重审规则，而不是默认永续。
+
+1. **冻结输入，实时投影输出。** fixture 保存 raw SDK result、合成知识库或调用参数；`observe()` 必须调用当前构建产物。不要提交一份会随实现漂移的 projected-output 快照。理由：评审要测的是当前产物的可理解性，快照一旦随实现漂移，测的就是快照不是产物。
+2. **盲 prompt 与隐藏 rubric 分离。** `prompt.md` 只能含问题和 `{{EVAL_OBSERVATIONS}}`；答案键、预期 next action、intentional design 只在 `rubric.md`。理由：判定线索泄漏进 prompt 会把评审退化成指令跟随（forward-assertion 污染），作废「fresh model 能否自己理解」这一证据价值。
+3. **一次物化，多次独立评审。** 同一批运行共享完全相同的 task，避免把 fixture 波动误判成模型分歧；每次调用新的 headless 进程和隔离的临时 `DSH_HOME`，但暂存所选 profile 的配置与依赖链接。理由：reviewer 输出非确定性，单轮是弱证据；输入 byte-identical 才能把轮间分歧归因于模型而非素材。
+4. **主动标准化非语义噪声。** 临时绝对路径、时间戳等应在 plugin 的 observation projection 中替换或移除，同时保留真实字段名与语义。理由：噪声差异会被 reviewer 当成语义信号，制造假分歧。
+5. **显式登记 intentional design。** reviewer 提出的 red flag 只有不在该清单中时才是新发现，避免反复争论已接受取舍。理由：没有台账，已接受的取舍会在每轮评审里被重新争论，评审永不收敛——台账同时是 rubric 的人审校准面。
+6. **生成物不做 SSOT。** `.runs/` 只用于当次人工审阅，gitignore 使用无路径前缀的 `.runs/`，覆盖任意深度。理由：review 判定是证据不是档案——非确定性被测者的轮次产物当次有效，跨轮对比走 `--report` JSON 与实验面带戳目录。

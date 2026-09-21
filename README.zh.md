@@ -2,20 +2,20 @@
 
 [English](README.md) | 中文
 
-**面向插件作者的 dsh-native agent 评测层**：behavior case 跑真实 headless dsh trace，review experiment 测 fresh model 能否理解插件输出。
+**面向插件作者的 dsh-native（dsh = DeepSeek 的 deepseek-harness agent CLI）agent 评测层**：behavior case 跑真实 headless dsh trace，review experiment 测 fresh model 能否理解插件输出。
 
-它评测的是**装配后的 agent harness**（插件 + profile + patch + 工具注册表在真实 dsh headless 里接成的那张图），不是孤立函数；判定走 dsh 原生的 session trace 投影与 matcher（契约断言），不是 metric 分数。它不是通用 agent eval 平台（无 dashboard / dataset hosting / metric catalog，也不做 benchmark 排名），也不是 DeepEval / OpenAI Evals 的替代品——那些项目证明了这个问题空间成立，本包选择 dsh-native 的垂直解法。
+它评测的是**装配后的 agent harness**（插件 + profile + patch + 工具注册表在真实 dsh headless 里接成的那张图），不是孤立函数；判定走 dsh 原生的 session trace 投影与 matcher（契约断言），不是 metric 分数。它不是通用 agent eval 平台（无 dashboard / dataset hosting / metric catalog，也不做 benchmark 排名），也不是 DeepEval / OpenAI Evals 的替代品——那些项目证明了这个问题空间成立，本包选择 dsh-native 的垂直解法。按部署形态说：eval 框架把模型调用内嵌在 harness 里；任务制品（SWE-bench 那一形态）发布任务 + fixture + verifier，由运行方自己供 agent。本包组合两者——mock case 是免凭证制品，由确定性 trace verifier 判定；real case 把装配后的 harness 本身（含 profile 提供的模型）置于契约断言之下；comprehension review 把空白环境 reviewer——只看得到插件物化输出、别无他物的模型——当测量仪器派往插件的输出面，而不是被测对象。
 
 > 文档以中文为主；深度契约在 [docs/](docs/README.md)（matchers / 边界契约 / review / 报告结构 / 宿主接线 / 已知问题）。
 
 ## 为什么需要它
 
-| 类型 | 问题 | 判定 | 执行 |
-|---|---|---|---|
-| 单元/shape test | 确定性字段和值是否正确 | 自动 | plugin 自己的 `node:test` |
-| behavior real | 自然语言意图是否选到正确工具 | trace matcher | dsh + 真实模型 |
-| behavior mock | 工具管线与写入 round-trip 是否稳定 | trace matcher + workspace inspect | dsh + 脚本化 mock LLM |
-| comprehension review | 一个 fresh model 能否从输出理解含义和下一步 | 人工对照 rubric，多次收敛 | 抽象 review experiment + 可替换 executor |
+| 类型 | 问题 | 粒度 | 判定 | 执行 |
+|---|---|---|---|---|
+| 单元/shape test | 确定性字段和值是否正确 | component | 自动 | plugin 自己的 `node:test` |
+| behavior real | 自然语言意图是否选到正确工具 | trajectory | trace matcher | dsh + 真实模型 |
+| behavior mock | 工具管线与写入 round-trip 是否稳定 | trajectory + 终态 | trace matcher + workspace inspect | dsh + 脚本化 mock LLM |
+| comprehension review | 一个 fresh model 能否从输出理解含义和下一步 | rubric 为主判 | 人工对照 rubric，多次收敛 | 抽象 review experiment + 可替换 executor |
 
 dsh 插件的正确性来自「装配出的图是否真的把工具、steer、prompt、gate 接到一起」——这类问题插件自己的单测只能覆盖一部分；而「输出能否被理解」根本不是字符串回归。本包把这两层从手动试跑变成可复跑证据。
 
@@ -50,7 +50,7 @@ npm i -D @catheadowl/dsh-eval
 `<plugin>/eval/behavior/mock/smoke.eval.mjs`：
 
 ```js
-import { firstTool, toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
+import { toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
 
 export default {
   id: 'my-first-case',
@@ -65,6 +65,8 @@ export default {
 ```bash
 dsh-eval run --mode mock eval/behavior/mock
 dsh-review --dry-run eval/comprehension     # review 层的免模型预演
+# → PASS my-first-case
+#   1 selected, 1 passed, 0 failed, 0 skipped
 ```
 
 命令需要知道用哪个 dsh profile：显式传 `--profile <name>`，或放一份 `dsh-eval.config.mjs` 到包根（见下节「统一配置」）。
@@ -127,4 +129,4 @@ export default {
 
 runner 用 `try/finally` 保证临时目录与链接在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不污染真实 profile store。behavior 与 review CLI 共享目录扫描（跳过 `.runs` 与 `node_modules`）；behavior CLI 在加载期做 case shape 校验与跨文件重复 id 检测，尽早失败。
 
-License: MIT。框架自身的测试与发布自检由仓库 CI 承接，不随包发布。
+License: MIT。框架自身的测试与发布自检由仓库 CI 承接，不随包发布。开发与贡献：[CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md)。

@@ -2,20 +2,20 @@
 
 English | [中文](README.zh.md)
 
-**A dsh-native agent evaluation layer for plugin authors**: behavior cases run against real headless dsh traces, while review experiments test whether fresh models understand plugin outputs.
+**A dsh-native (dsh = DeepSeek's deepseek-harness agent CLI) agent evaluation layer for plugin authors**: behavior cases run against real headless dsh traces, while review experiments test whether fresh models understand plugin outputs.
 
-It evaluates the **assembled agent harness** (the graph a plugin + profile + patch + tool registry form inside a real dsh headless run), not isolated functions; verdicts come from dsh-native session-trace projections and matchers (contract assertions), not metric scores. It is not a general agent-eval platform (no dashboard / dataset hosting / metric catalog, no benchmark ranking) and not a DeepEval / OpenAI Evals replacement — those projects proved the problem space; this package picks the dsh-native vertical solution.
+It evaluates the **assembled agent harness** (the graph a plugin + profile + patch + tool registry form inside a real dsh headless run), not isolated functions; verdicts come from dsh-native session-trace projections and matchers (contract assertions), not metric scores. It is not a general agent-eval platform (no dashboard / dataset hosting / metric catalog, no benchmark ranking) and not a DeepEval / OpenAI Evals replacement — those projects proved the problem space; this package picks the dsh-native vertical solution. In deployment terms: eval frameworks embed the model calls inside the harness, while task artifacts (the SWE-bench shape) ship task + fixture + verifier and let the runner supply the agent. This package composes the two — mock cases are credential-free artifacts judged by deterministic trace verifiers, real cases put the assembled harness itself (profile-supplied model included) under contract assertions, and comprehension review dispatches blank-environment reviewers — models that see only the plugin's materialized output, nothing else — as the measuring instrument at the plugin's output surface, not as the subject.
 
 > Documentation is Chinese-first; deep contracts live in [docs/](docs/README.md) (matchers / boundary contracts / review / report structure / host wiring / known issues).
 
 ## Why it exists
 
-| Layer | Question | Verdict | Execution |
-|---|---|---|---|
-| unit / shape test | are deterministic fields and values correct | automatic | the plugin's own `node:test` |
-| behavior real | does natural-language intent pick the right tool | trace matcher | dsh + real model |
-| behavior mock | is the tool pipeline and write round-trip stable | trace matcher + workspace inspect | dsh + scripted mock LLM |
-| comprehension review | can a fresh model understand the output and the next step | manual rubric, converged over runs | abstract review experiment + replaceable executor |
+| Layer | Question | Granularity | Verdict | Execution |
+|---|---|---|---|---|
+| unit / shape test | are deterministic fields and values correct | component | automatic | the plugin's own `node:test` |
+| behavior real | does natural-language intent pick the right tool | trajectory | trace matcher | dsh + real model |
+| behavior mock | is the tool pipeline and write round-trip stable | trajectory + end state | trace matcher + workspace inspect | dsh + scripted mock LLM |
+| comprehension review | can a fresh model understand the output and the next step | rubric-primary | manual rubric, converged over runs | abstract review experiment + replaceable executor |
 
 A dsh plugin is correct when the assembled graph really wires tools, steers, prompts, and gates together — plugin unit tests cover only part of that, and "is the output understandable" is not a string regression at all. This package turns both layers into replayable evidence instead of manual trial runs.
 
@@ -50,7 +50,7 @@ npm i -D @catheadowl/dsh-eval
 `<plugin>/eval/behavior/mock/smoke.eval.mjs`:
 
 ```js
-import { firstTool, toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
+import { toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
 
 export default {
   id: 'my-first-case',
@@ -65,6 +65,8 @@ export default {
 ```bash
 dsh-eval run --mode mock eval/behavior/mock
 dsh-review --dry-run eval/comprehension     # model-free dry run of the review layer
+# → PASS my-first-case
+#   1 selected, 1 passed, 0 failed, 0 skipped
 ```
 
 The command needs to know which dsh profile to use: pass `--profile <name>` explicitly, or drop a `dsh-eval.config.mjs` at the package root (see "Unified config" below).
@@ -127,4 +129,4 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 
 The runner uses `try/finally` so temp directories and links are cleaned up on every path (`prepare` throwing, mock validation failure, spawn errors) — the real profile store is never polluted. The behavior and review CLIs share directory scanning (skipping `.runs` and `node_modules`); the behavior CLI validates case shapes and detects cross-file duplicate ids at load time, failing as early as possible.
 
-License: MIT. The framework's own tests and release self-checks are carried by the repository CI and do not ship with the package.
+License: MIT. The framework's own tests and release self-checks are carried by the repository CI and do not ship with the package. Development & contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md).
