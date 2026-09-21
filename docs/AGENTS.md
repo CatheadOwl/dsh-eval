@@ -20,6 +20,7 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 | `experimental.md` | `src/experimental.mjs`、`scripts/verify-experimental-face.mjs` | experimental 门面加/撤符号即改清单（verify-experimental-face 闸强制符号级对账）；档位语义变更查警告横幅措辞 |
 | `intent-cases.md` | 意图面 e2e 方法论（开发仓手册 agent-tools-dev「意图面 e2e」，按名引用） | 触发表/失败启发集演进 → 同步内联表——本篇的表是**规范版**，不是摘要 |
 | `review.md` / `disablerows.md` / `report.md` | 本包框架源码 | 契约变更同 commit 更新（闸门对账 facade 导出；CLI flags 变更查 review/report 两篇） |
+| `review.md` 空白环境节 · 静态禁用清单（`REVIEW_DISABLED_TOOL_ROWS`）与接线白名单（`REVIEW_REQUIRED_ROWS`） | dsh base 模板的工具行/模式行清单（vendored 检出 `packages/bundle/base/cordis.patch.yml`） | 宿主新增或改名模板行（0.1.6 plan-mode 实证：`plan-mode` 行常驻列出 `exit_plan_mode`，静态清单漏盖 → 每次 review 必死边界违规）→ 重枚举 base 模板行并与两清单对账 |
 | 全篇涉及的宿主 seam 断言（退出语义 / JSONL 布局 / overlay 顺序） | dsh 宿主源码（vendored 检出） | 宿主 seam 源码演进 → 先对宿主源码重新验证断言，再动引用它的文档 |
 
 ## 目录约定
