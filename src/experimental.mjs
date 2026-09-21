@@ -28,6 +28,11 @@ export {
   executeReviewExperiment,
   materializeReviewExperiment,
   renderObservationSections,
+  buildJudgeTask,
+  executeReviewJudge,
+  parseJudgeOutput,
+  loadRubricText,
+  JUDGE_OUTPUT_SECTIONS,
   OBSERVATIONS_PLACEHOLDER,
 } from './experiment/review.mjs'
 

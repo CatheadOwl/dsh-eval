@@ -144,3 +144,74 @@ describe('renderReviewReport', () => {
     assert.match(partial, /- tool boundary: checked on 1 of 2 run\(s\); the rest reported none/)
   })
 })
+
+describe('renderReviewReport · judge first-pass (EVAL-033)', () => {
+  const judgedResult = {
+    runs: 1,
+    observations: 'obs',
+    attempts: [{ index: 1, ok: true, result: { answer: 'reviewer answer', stdout: 'reviewer answer' } }],
+  }
+
+  it('renders the machine section separately and marks the human columns as prefill-verified', () => {
+    const markdown = renderReviewReport({
+      experiment,
+      result: judgedResult,
+      adapter: 'dsh-headless',
+      profile: 'headless',
+      judge: {
+        status: 'judged',
+        profile: 'headless',
+        judgedAt: '2026-09-21T00:00:00.000Z',
+        sections: {
+          Verdicts: 'run 1: field semantics understood across runs',
+          'Intentional design hits': '- `[truncated: N]` counting — matches list item 1 (run 1)',
+          'New red flags': '- none raised',
+          'Next step': 'no action — reviewers agreed on every criterion',
+        },
+      },
+    })
+    assert.match(markdown, /## Judge first-pass \(machine — prefill, not a verdict gate\)/)
+    assert.match(markdown, /status: judged/)
+    assert.match(markdown, /instrument: profile `headless`, judged at 2026-09-21T00:00:00\.000Z/)
+    assert.match(markdown, /`judge\.txt` · parsed prefill: `judge\.json`/)
+    assert.match(markdown, /### Verdicts[\s\S]*field semantics understood/)
+    assert.match(markdown, /### Intentional design hits[\s\S]*matches list item 1/)
+    // Human columns stay authoritative: prefill note points UP at the machine section.
+    assert.match(markdown, /Machine prefill in the judge section above — verify each against the rubric/)
+    assert.doesNotMatch(markdown, /Next step \(pick one\)\n\nPick one:/)
+  })
+
+  it('renders unparsed judge output as unread, never as a pass', () => {
+    const markdown = renderReviewReport({
+      experiment,
+      result: judgedResult,
+      adapter: 'dsh-headless',
+      judge: { status: 'unparsed', missing: ['Verdicts', 'Next step'], profile: 'headless' },
+    })
+    assert.match(markdown, /## Judge first-pass[\s\S]*four-heading contract \(missing: Verdicts, Next step\)/)
+    assert.match(markdown, /raw output preserved in `judge\.txt`/)
+    // No machine prefill note on the human columns when nothing was parsed.
+    assert.doesNotMatch(markdown, /Machine prefill in the judge section above/)
+  })
+
+  it('accounts failed and not-executed judge passes without inventing content', () => {
+    const failed = renderReviewReport({
+      experiment, result: judgedResult, adapter: 'dsh-headless',
+      judge: { status: 'failed', error: 'dsh reviewer exited with code 1' },
+    })
+    assert.match(failed, /Judge dispatch failed: dsh reviewer exited with code 1/)
+    const skipped = renderReviewReport({
+      experiment, result: judgedResult, adapter: 'dsh-headless',
+      judge: { status: 'not-executed', reason: 'no successful reviewer run to grade' },
+    })
+    assert.match(skipped, /_Not executed: no successful reviewer run to grade\._/)
+  })
+
+  it('keeps the pre-judge report shape when no judge pass ran', () => {
+    const markdown = renderReviewReport({
+      experiment, result: judgedResult, adapter: 'dsh-headless', profile: 'headless',
+    })
+    assert.doesNotMatch(markdown, /Judge first-pass/)
+    assert.match(markdown, /## Next step \(pick one\)[\s\S]*- \[ \] change plugin output/)
+  })
+})

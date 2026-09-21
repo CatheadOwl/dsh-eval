@@ -27,6 +27,11 @@ import { resolveDshCliChain } from '@catheadowl/dsh-eval/experimental'
 | `executeReviewExperiment` | 用给定 executor 执行抽象 review 实验 |
 | `materializeReviewExperiment` | 把实验定义物化为产物目录 |
 | `renderObservationSections` | 标准 observation renderer（自定义 executor 用） |
+| `buildJudgeTask` | 组装机器第一道判读任务（rubric + observations + 全部 reviewer 答案 → 四节固定输出契约的 prompt；契约见 [review.md](review.md) judge 节） |
+| `executeReviewJudge` | 经同一 executor 跑一次 judge dispatch，返回 `{ task, raw, parsed, judgedAt }`（解析失败是 `unparsed` 状态，不是异常） |
+| `parseJudgeOutput` | 按 `JUDGE_OUTPUT_SECTIONS` 四节契约解析 judge 输出；缺节返回 `{ status: 'unparsed', missing }` |
+| `loadRubricText` | 把实验定义的 rubric 标识（路径 / `file:` URL / 内联文本）解析为 judge 可用的文本 |
+| `JUDGE_OUTPUT_SECTIONS` | judge 输出契约的四个节名（`Verdicts` / `Intentional design hits` / `New red flags` / `Next step`） |
 | `OBSERVATIONS_PLACEHOLDER` | prompt 中的观测占位符常量（必须恰好出现一次） |
 | `defineBehaviorExperiment` | 定义并校验行为实验（臂 × 重复 × 守卫 × 判读标准），冻结记录带 `definitionSha256` 预注册指纹（形态与纪律见 [experiments.md](experiments.md)） |
 | `executeBehaviorExperiment` | 执行行为实验：臂覆写深合并、case id 框架铸造、逐 run 守卫与具名失败记账、零 guard-clean 臂判 invalid |

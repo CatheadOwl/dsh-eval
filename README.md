@@ -114,7 +114,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 |---|---|
 | [host-wiring](docs/host-wiring.md) | peer wiring (incl. the npm antique-peer trap), building the CLI, profiles, model selection, credentials, spawn requirements |
 | [concepts](docs/concepts.md) | concept mapping from mainstream agent eval (dataset / metric / LLM-as-judge / trajectory / CI) into cases / matchers / review — behavior cases are unittest semantics, judgment frozen at authoring time |
-| [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules |
+| [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules, machine judge first-pass (`--judge`) |
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
 | [disablerows](docs/disablerows.md) | `disableRows` and the turn-close gate boundary contract |
 | [rowconfig](docs/rowconfig.md) | the `rowConfig` per-row config override contract (whole-segment replacement, restate needed keys) |

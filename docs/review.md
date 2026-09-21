@@ -45,11 +45,31 @@ dsh-review --dry-run <experiment file or directory>
 dsh-review \
   --profile <profile> \
   --repo <deepseek-harness checkout> \
-  [--runs 5] [--timeout 300000] [--keep-plugin-rows] \
+  [--runs 5] [--timeout 300000] [--keep-plugin-rows] [--judge] \
   <experiment file or directory>
 ```
 
-`--profile`/`--repo` 可来自 `dsh-eval.config.mjs`（见 README），flags 覆盖 config。
+`--profile`/`--repo` 可来自 `dsh-eval.config.mjs`（见 README），flags 覆盖 config。`--judge` 追加机器第一道判读（见下节），要求真实运行（与 `--dry-run` 组合直接拒绝——dry-run 不碰模型）。
+
+## Judge 第一道（`--judge`）
+
+review 的判分规程写在每份 rubric 的判分节里，按设计由人执行；`--judge` 把这道规程交给机器做**第一道**：reviewer 跑完后，同一 executor（同一空白环境、同一 profile）再做一次 dispatch——judge 看到 rubric（答题人从未见过的答案钥匙）、byte-identical observations、全部成功 reviewer 的答案，按固定四节契约输出预填：
+
+| 节 | 内容 |
+|---|---|
+| `Verdicts` | 逐 run：rubric 判据 understood / missed / uncertain + 引文；跨 run 一致与分歧 |
+| `Intentional design hits` | 命中 rubric 的 intentional / accepted 清单的 reviewer flag（引 run + 原文 + 清单项） |
+| `New red flags` | 清单外新发现——真正的 findings，各标注疑似来源（fixture / design / unclear） |
+| `Next step` | 四选一建议（改输出 / 改 rubric / 加 behavior case / 不处理）+ 一行理由 |
+
+纪律（「不伪装全自动」由**标注**达成，不由缺席达成）：
+
+- **判定是证据不是门**：judge 结果不进退出码——review 恒不作 CI 门，机器判读同理。
+- **仪器身份记账**：`run.json` 的 `judge` 字段记 `status`（`judged` / `unparsed` / `failed` / `not-executed`）+ profile + `judgedAt`；报告的 Judge first-pass 段自带 machine——prefill, not a verdict gate 标注。
+- **不合格输出响亮记账**：judge 输出缺节 → `unparsed`（缺失节名进 `judge.json`，原文留 `judge.txt`），报告明示按 rubric 人工判读——不静默当作通过。
+- **人工栏目仍是权威记录**：三个 human judgment 栏保留为 checklist；机器预填在它们上方单独渲染，人只裁增量（新 genuine 项），核对后勾选或覆写。
+
+产物增补：`judge.txt`（judge 原文）、`judge.json`（解析后的预填或失败/未执行记账）。全部 reviewer 失败时 judge 记 `not-executed`。程序化消费走 `experimental` 子路径（`buildJudgeTask` / `executeReviewJudge` / `parseJudgeOutput` / `loadRubricText` / `JUDGE_OUTPUT_SECTIONS`，见 [experimental.md](experimental.md)）。
 
 ## 空白环境（默认）与工具边界
 

@@ -8,6 +8,23 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Added
+
+- **`dsh-review --judge`: machine first-pass grading for comprehension review.**
+  One extra dispatch through the same blank-environment executor sees the hidden
+  rubric (which the blind reviewers never saw), the byte-identical observations,
+  and every reviewer answer, then prefills the report's three human columns under
+  a fixed four-section contract (`Verdicts` / `Intentional design hits` /
+  `New red flags` / `Next step`). Judge output is evidence, never an exit-code
+  gate; contract-violating output is recorded loudly as `unparsed` (`judge.txt`
+  raw + `judge.json` accounting, `run.json` judge field with profile + judgedAt).
+  The three human-judgment sections remain the authoritative record — the judge
+  narrows what a human must read. Programmatic primitives on the `experimental`
+  subpath (`buildJudgeTask` / `executeReviewJudge` / `parseJudgeOutput` /
+  `loadRubricText` / `JUDGE_OUTPUT_SECTIONS`).
+
 ## [0.4.2] — 2026-09-19
 
 ### Fixed

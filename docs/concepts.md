@@ -12,7 +12,7 @@ description: 概念对照——从主流 agent eval 叙事（dataset / metric / 
 | dataset / test cases | case 即代码：`*.eval.mjs`（id / mode / task / prepare / expect），fixture 在 `prepare` 播种 | 评测资产随插件仓版本化，不是数据文件 |
 | metric / score | matcher（`toolCalled` / `finalTextMatches` / `systemPromptIncludes` …）：契约断言，过 / 不过 | 刻意不打分：插件契约是二值的，分数掩盖「哪条破了」；聚合面是 report 的 pass/fail 计数 |
 | custom grader / custom metric | 自定义 matcher（`expect` 内任意断言函数）+ 证据锚纪律（纯负向断言须自报 `requiresEvidence: false`） | 自定义判定仍是确定性证据链，不是自由打分 |
-| LLM-as-judge | 不内置判卷模型。comprehension review 里 fresh model 是**答题人**（测的是 surface 可理解性），判分规程写在每份 rubric 的判分节，由人对照答案钥匙执行 | 答题人与判卷人分离；判卷不给仪器身份就不记账，宁缺勿伪 |
+| LLM-as-judge | judge 是**机器第一道判读**（`dsh-review --judge`）：reviewer 跑完后同一空白环境再做一次 dispatch，看 rubric（答题人从未见过的答案钥匙）+ observations + 全部 reviewer 答案，按四节契约（`Verdicts` / `Intentional design hits` / `New red flags` / `Next step`）预填报告的三个人工栏目；人只裁 intentional 清单外的新增项 | 答题人与判卷人分离（fresh model 答题、judge 判卷、人核增量）；judge 判定记证据不进退出码，仪器身份（profile + judgedAt）随 run 记账，输出缺节响亮记 `unparsed` |
 | trace / span | dsh session JSONL → `EvalTrace` 投影（tool calls / steer / system prompt 面）+ `census` 普查 | trace 是一等公民且机器可断言；census 防投影静默降级的假绿 |
 | trajectory eval | 原生模式：matcher 断工具调用序列、参数路由、模型可见面 | 是对轨迹上的**契约**做断言，不是对轨迹打质量分 |
 | end-to-end / task success | behavior real（自然语言意图 → 真实工具选择）+ `inspect` 终态守卫（显式 `evidence: 'inspect'`） | 终态可查走确定性 verifier |
@@ -27,7 +27,7 @@ description: 概念对照——从主流 agent eval 叙事（dataset / metric / 
 | 不做 | 替代 |
 |---|---|
 | metric catalog / 打分 | matcher 契约断言 + `--report` 计数聚合 |
-| 内置 LLM 判卷 | 判分规程随 rubric 成文（答题人 / 判卷人分离），判卷对照答案钥匙执行 |
+| 自动评分 / verdict 门 | judge 第一道机器判读（`--judge`）预填人工栏目——判定记证据、不进退出码，人工栏目仍是权威记录 |
 | dashboard | `--format json` / `review-report.md` 机器字段 |
 | dataset hosting | case 即代码，随插件仓版本化 |
 | benchmark 排名 | release-readiness：报告回答「哪些插件契约绿 / 黄 / 红」 |

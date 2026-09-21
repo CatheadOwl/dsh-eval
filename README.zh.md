@@ -114,7 +114,7 @@ export default {
 |---|---|
 | [host-wiring](docs/host-wiring.md) | peer 接线（含 npm 古董 peer 坑）、构建 CLI、profile、模型选择、凭证、spawn 要求 |
 | [concepts](docs/concepts.md) | 主流 agent eval 概念对照：dataset / metric / LLM-as-judge / trajectory / CI 如何映射到 case / matcher / review（behavior 即 unittest 语义，判断冻结于写作时） |
-| [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则 |
+| [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则、机器 judge 第一道（`--judge`） |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig](docs/rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换、重述所需键） |

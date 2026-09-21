@@ -47,6 +47,51 @@ function toolBoundarySummary(attempts) {
 }
 
 /**
+ * Machine first-pass judge block (EVAL-033). Rendered as its own clearly
+ * labeled section between the reviewer conclusions and the human columns:
+ * the judge is a prefill instrument, the human sections below stay the
+ * authoritative record (R3 — "not fully automatic" is achieved by labeling,
+ * not by absence).
+ */
+function judgeSection(judge, profile) {
+  if (judge === undefined) return []
+  const lines = []
+  lines.push('## Judge first-pass (machine — prefill, not a verdict gate)')
+  lines.push('')
+  if (judge.status === 'not-executed') {
+    lines.push(`_Not executed: ${judge.reason ?? 'no judge dispatch happened'}._`)
+    lines.push('')
+    return lines
+  }
+  lines.push(`- status: ${judge.status}`)
+  lines.push(`- instrument: profile \`${judge.profile ?? profile ?? 'unknown'}\`${judge.judgedAt ? `, judged at ${judge.judgedAt}` : ''}`)
+  lines.push('- full output: `judge.txt` · parsed prefill: `judge.json`')
+  lines.push('')
+  if (judge.status === 'failed') {
+    lines.push(`_Judge dispatch failed: ${judge.error}._`)
+    lines.push('')
+    return lines
+  }
+  if (judge.status === 'unparsed') {
+    lines.push(`_Judge output did not follow the four-heading contract (missing: ${judge.missing?.join(', ')}) — raw output preserved in \`judge.txt\`; grade manually against the rubric._`)
+    lines.push('')
+    return lines
+  }
+  for (const [name, title] of [
+    ['Verdicts', '### Verdicts'],
+    ['Intentional design hits', '### Intentional design hits'],
+    ['New red flags', '### New red flags'],
+    ['Next step', '### Next step'],
+  ]) {
+    lines.push(title)
+    lines.push('')
+    lines.push(judge.sections?.[name]?.trim() || '_(empty)_')
+    lines.push('')
+  }
+  return lines
+}
+
+/**
  * Render the review report markdown.
  *
  * @param {object} parts
@@ -58,6 +103,11 @@ function toolBoundarySummary(attempts) {
  * @param {string} [parts.adapter] - adapter label (e.g. 'dsh-headless'); absent
  *   for a dry run.
  * @param {string} [parts.profile] - the profile the reviewers ran under.
+ * @param {object} [parts.judge] - machine first-pass judge accounting
+ *   (EVAL-033): one of `{ status: 'judged', sections, profile, judgedAt }`,
+ *   `{ status: 'unparsed', missing, profile, judgedAt }`,
+ *   `{ status: 'failed', error }`, or `{ status: 'not-executed', reason }`.
+ *   Absent for runs without the judge pass.
  * @returns {string} markdown report.
  */
 export function renderReviewReport(parts) {
@@ -122,19 +172,30 @@ export function renderReviewReport(parts) {
     }
   }
 
+  // Machine first-pass prefill (EVAL-033): its own labeled section, kept
+  // strictly separate from the human columns below — the human sections
+  // remain the authoritative record; the judge narrows what a human must
+  // read, it does not replace the reading.
+  lines.push(...judgeSection(parts.judge, parts.profile))
+  const machinePrefill = parts.judge?.status === 'judged'
+
   lines.push('## Intentional design hits (human judgment)')
   lines.push('')
-  lines.push('Reviewer flags that match an already-accepted trade-off. Cite the run and quote the flag.')
+  lines.push('Reviewer flags that match an already-accepted trade-off. Cite the run and quote the flag.'
+    + (machinePrefill ? ' Machine prefill in the judge section above — verify each against the rubric before checking it off.' : ''))
   lines.push('')
   lines.push('- [ ] ')
   lines.push('')
   lines.push('## New red flags (human judgment)')
   lines.push('')
-  lines.push('Flags NOT covered by the rubric or the intentional-design list. These are the actual findings.')
+  lines.push('Flags NOT covered by the rubric or the intentional-design list. These are the actual findings.'
+    + (machinePrefill ? ' Machine prefill in the judge section above — adjudicate the new-genuine ones; suspected-fixture ones usually want a fixture fix first.' : ''))
   lines.push('')
   lines.push('- [ ] ')
   lines.push('')
   lines.push('## Next step (pick one)')
+  lines.push('')
+  lines.push((machinePrefill ? 'The judge suggested a next step above — agree or override.' : 'Pick one:'))
   lines.push('')
   lines.push('- [ ] change plugin output')
   lines.push('- [ ] change rubric')

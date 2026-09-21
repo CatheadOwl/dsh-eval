@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { describe, it, test } from 'node:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { createDshHeadlessReviewExecutor } from '../src/adapters/dsh/review.mjs'
 import {
+  buildJudgeTask,
   defineReviewExperiment,
   executeReviewExperiment,
+  executeReviewJudge,
+  JUDGE_OUTPUT_SECTIONS,
+  loadRubricText,
   materializeReviewExperiment,
+  parseJudgeOutput,
   renderObservationSections,
 } from '../src/experiment/review.mjs'
 
@@ -394,4 +400,80 @@ test('records a checked tool boundary on the result when the trace exists', asyn
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+describe('review judge primitives (EVAL-033)', () => {
+  it('builds a judge task carrying the rubric, the observations, and every answer', () => {
+    const task = buildJudgeTask({
+      rubricText: '# Answer key\n\ndepth is relative to the anchor.',
+      observations: '## Hops\n\nhop-1 output',
+      answers: ['first reviewer answer', 'second reviewer answer'],
+    })
+    assert.match(task, /Answer key \(hidden grading standard — the reviewers never saw this\)[\s\S]*depth is relative to the anchor/)
+    assert.match(task, /## Observations[\s\S]*hop-1 output/)
+    assert.match(task, /### run 1\nfirst reviewer answer/)
+    assert.match(task, /### run 2\nsecond reviewer answer/)
+    for (const heading of JUDGE_OUTPUT_SECTIONS) assert.match(task, new RegExp(`## ${heading}`))
+  })
+
+  it('refuses judge tasks with empty rubric, observations, or answers', () => {
+    assert.throws(() => buildJudgeTask({ rubricText: '', observations: 'o', answers: ['a'] }), /rubricText/)
+    assert.throws(() => buildJudgeTask({ rubricText: 'r', observations: ' ', answers: ['a'] }), /observations/)
+    assert.throws(() => buildJudgeTask({ rubricText: 'r', observations: 'o', answers: [] }), /answers/)
+  })
+
+  it('parses a contract-following judge output into four sections', () => {
+    const raw = [
+      '## Verdicts', 'run 1: understood depth relativity.', '',
+      '## Intentional design hits', '- `[truncated: N]` counting (run 1).', '',
+      '## New red flags', '- none.', '',
+      '## Next step', 'no action.',
+    ].join('\n')
+    const parsed = parseJudgeOutput(raw)
+    assert.equal(parsed.status, 'judged')
+    assert.match(parsed.sections.Verdicts, /understood depth relativity/)
+    assert.match(parsed.sections['Intentional design hits'], /truncated/)
+    assert.match(parsed.sections['New red flags'], /none/)
+    assert.match(parsed.sections['Next step'], /no action/)
+  })
+
+  it('reports unparsed output with the missing headings, never as a pass', () => {
+    const parsed = parseJudgeOutput('## Verdicts\nfine.\n\n## New red flags\n- none.')
+    assert.equal(parsed.status, 'unparsed')
+    assert.deepEqual(parsed.missing, ['Intentional design hits', 'Next step'])
+  })
+
+  it('loads the rubric from a path, a file URL, or an inline string — and refuses other URL protocols', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'judge-rubric-'))
+    try {
+      const rubricPath = join(dir, 'rubric.md')
+      writeFileSync(rubricPath, '# key\ninline file rubric', 'utf8')
+      assert.equal(loadRubricText(rubricPath), '# key\ninline file rubric')
+      assert.equal(loadRubricText(pathToFileURL(rubricPath)), '# key\ninline file rubric')
+      assert.equal(loadRubricText('inline rubric text\nsecond line'), 'inline rubric text\nsecond line')
+      assert.throws(() => loadRubricText(new URL('https://example.invalid/rubric.md')), /file: only/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('executes the judge through the same executor and never throws on unparsed output', async () => {
+    const experiment = defineReviewExperiment({
+      id: 'judged-review',
+      prompt,
+      rubric: 'inline key text',
+      async observe() { return [{ heading: 'Evidence', entries: [{ heading: 'only', paragraphs: ['x'] }] }] },
+    })
+    const calls = []
+    const judgeRun = await executeReviewJudge(experiment, async (task, context) => {
+      calls.push({ task, context })
+      return { answer: '## Verdicts\nok\n\n## Intentional design hits\n- none\n\n## New red flags\n- none\n\n## Next step\nno action' }
+    }, { observations: 'obs', answers: ['a1'] })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].context.judgePass, true)
+    assert.equal(calls[0].context.experimentId, 'judged-review')
+    assert.equal(judgeRun.parsed.status, 'judged')
+    assert.match(judgeRun.task, /inline key text/)
+    assert.ok(judgeRun.judgedAt)
+  })
 })

@@ -10,8 +10,8 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { materializeReviewExperiment } from '../src/experiment/review.mjs'
-import { runDshReviewExperiment } from '../src/adapters/dsh/review.mjs'
+import { materializeReviewExperiment, executeReviewExperiment, executeReviewJudge } from '../src/experiment/review.mjs'
+import { createDshHeadlessReviewExecutor } from '../src/adapters/dsh/review.mjs'
 import { discoverFiles } from '../src/discovery.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
 import { resolveDshCliChain } from '../src/cli.mjs'
@@ -19,10 +19,12 @@ import { renderReviewReport } from '../src/review-report.mjs'
 
 function usage(error) {
   const message = [
-    'usage: dsh-review [--dry-run] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] [--keep-plugin-rows] <*.review.mjs or directories...>',
+    'usage: dsh-review [--dry-run] [--judge] [--runs N] [--profile NAME (default: headless) --repo DIR] [--timeout MS] [--keep-plugin-rows] <*.review.mjs or directories...>',
     '       --profile/--repo may come from a dsh-eval.config.mjs found upward from cwd; flags override it.',
     '       blank environment by default: every out-of-tree plugin row in the staged profile is disabled;',
     '       --keep-plugin-rows opts back into the host profile plugin face (e.g. reviewing a plugin\'s own gates).',
+    '       --judge adds a machine first-pass grading dispatch (one more model run that sees the rubric,',
+    '       the observations, and every reviewer answer); it prefills the report, never gates the exit code.',
   ].join('\n')
   if (error) process.stderr.write(`${error}\n${message}\n`)
   else process.stdout.write(`${message}\n`)
@@ -30,11 +32,12 @@ function usage(error) {
 }
 
 function parseArgs(argv) {
-  const options = { dryRun: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined, keepPluginRows: false }
+  const options = { dryRun: false, judge: false, runs: undefined, timeoutMs: undefined, profile: undefined, repo: undefined, keepPluginRows: false }
   const paths = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--dry-run') { options.dryRun = true; continue }
+    if (arg === '--judge') { options.judge = true; continue }
     if (arg === '--runs') { options.runs = Number(argv[++index]); continue }
     if (arg === '--profile') { options.profile = argv[++index]; continue }
     if (arg === '--repo') { options.repo = argv[++index]; continue }
@@ -44,6 +47,7 @@ function parseArgs(argv) {
     paths.push(arg)
   }
   if (paths.length === 0) usage('error: at least one review experiment path is required')
+  if (options.judge && options.dryRun) usage('error: --judge requires a real run (dry-run invokes no model)')
   if (options.runs !== undefined && (!Number.isInteger(options.runs) || options.runs < 1)) usage('error: --runs must be a positive integer')
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)) usage('error: --timeout must be a positive integer')
   return { options, paths }
@@ -66,7 +70,7 @@ function artifactDir(experiment) {
   return join(dirname(experiment.__file), '.runs', experiment.id)
 }
 
-function writeMaterialized(experiment, materialized, extra = {}, reviewResult = undefined) {
+function writeMaterialized(experiment, materialized, extra = {}, reviewResult = undefined, judge = undefined) {
   const output = artifactDir(experiment)
   // Fresh-run semantics: wipe before writing, so an execution with fewer runs
   // never leaves a previous execution's run-N files looking current. The dir
@@ -87,6 +91,7 @@ function writeMaterialized(experiment, materialized, extra = {}, reviewResult = 
     observations: materialized.observations,
     adapter: extra.adapter,
     profile: extra.profile,
+    judge,
   }), 'utf8')
   return output
 }
@@ -128,17 +133,57 @@ for (const file of files) {
     }
 
     process.stdout.write(`RUN  ${experiment.id} (${options.runs ?? experiment.defaultRuns} reviews)...\n`)
-    const result = await runDshReviewExperiment(experiment, {
+    // One executor instance serves the reviewer dispatches AND the judge
+    // dispatch (same blank environment, same profile — the judge differs
+    // only in what it sees: the rubric, which the reviewers never saw).
+    const executor = createDshHeadlessReviewExecutor({
       profile,
       cliPath: cli.cliPath,
-      runs: options.runs,
       timeoutMs: options.timeoutMs,
       keepPluginRows: options.keepPluginRows,
     })
+    const result = await executeReviewExperiment(experiment, executor, { runs: options.runs })
+
+    // Machine first-pass judge (EVAL-033): one more dispatch through the
+    // same executor, seeing rubric + observations + every successful
+    // answer. Judge trouble is ACCOUNTED, never exit-code-relevant: the
+    // verdict is evidence (review never gates CI), and "the judge pass did
+    // not produce a prefill" must look exactly like that in the artifacts.
+    let judge
+    let judgeRaw
+    if (options.judge) {
+      const answers = result.attempts.filter(attempt => attempt.ok)
+        .map(attempt => attempt.result?.answer ?? attempt.result?.stdout ?? '')
+        .filter(answer => answer !== '')
+      if (answers.length === 0) {
+        judge = { status: 'not-executed', reason: 'no successful reviewer run to grade' }
+      } else {
+        try {
+          const judgeRun = await executeReviewJudge(experiment, executor, {
+            observations: result.observations,
+            answers,
+          })
+          judge = { ...judgeRun.parsed, profile, judgedAt: judgeRun.judgedAt }
+          judgeRaw = judgeRun.raw
+        } catch (error) {
+          judge = { status: 'failed', error: error instanceof Error ? error.message : String(error) }
+        }
+      }
+      if (judge.status !== 'judged') {
+        process.stderr.write(`WARN ${experiment.id}: judge pass ${judge.status}`
+          + (judge.missing ? ` (missing sections: ${judge.missing.join(', ')})` : '')
+          + (judge.error ? ` (${judge.error})` : '')
+          + (judge.reason ? ` (${judge.reason})` : '') + '\n')
+      }
+    }
+
     const output = writeMaterialized(experiment, result, {
       adapter: 'dsh-headless',
       profile,
       runs: result.runs,
+      // Machine-readable judge accounting: judged / unparsed / failed /
+      // not-executed — same shape the report renders in prose.
+      ...(judge === undefined ? {} : { judge: { status: judge.status, profile, ...(judge.judgedAt ? { judgedAt: judge.judgedAt } : {}) } }),
       // Machine-readable boundary accounting per run: `checked` (the request
       // headers were inspected) vs `not-executed` (no session artifact, so the
       // reviewer's tool face was never verified) — the report and run-N.txt
@@ -148,7 +193,15 @@ for (const file of files) {
         status: attempt.result?.toolValidation?.status ?? 'not-reported',
         ...(attempt.result?.traceGap === undefined ? {} : { reason: attempt.result.traceGap }),
       })),
-    }, result)
+    }, result, judge)
+    // Parsed judge prefill lands in run artifacts beside the raw output:
+    // judge.json is what a triage consumer reads first, judge.txt the
+    // verbatim instrument output behind it (written after writeMaterialized —
+    // it wipes the artifact dir on entry).
+    if (judge !== undefined) {
+      writeFileSync(join(output, 'judge.json'), JSON.stringify(judge, null, 2), 'utf8')
+      if (judgeRaw !== undefined) writeFileSync(join(output, 'judge.txt'), judgeRaw, 'utf8')
+    }
     for (const attempt of result.attempts) {
       const payload = attempt.result ?? {}
       // run-N.txt is the reviewer's ANSWER (trace-derived, splice-proof),
