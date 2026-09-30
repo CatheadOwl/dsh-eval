@@ -10,6 +10,13 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+### Fixed
+
+- discovery test re-points the repo corpus case at its post-2026-09-01
+  location (`extras/modules/enrichment/eval/behavior/mock/` — the prompt
+  module was absorbed into enrichment); stale path broke the suite on fresh
+  checkouts.
+
 ### Added
 
 - **`dsh-review --judge`: machine first-pass grading for comprehension review.**
