@@ -10,6 +10,21 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+### Changed
+
+- **Session-log parsing tracks the host's current format generation (v4).**
+  `KNOWN_SESSION_FORMAT_VERSIONS` moves from v3 to v4 together with the
+  six-projection re-verification; stale v3 artifacts no longer parse (fresh
+  runs are unaffected — eval only reads the artifacts its own runs write
+  through the staged host).
+- **Source matchers and injection classification read v4 producer-owned
+  sources.** `userMessageTextIncludes` / `userMessageTextExcludes` match
+  `source.kind` (e.g. `'gates'`, `'enrichment'`) instead of the retired
+  `source.plugin` wrapper; `answerText` cuts at the first formless non-user
+  injection landing after the first substantive assistant text (declared
+  context forms and pre-answer setup no longer cut the answer chain); the
+  mock-determinism hint names formless injectors the same way.
+
 ### Fixed
 
 - discovery test re-points the repo corpus case at its post-2026-09-01

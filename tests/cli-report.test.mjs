@@ -32,9 +32,9 @@ const rawRoot = overlay.match(/^\\s*root:\\s*(.+)$/mu)[1].trim()
 const sessionsRoot = rawRoot.replace(/^["']|["']$/gu, '')
 mkdirSync(sessionsRoot, { recursive: true })
 writeFileSync(
-  sessionsRoot + '/session.v3.jsonl',
+  sessionsRoot + '/session.v4.jsonl',
   [
-    JSON.stringify({ type: 'session', version: 3, id: 'session-fake' }),
+    JSON.stringify({ type: 'session', version: 4, id: 'session-fake' }),
     JSON.stringify({ seq: 1, type: 'user/message', data: { message: { role: 'user', content: [] } } }),
     JSON.stringify({ seq: 2, type: 'tool/call', data: { turn: 1, step: 1, toolName: 'renamed', arguments: '{}' } }),
     JSON.stringify({ seq: 3, type: 'assistant/message', data: { turn: 1, step: 1, message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] } } }),

@@ -175,9 +175,9 @@ const task = process.argv.at(-1)
 const text = task.includes('fail-arm') ? 'no tag here' : 'tag=' + tag + ' keep=' + keep
 mkdirSync(sessionsRoot, { recursive: true })
 writeFileSync(
-  sessionsRoot + '/session.v3.jsonl',
+  sessionsRoot + '/session.v4.jsonl',
   [
-    JSON.stringify({ type: 'session', version: 3, id: 'session-fake' }),
+    JSON.stringify({ type: 'session', version: 4, id: 'session-fake' }),
     JSON.stringify({ seq: 1, type: 'assistant/message', data: { turn: 1, step: 1, message: { role: 'assistant', content: [{ type: 'text', text }] } } }),
     JSON.stringify({ seq: 2, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
   ].join('\\n') + '\\n',

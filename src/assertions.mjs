@@ -44,14 +44,16 @@ function nameMatches(matcher, name) {
 
 /**
  * Whether a message `source` satisfies a source matcher. A string or RegExp
- * matches `source.plugin` (the producer name — e.g. `'gates'` for steer);
- * a function receives the full `source` object (for `kind`-based matching).
+ * matches `source.kind` (the producer's own kind — e.g. `'gates'` for steer,
+ * `'enrichment'` for injections; format-v4 producer-owned attribution);
+ * a function receives the full `source` object (for `form`- or
+ * field-based matching).
  */
 function sourceMatches(matcher, source) {
   if (typeof matcher === 'function') return matcher(source) === true
-  const plugin = source?.plugin
-  if (matcher instanceof RegExp) return typeof plugin === 'string' && matcher.test(plugin)
-  return plugin === matcher
+  const kind = source?.kind
+  if (matcher instanceof RegExp) return typeof kind === 'string' && matcher.test(kind)
+  return kind === matcher
 }
 
 /** Render a source matcher for diagnostics. */
@@ -454,9 +456,10 @@ export function subagentCompleted(matcher) {
 
 /**
  * A user message from a source matching `sourceMatcher` contains `substring`.
- * Source matcher: string/RegExp against `source.plugin`, or a predicate over
- * the full `source`. This is how a case asserts plugin steer — a `user/message`
- * with a plugin source — separately from the task prompt (`kind: 'user'`).
+ * Source matcher: string/RegExp against `source.kind` (the producer's own
+ * kind), or a predicate over the full `source`. This is how a case asserts
+ * plugin steer — a `user/message` with a producer source — separately from
+ * the task prompt (`kind: 'user'`).
  */
 export function userMessageTextIncludes(sourceMatcher, substring) {
   return {

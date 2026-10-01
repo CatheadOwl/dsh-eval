@@ -6,7 +6,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 全部从包根导入：`import { toolCalled, … } from '@catheadowl/dsh-eval'`。
 
-断言对象是 dsh session 事件投影（`EvalTrace`，**仅会话格式 v3**——旧代际在解析入口拒绝），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具（输入面），`systemMessages` / `systemPrompt` 投影组装后 system prompt（v3 面事件折叠），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
+断言对象是 dsh session 事件投影（`EvalTrace`，**仅当前会话格式代**——其余代际在解析入口拒绝），不只是「模型产出」：`requestHeaders` 投影模型被挂载的工具（输入面），`systemMessages` / `systemPrompt` 投影组装后 system prompt（面事件折叠），`userMessages` 投影 user-role 的模型可见输入面（任务 prompt、插件 steer、注入上下文）——这让 mock 能断言插件的**驱动级 steer**，而不只断工具选择或最终文本。
 
 ## EvalTrace 形状（谓词与 `result.trace` 共用）
 
@@ -16,9 +16,9 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `toolResults` | `{ seq, turn, step, callId, text, error?, isError? }[]`（与 `toolCalls` 按 `callId` 配对） |
 | `assistantTexts` | `string[]` 非空组装 assistant 文本，按日志序 |
 | `finalText` | 最后一个组装 assistant 文本（无则 `''`） |
-| `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，插件 steer `{ kind: 'plugin', plugin }`） |
+| `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，steer/注入为 v4 producer-owned 形状 `{ kind: '<生产方>' }`——如 `{ kind: 'gates' }`、`{ kind: 'enrichment' }`，无共享 `plugin` 包裹；上下文类注入自带 `form` 字段，如 runtime-context 的 `{ kind: 'runtime-context', form: 'snapshot' }`） |
 | `requestHeaders` | `{ seq, reason, toolNames }[]`（挂载工具名与 request reason；v3 起 header **不带** system 字段，prompt 一律读 `systemMessages` / `systemPrompt`） |
-| `systemMessages` / `systemPrompt` | v3 的 system prompt 面：`{ seq, text }[]` 存活 `system/message` 节点（append/replace 面折叠、按面序）+ 有效 prompt（存活节点最后一个非空，无则 `''`） |
+| `systemMessages` / `systemPrompt` | system prompt 面：`{ seq, text }[]` 存活 `system/message` 节点（append/replace 面折叠、按面序）+ 有效 prompt（存活节点最后一个非空，无则 `''`） |
 | `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
 | `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, projectionFieldGaps, subagent: { mainLogDescriptorEvents, supportedDescriptors, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
 | `sessions` / `sessionId` | 原始解析结果 `{ header, events }[]` 与主 session id |
@@ -42,9 +42,9 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 ## 模型可见面（输入侧）
 
-- `systemPromptIncludes(substring)`：组装后的 system prompt 含子串，读 v3 `system/message` 面事件折叠（`systemPrompt`）。面事件**不存在**时响亮失败（渠道空置，不读作「prompt 缺子串」）——守卫因此能区分「没写进 prompt」与「根本看不到 prompt」；
+- `systemPromptIncludes(substring)`：组装后的 system prompt 含子串，读 `system/message` 面事件折叠（`systemPrompt`）。面事件**不存在**时响亮失败（渠道空置，不读作「prompt 缺子串」）——守卫因此能区分「没写进 prompt」与「根本看不到 prompt」；
 - `toolMounted(name)`：工具出现在某个 request/header 的挂载列表；
-- `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `plugin` 名（如 steer 生产方），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（插件 steer 为 `{ kind: 'plugin', plugin: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
+- `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `kind`（生产方自己的 kind，如 steer 生产方 `'gates'`），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（steer/注入为 v4 producer-owned `{ kind: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
 
 ## 派发面（子 agent）
 

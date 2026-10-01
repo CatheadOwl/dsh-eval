@@ -280,8 +280,8 @@ test('fails on tool boundary violation when session trace shows unexpected tools
       "const home = process.env.DSH_HOME",
       "const dir = join(home, 'sessions')",
       "mkdirSync(dir, { recursive: true })",
-      "writeFileSync(join(dir, 'session.v3.jsonl'),",
-      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
+      "writeFileSync(join(dir, 'session.v4.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":4,\"id\":\"s1\"}\\n'",
       "  + '{\"seq\":0,\"type\":\"request/header\",\"data\":{\"reason\":\"initial\",\"header\":{\"system\":\"s\",\"tools\":[{\"name\":\"coggit_status\"}]}}}\\n')",
       '',
     ].join('\n'))
@@ -318,18 +318,18 @@ test('captures the trace-derived answer when a tail interaction hijacks the fina
     const cli = join(root, 'fake-cli.mjs')
     // The fake CLI prints the (hijacked) final message to stdout — the host
     // headless behavior — and writes a session log where the analysis
-    // precedes a plugin-sourced gate complaint.
+    // precedes a producer-sourced gate complaint (format-v4 kind face).
     writeFileSync(cli, [
       "import { mkdirSync, writeFileSync } from 'node:fs'",
       "import { join } from 'node:path'",
       "console.log('cannot fix the gate error')",
       "const dir = join(process.env.DSH_HOME, 'sessions')",
       "mkdirSync(dir, { recursive: true })",
-      "writeFileSync(join(dir, 'session.v3.jsonl'),",
-      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
+      "writeFileSync(join(dir, 'session.v4.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":4,\"id\":\"s1\"}\\n'",
       "  + '{\"seq\":1,\"type\":\"user/message\",\"data\":{\"content\":[{\"type\":\"text\",\"text\":\"analyze\"}],\"source\":{\"kind\":\"user\"}}}\\n'",
       "  + '{\"seq\":2,\"type\":\"assistant/message\",\"data\":{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"the analysis\"}]}}}\\n'",
-      "  + '{\"seq\":3,\"type\":\"user/message\",\"data\":{\"content\":[{\"type\":\"text\",\"text\":\"doc-link failed\"}],\"source\":{\"kind\":\"plugin\",\"plugin\":\"gates\"}}}\\n'",
+      "  + '{\"seq\":3,\"type\":\"user/message\",\"data\":{\"content\":[{\"type\":\"text\",\"text\":\"doc-link failed\"}],\"source\":{\"kind\":\"gates\"}}}\\n'",
       "  + '{\"seq\":4,\"type\":\"assistant/message\",\"data\":{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"cannot fix the gate error\"}]}}}\\n')",
       '',
     ].join('\n'))
@@ -389,8 +389,8 @@ test('records a checked tool boundary on the result when the trace exists', asyn
       "console.log('the answer')",
       "const dir = join(process.env.DSH_HOME, 'sessions')",
       "mkdirSync(dir, { recursive: true })",
-      "writeFileSync(join(dir, 'session.v3.jsonl'),",
-      "  '{\"type\":\"session\",\"version\":3,\"id\":\"s1\"}\\n'",
+      "writeFileSync(join(dir, 'session.v4.jsonl'),",
+      "  '{\"type\":\"session\",\"version\":4,\"id\":\"s1\"}\\n'",
       "  + '{\"seq\":0,\"type\":\"request/header\",\"data\":{\"reason\":\"initial\",\"header\":{\"system\":\"s\",\"tools\":[]}}}\\n')",
       '',
     ].join('\n'))

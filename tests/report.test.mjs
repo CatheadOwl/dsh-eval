@@ -88,30 +88,30 @@ describe('mockDeterminismHint', () => {
   const finalTextFailure = ["final text includes: 'done': final text does not include 'done'; final text: \"eval-mock: script exhausted after 4 step(s)\""]
   const traceWith = sources => ({ userMessages: sources.map((source, i) => ({ seq: i, source, text: 'x' })) })
 
-  it('names the non-host injector plugins and both framework-native exits', () => {
+  it('names the formless injector producers and both framework-native exits', () => {
     const hint = mockDeterminismHint({
       trace: traceWith([
         { kind: 'user' },
-        { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
-        { kind: 'skill-catalog' },
-        { kind: 'plugin', plugin: 'gates' },
-        { kind: 'plugin', plugin: 'gates' },
+        { kind: 'runtime-context', form: 'snapshot', sections: [] },
+        { kind: 'skill-catalog', form: 'catalog', entries: [] },
+        { kind: 'gates' },
+        { kind: 'gates' },
       ]),
       failures: finalTextFailure,
     })
-    assert.match(hint, /non-host plugin\(s\) 'gates'/)
+    assert.match(hint, /formless non-'user' producer\(s\) 'gates'/)
     assert.match(hint, /disableRows: \['gates'\]/)
     assert.match(hint, /assistantTextIncludes/)
   })
 
-  it('stays silent without a terminal-text failure or without non-host injections', () => {
+  it('stays silent without a terminal-text failure or without formless injections', () => {
     const trace = traceWith([
       { kind: 'user' },
-      { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
-      { kind: 'plugin', plugin: 'gates' },
+      { kind: 'runtime-context', form: 'snapshot', sections: [] },
+      { kind: 'gates' },
     ])
     assert.equal(mockDeterminismHint({ trace, failures: ['toolCalled: x'] }), undefined)
-    assert.equal(mockDeterminismHint({ trace: traceWith([{ kind: 'user' }, { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }]), failures: finalTextFailure }), undefined)
+    assert.equal(mockDeterminismHint({ trace: traceWith([{ kind: 'user' }, { kind: 'runtime-context', form: 'snapshot', sections: [] }]), failures: finalTextFailure }), undefined)
     assert.equal(mockDeterminismHint({ trace: undefined, failures: finalTextFailure }), undefined)
   })
 })

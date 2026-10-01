@@ -38,18 +38,18 @@ describe('parseSessionLog', () => {
   })
 
   // The header stamp is the host's declaration of the artifact's generation.
-  // The parser is format-v3 only: an older stamp is refused exactly like an
-  // unknown one (EVAL-020 admission + the v3-only design rule — no
-  // legacy-format compatibility).
-  it('accepts v3 and refuses older or unknown generations by their number', () => {
+  // The parser tracks the current generation only: any other stamp — older
+  // or unknown — is refused the same way (EVAL-020 admission + the
+  // no-legacy-compat design rule).
+  it('accepts the current generation and refuses older or unknown ones by their number', () => {
     const header = version => `{"type":"session","version":${version},"id":"s"}\n`
     for (const version of KNOWN_SESSION_FORMAT_VERSIONS) {
       assert.doesNotThrow(() => parseSessionLog(header(version)), `v${version} must be accepted`)
     }
-    for (const version of [0, 1, 2, 4]) {
+    for (const version of [0, 1, 2, 3, 5]) {
       assert.throws(
         () => parseSessionLog(header(version)),
-        new RegExp(`session header version v${version} is not a known generation \\(known: v3\\); the host session format may have changed generation`),
+        new RegExp(`session header version v${version} is not a known generation \\(known: v4\\); the host session format may have changed generation`),
         `v${version} must be refused`,
       )
     }
@@ -79,25 +79,25 @@ describe('buildTrace', () => {
     assert.equal(headerTrace.requestHeaders[0].reason, 'initial')
     assert.equal('system' in headerTrace.requestHeaders[0], false, 'the pre-v3 header.system channel is gone from the projection')
     assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'subagent_at'])
-    // The prompt itself is read from the v3 system/message fold.
+    // The prompt itself is read from the system/message fold.
     assert.ok(headerTrace.systemPrompt.includes('subagent_at'))
   })
 
-  // Format v3 moved the assembled prompt out of request/header into streaming
+  // The format moved the assembled prompt out of request/header into streaming
   // system/message surface events; the projection folds them instead of
   // reading a header field that no longer exists (2026-09-14 seam).
-  it('folds v3 system/message nodes and takes the last non-empty as the effective prompt', () => {
+  it('folds system/message nodes and takes the last non-empty as the effective prompt', () => {
     const promptTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'system-prompt-session.jsonl'), 'utf8'))])
     assert.deepEqual(promptTrace.systemMessages.map(node => node.seq), [2])
     assert.ok(promptTrace.systemMessages[0].text.includes('cognition-link directive'))
     assert.equal(promptTrace.systemPrompt, promptTrace.systemMessages[0].text)
-    // The v3 header carries no system field and that is NOT a gap.
+    // The header carries no system field and that is NOT a gap.
     assert.equal('system' in promptTrace.requestHeaders[0], false)
     assert.deepEqual(promptTrace.census.projectionFieldGaps, {})
   })
 
   it('folds an in-history append: the newest non-empty node is the effective prompt', () => {
-    const log = '{"type":"session","version":3,"id":"session-history"}'
+    const log = '{"type":"session","version":4,"id":"session-history"}'
       + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v1"}]}},"surfaceOp":"append"}'
       + '\n{"seq":2,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
       + '\n{"seq":4,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v2 with directive"}]}},"surfaceOp":"append"}'
@@ -107,7 +107,7 @@ describe('buildTrace', () => {
   })
 
   it('folds a replacing system/message: the shadowed node stops surviving', () => {
-    const log = '{"type":"session","version":3,"id":"session-replace"}'
+    const log = '{"type":"session","version":4,"id":"session-replace"}'
       + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v1"}]}},"surfaceOp":"append"}'
       + '\n{"seq":2,"type":"request/header","data":{"reason":"change","header":{"config":{"provider":"p","model":"m"}}}}'
       + '\n{"seq":4,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"prompt v2"}]}},"surfaceOp":{"op":"replace","startSeq":1,"endSeq":1},"sourceEventSeqs":[1]}'
@@ -122,7 +122,7 @@ describe('buildTrace', () => {
   })
 
   it('folds a compaction replace from a non-system event shadowing a later system node', () => {
-    const log = '{"type":"session","version":3,"id":"session-compaction"}'
+    const log = '{"type":"session","version":4,"id":"session-compaction"}'
       + '\n{"seq":1,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"node zero"}]}},"surfaceOp":"append"}'
       + '\n{"seq":2,"type":"system/message","data":{"message":{"role":"system","content":[{"type":"text","text":"later in-history node"}]}},"surfaceOp":"append"}'
       + '\n{"seq":3,"type":"user/message","data":{"content":[{"type":"text","text":"task"}],"source":{"kind":"user"},"role":"user"},"surfaceOp":"append"}'
@@ -134,17 +134,17 @@ describe('buildTrace', () => {
     assert.equal(built.systemPrompt, 'node zero')
   })
 
-  it('census: a v3 run with requests but no prompt surface records promptSurfaceAbsent', () => {
-    const log = '{"type":"session","version":3,"id":"session-noprompt"}'
+  it('census: a run with requests but no prompt surface records promptSurfaceAbsent', () => {
+    const log = '{"type":"session","version":4,"id":"session-noprompt"}'
       + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
     const built = buildTrace([parseSessionLog(log)])
     assert.deepEqual(built.census.projectionFieldGaps, { promptSurfaceAbsent: 1 })
   })
 
-  it('refuses a pre-v3 log at admission instead of projecting it', () => {
+  it('refuses a prior-generation log at admission instead of projecting it', () => {
     const v0 = '{"type":"session","version":0,"id":"session-v0"}'
       + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
-    assert.throws(() => buildTrace([parseSessionLog(v0)]), /is not a known generation \(known: v3\)/)
+    assert.throws(() => buildTrace([parseSessionLog(v0)]), /is not a known generation \(known: v4\)/)
   })
 
   it('projects an empty requestHeaders list when no request/header event exists', () => {
@@ -183,16 +183,51 @@ describe('buildTrace', () => {
     assert.equal(steerTrace.userMessages.length, 2)
     assert.deepEqual(steerTrace.userMessages[0].source, { kind: 'user' })
     assert.equal(steerTrace.userMessages[0].text, 'write task-a.md')
-    assert.deepEqual(steerTrace.userMessages[1].source, { kind: 'plugin', plugin: 'gates' })
+    assert.deepEqual(steerTrace.userMessages[1].source, { kind: 'gates' })
     assert.ok(steerTrace.userMessages[1].text.includes('task-a.md'))
   })
 
-  it('derives answerText as the last assistant text before a plugin injection', () => {
-    // steer-session: assistant "done" → gates splice → assistant "fixed the
-    // link". finalText is the post-splice message; the ANSWER is "done".
+  it('derives answerText as the last assistant text before a hijacking injection', () => {
+    // steer-session: assistant "done" → gates splice (formless, after the
+    // first substantive text) → assistant "fixed the link". finalText is
+    // the post-splice message; the ANSWER is "done".
     const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
     assert.equal(steerTrace.finalText, 'fixed the link')
     assert.equal(steerTrace.answerText, 'done')
+  })
+
+  it('does not let form-declared or pre-answer injections cut the answer chain', () => {
+    // Format v4 producer-owned sources have no catch-all injection kind, so
+    // the hijack predicate leans on what the log still tells: a declared
+    // context `form` is a riding context (runtime-context snapshot, skill
+    // catalog), and anything before the first substantive assistant text is
+    // task setup — neither re-opens the conversation. Only a formless
+    // attributed injection AFTER the first text does (previous test).
+    const header = '{"type":"session","version":4,"id":"session-guard"}'
+    const userMessage = (seq, source) => JSON.stringify({ seq, type: 'user/message', data: { role: 'user', content: [{ type: 'text', text: 'ctx ' + seq }], source } })
+    const assistant = (seq, text) => JSON.stringify({ seq, type: 'assistant/message', data: { message: { role: 'assistant', content: [{ type: 'text', text }] } } })
+    const log = [
+      header,
+      userMessage(1, { kind: 'user' }),
+      userMessage(2, { kind: 'runtime-context', form: 'snapshot', sections: [] }),
+      userMessage(3, { kind: 'skill-catalog', form: 'catalog', entries: [] }),
+      userMessage(4, { kind: 'enrichment' }),
+      assistant(5, 'the answer'),
+      userMessage(6, { kind: 'runtime-context', form: 'snapshot', sections: [] }),
+      assistant(7, 'still the answer refreshed'),
+    ].join('\n')
+    const guardTrace = buildTrace([parseSessionLog(log)])
+    assert.equal(guardTrace.answerText, 'still the answer refreshed')
+    // Same log minus the riding forms: the formless pre-answer injection at
+    // seq 4 still does not cut (nothing substantive preceded it), but the
+    // model's only text is the answer.
+    const logNoForms = [
+      header,
+      userMessage(1, { kind: 'user' }),
+      userMessage(4, { kind: 'enrichment' }),
+      assistant(5, 'done'),
+    ].join('\n')
+    assert.equal(buildTrace([parseSessionLog(logNoForms)]).answerText, 'done')
   })
 
   it('degenerates answerText to finalText without plugin injections', () => {
@@ -277,9 +312,9 @@ describe('buildTrace', () => {
   // record lands whatever its fields say — so a moved payload field needs its
   // own signal, or the census stays blind to the rename path it was built for.
   it('census reports a kept record whose field went missing', () => {
-    // On v3 a header never carries `system`; the moved-field signals here are
+    // A header never carries `system`; the moved-field signals here are
     // the tool-face renames plus the nameless mounted tool entry.
-    const log = '{"type":"session","version":3,"id":"session-drift"}'
+    const log = '{"type":"session","version":4,"id":"session-drift"}'
       + '\n{"seq":1,"type":"tool/call","data":{"turn":1,"step":1,"toolName":"renamed","arguments":"{}"}}'
       + '\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"user","content":[]}}}'
       + '\n{"seq":3,"type":"request/header","data":{"header":{"reason":"initial","tools":[{"description":"no name"}]}}}'
@@ -302,11 +337,11 @@ describe('buildTrace', () => {
   })
 
   it('census reports main-log drops, dropped child identity and unprojected event types apart', () => {
-    const main = '{"type":"session","version":3,"id":"session-main"}'
+    const main = '{"type":"session","version":4,"id":"session-main"}'
       + '\n{"seq":1,"type":"user/message","data":{"message":{"role":"user","content":[]}}}'
       + '\n{"seq":2,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-1","toolName":"renamed"}}'
       + '\n{"seq":3,"type":"step/end","data":{"turn":1,"step":1}}'
-    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+    const child = '{"type":"session","version":4,"id":"session-child","parentSession":"session-main"}'
       + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":2,"label":"legacy"}}'
     const census = buildTrace([parseSessionLog(main), parseSessionLog(child)]).census
 
@@ -343,8 +378,8 @@ describe('buildTrace', () => {
   // label-keyed count matchers, so `*Count(label, 0)` stays vacuously green
   // even though `supportedDescriptors` looks healthy.
   it('census flags a child whose label is missing even when other identity fields folded', () => {
-    const main = '{"type":"session","version":3,"id":"session-main"}'
-    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+    const main = '{"type":"session","version":4,"id":"session-main"}'
+    const child = '{"type":"session","version":4,"id":"session-child","parentSession":"session-main"}'
       + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":3,"mode":"one-shot","provider":"p"}}'
     const built = buildTrace([parseSessionLog(main), parseSessionLog(child)])
     const census = built.census
@@ -365,7 +400,7 @@ describe('buildTrace', () => {
   // function) or swallows the key through the `__proto__` setter — either way the
   // census stops being numbers about events.
   it('census counts prototype-named event types as numbers', () => {
-    const log = '{"type":"session","version":3,"id":"session-proto"}'
+    const log = '{"type":"session","version":4,"id":"session-proto"}'
       + '\n{"seq":1,"type":"constructor","data":{}}'
       + '\n{"seq":2,"type":"toString","data":{}}'
       + '\n{"seq":3,"type":"__proto__","data":{}}'
@@ -382,8 +417,8 @@ describe('buildTrace', () => {
   // EVENTS, not child sessions: a child may log several supported descriptors
   // while its identity still folds from the first one only.
   it('census sums descriptor events per child, not child sessions', () => {
-    const main = '{"type":"session","version":3,"id":"session-main"}'
-    const child = '{"type":"session","version":3,"id":"session-child","parentSession":"session-main"}'
+    const main = '{"type":"session","version":4,"id":"session-main"}'
+    const child = '{"type":"session","version":4,"id":"session-child","parentSession":"session-main"}'
       + '\n{"seq":1,"type":"subagent/descriptor","data":{"version":3,"label":"first"}}'
       + '\n{"seq":2,"type":"subagent/descriptor","data":{"version":3,"label":"second"}}'
     const merged = buildTrace([parseSessionLog(main), parseSessionLog(child)])
@@ -418,12 +453,12 @@ describe('collectSessionTrace — collection', () => {
   })
 
   // The host names each immutable format generation: v0 keeps `session.jsonl`,
-  // later generations add `vN` (`session.v3.jsonl`). Matching only the v0 name
+  // later generations add `vN` (`session.v4.jsonl`). Matching only the v0 name
   // finds no trace at all after a format bump.
   it('discovers a versioned generation artifact (session.vN.jsonl)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-trace-'))
     try {
-      writeFileSync(join(dir, 'session.v3.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
+      writeFileSync(join(dir, 'session.v4.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
       assert.equal(collectSessionTrace(dir).trace?.sessionId, 'session-fixture-1')
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -435,7 +470,7 @@ describe('collectSessionTrace — collection', () => {
     try {
       const text = readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8')
       writeFileSync(join(dir, 'session.migration.abc123.jsonl.tmp'), text)
-      writeFileSync(join(dir, 'session.v3.jsonl.zstd'), text)
+      writeFileSync(join(dir, 'session.v4.jsonl.zstd'), text)
       assert.equal(collectSessionTrace(dir).trace, undefined)
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -447,7 +482,7 @@ describe('collectSessionTrace — diagnosis', () => {
   it('returns the trace and no gap when a generation artifact is present', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
     try {
-      writeFileSync(join(dir, 'session.v3.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
+      writeFileSync(join(dir, 'session.v4.jsonl'), readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))
       const { trace, gap } = collectSessionTrace(dir)
       assert.equal(trace?.sessionId, 'session-fixture-1')
       assert.equal(gap, undefined)

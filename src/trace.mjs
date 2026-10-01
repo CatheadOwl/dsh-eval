@@ -34,17 +34,20 @@ const PROJECTED_FIELD_BY_EVENT_TYPE = new Map([
 
 /**
  * Session format generations this parser accepts. The host's generation
- * chain ships codecs v0–v3 (`session-format-catalog/src/generated.ts`,
- * `currentVersion: 3` = `SESSION_FORMAT_VERSION` in
- * `core/session/src/types.ts`); this projection is format-v3 ONLY — older
- * generations are rejected exactly like unknown ones, no legacy-format
- * compatibility is carried (the repo's no-legacy-compat design rule). A
- * stamp outside this set means the log's payload this projection was never
- * verified against — fail at the seam instead of projecting empty fields,
- * and bump this set only together with the re-verification the docs'
- * maintenance trigger describes.
+ * chain ships codecs v0–v4 (`session-format-catalog/src/generated.ts`,
+ * `currentVersion: 4` = `SESSION_FORMAT_VERSION` in
+ * `core/session/src/types.ts`); this projection tracks the CURRENT
+ * generation only — every earlier one is rejected exactly like unknown
+ * ones, no legacy-format compatibility is carried (the repo's
+ * no-legacy-compat design rule): eval reads only the fresh artifacts its
+ * own runs write through the staged host, so once the host moves on, a
+ * prior generation has no live producer. A stamp outside this set means
+ * the log's payload this projection was never verified against — fail at
+ * the seam instead of projecting empty fields, and bump this set only
+ * together with the re-verification the docs' maintenance trigger
+ * describes.
  */
-export const KNOWN_SESSION_FORMAT_VERSIONS = new Set([3])
+export const KNOWN_SESSION_FORMAT_VERSIONS = new Set([4])
 
 /** Known generations rendered for an error message: `v3`. */
 function knownGenerationsLabel() {
@@ -102,15 +105,16 @@ function messageText(message) {
 }
 
 /**
- * Fold one event into the surviving system-prompt nodes. Format v3 persists
- * the assembled prompt as streaming `system/message` surface events: an
+ * Fold one event into the surviving system-prompt nodes. The format keeps
+ * persisting the assembled prompt as streaming `system/message` surface
+ * events (verified against v4): an
  * append adds a node; a replace (`surfaceOp: { startSeq, endSeq }`, carried
  * by ANY surface event type — tool-result rewrites and compaction included)
  * shadows the node range it covers while the replacing event takes over at
  * the end (`core/session/src/surface.ts`; surface order is seq order). The
  * first request always commits node 0 (`SystemPromptProjection` in
- * `core/agent-loop`), even for an empty prompt. Logs of older generations
- * are refused at admission — this fold only ever sees v3 payloads.
+ * `core/agent-loop`), even for an empty prompt. Logs of other generations
+ * are refused at admission — this fold only ever sees v4 payloads.
  * @param {{ seq: number, text: string }[]} nodes - surviving nodes so far, in surface order.
  * @param {object} event - one parsed event record.
  * @returns {void} mutates `nodes`.
@@ -365,7 +369,7 @@ export function buildTrace(logs) {
     if (event.type === 'request/header') {
       // The assembled model request header: mounted tool schemas. What the
       // model is told to do lives in the system/message fold (`systemPrompt`)
-      // — format v3 dropped the header `system` field by design.
+      // — the header has carried no `system` field since format v3.
       if (Array.isArray(event.data?.header?.tools)
         && !event.data.header.tools.some(tool => typeof tool?.name === 'string')) {
         recordGap('headerWithoutToolNames')
@@ -420,7 +424,7 @@ export function buildTrace(logs) {
   }
 
   // Channel-level gap: requests happened, yet no prompt surface exists.
-  // Every v3 request commits at least one system/message node, so this is the
+  // Every request commits at least one system/message node, so this is the
   // "cannot see the prompt at all" shape — not "the prompt lacks something".
   if (requestHeaders.length > 0 && systemNodes.length === 0) {
     recordGap('promptSurfaceAbsent')
@@ -435,14 +439,26 @@ export function buildTrace(logs) {
   )
 
   const assistantTexts = assistantEntries.map(entry => entry.text)
-  // The answer to the task, as opposed to the last message: once a
-  // plugin-sourced injection (kind 'plugin' — a turn-close gate splice, an
-  // infra complaint) enters the conversation, every assistant message after
-  // it responds to the injection, not to the task. The answer is therefore
-  // the last assistant text BEFORE the first plugin injection; without one
-  // it degenerates to finalText (the task was the reviewer's last business).
+  // The answer to the task, as opposed to the last message. Format v4 has
+  // no catch-all injection kind — sources are producer-owned — so the
+  // hijack shape is read from what the log still tells: an attributed
+  // injection (any non-'user' kind) that declares no context `form` and
+  // lands AFTER the first substantive assistant text re-opens the
+  // conversation, and every assistant message after it responds to the
+  // injection, not the task (a turn-close gate splice, an infra
+  // complaint). The two guards keep non-hijacking injections out: a
+  // declared `form` (snapshot/catalog/…) is a context presentation that
+  // rides along requests, and anything before the first substantive text
+  // is task setup (startup runtime context, skill catalogs). Without a
+  // hijack the answer degenerates to finalText (the task was the
+  // reviewer's last business).
+  const firstAnswerSeq = assistantEntries[0]?.seq
   const firstInjectionSeq = userMessages.find(
-    message => message.source?.kind === 'plugin',
+    message => firstAnswerSeq !== undefined
+      && message.seq > firstAnswerSeq
+      && message.source?.kind !== undefined
+      && message.source.kind !== 'user'
+      && message.source.form === undefined,
   )?.seq
   const answerEntries = firstInjectionSeq === undefined
     ? assistantEntries
@@ -584,9 +600,11 @@ export function collectSessionTrace(sessionsRoot) {
  * @property {{ seq: number, turn: number, step: number, callId: string, text: string, error: object | undefined, isError: boolean | undefined }[]} toolResults
  * @property {string[]} assistantTexts - non-empty assembled assistant messages, log order.
  * @property {string} answerText - the last assistant text BEFORE the first
- *   plugin-sourced user message (gate splice / injected complaint); equals
- *   finalText when no plugin injection intervened ('' when none at all).
- *   The "answer to the task", as opposed to the possibly-hijacked last message.
+ *   hijacking injection (an attributed non-'user' source declaring no
+ *   context `form`, landing after the first substantive assistant text —
+ *   a gate splice / injected complaint); equals finalText when no such
+ *   injection intervened ('' when none at all). The "answer to the task",
+ *   as opposed to the possibly-hijacked last message.
  * @property {{ seq: number, source: object, text: string }[]} userMessages
  *   - non-empty `user/message` events (task prompt, plugin steer, injected
  *     context) with their verbatim `source` (`kind` + plugin-specific fields),
@@ -594,11 +612,11 @@ export function collectSessionTrace(sessionsRoot) {
  *     `source`.
  * @property {{ seq: number, reason: string, toolNames: string[] }[]} requestHeaders
  *   - projected `request/header` events: mounted tool schemas and the request
- *     reason. The assembled prompt is NOT here — format v3 dropped the header
- *     `system` field (the prompt lives in streaming system/message events,
- *     see `systemMessages` / `systemPrompt`).
+ *     reason. The assembled prompt is NOT here — the header has carried no
+ *     `system` field since format v3 (the prompt lives in streaming
+ *     system/message events, see `systemMessages` / `systemPrompt`).
  * @property {{ seq: number, text: string }[]} systemMessages
- *   - the SURVIVING `system/message` nodes of the format-v3 system-prompt
+ *   - the SURVIVING `system/message` nodes of the system-prompt
  *     surface, folded in surface (seq) order: appends add a node, a replace
  *     surfaceOp (any event type) shadows its range.
  * @property {string} systemPrompt
