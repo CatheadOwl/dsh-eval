@@ -34,6 +34,16 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
+- **`systemPromptExcludes` / `promptBefore`: prompt-face negative and ordering
+  matchers.** `systemPromptExcludes(substring)` asserts the assembled system
+  prompt does NOT contain a substring (the conditional-injection discipline —
+  an empty section is dropped, not injected as a stub) while refusing an
+  absent prompt surface exactly like `systemPromptIncludes`, so it has no
+  vacuous-pass path and is a positive-polarity evidence anchor rather than a
+  negative matcher. `promptBefore(before, after)` asserts the first occurrence
+  of `before` precedes the first occurrence of `after` in the effective prompt
+  (section-ordering contracts of injection-style plugins); a missing operand
+  fails loudly naming it.
 - **`dsh-review --judge`: machine first-pass grading for comprehension review.**
   One extra dispatch through the same blank-environment executor sees the hidden
   rubric (which the blind reviewers never saw), the byte-identical observations,

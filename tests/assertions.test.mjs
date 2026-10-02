@@ -18,6 +18,8 @@ import {
   finalTextMatches,
   assistantTextIncludes,
   systemPromptIncludes,
+  systemPromptExcludes,
+  promptBefore,
   toolMounted,
   userMessageTextIncludes,
   userMessageTextExcludes,
@@ -37,6 +39,12 @@ const subagentTrace = buildTrace([
   parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8')),
   parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child.jsonl'), 'utf8')),
   parseSessionLog(readFileSync(join(FIXTURES, 'subagent-child-pending.jsonl'), 'utf8')),
+])
+// Prompt: "You are an AI agent.\n\nAdopt the cognition-link directive: cite
+// the source of every claim." — known text, known order, for the prompt-face
+// matchers' presence/absence/ordering assertions.
+const systemPromptTrace = buildTrace([
+  parseSessionLog(readFileSync(join(FIXTURES, 'system-prompt-session.jsonl'), 'utf8')),
 ])
 
 describe('toolCalled', () => {
@@ -261,6 +269,85 @@ describe('systemPromptIncludes', () => {
   })
 })
 
+describe('systemPromptExcludes', () => {
+  it('passes when the folded system prompt lacks the substring', () => {
+    assert.equal(systemPromptExcludes('a directive that was never injected').check(systemPromptTrace).ok, true)
+  })
+
+  it('fails and locates the hit when the prompt contains the substring', () => {
+    const outcome = systemPromptExcludes('cognition-link').check(systemPromptTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /system\/message node/)
+    assert.match(outcome.message, /cognition-link/)
+    assert.match(outcome.message, /offset/)
+  })
+
+  it('fails as a channel absence when no prompt surface exists at all', () => {
+    const log = '{"type":"session","version":4,"id":"s"}'
+      + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+    const bare = buildTrace([parseSessionLog(log)])
+    const outcome = systemPromptExcludes('## Navigation').check(bare)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no system prompt surface/)
+    assert.match(outcome.message, /channel is absent/)
+  })
+
+  it('fails when no request/header event exists', () => {
+    const outcome = systemPromptExcludes('anything').check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /request\/header event/)
+  })
+
+  // Channel absence is refused, so there is no vacuous-pass path: the
+  // matcher is positive-polarity despite its name (contrast
+  // userMessageTextExcludes).
+  it('fails on an empty projection instead of passing vacuously', () => {
+    assert.equal(systemPromptExcludes('## Navigation').check(buildTrace([])).ok, false)
+  })
+})
+
+describe('promptBefore', () => {
+  it('passes when the before-operand precedes the after-operand', () => {
+    assert.equal(promptBefore('You are an AI agent', 'cognition-link directive').check(systemPromptTrace).ok, true)
+  })
+
+  it('fails on reversed order, reporting both offsets', () => {
+    const outcome = promptBefore('cognition-link directive', 'You are an AI agent').check(systemPromptTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /offset/)
+    assert.match(outcome.message, /not before/)
+  })
+
+  it('fails loudly naming a missing before-operand', () => {
+    const outcome = promptBefore('never injected', 'cognition-link directive').check(systemPromptTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /'never injected'/)
+    assert.match(outcome.message, /cannot assert ordering/)
+  })
+
+  it('fails loudly naming a missing after-operand', () => {
+    const outcome = promptBefore('cognition-link directive', 'never injected').check(systemPromptTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /'never injected'/)
+    assert.match(outcome.message, /cannot assert ordering/)
+  })
+
+  it('fails as a channel absence when no prompt surface exists at all', () => {
+    const log = '{"type":"session","version":4,"id":"s"}'
+      + '\n{"seq":1,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"}}}}'
+    const bare = buildTrace([parseSessionLog(log)])
+    const outcome = promptBefore('## Navigation', 'tool guidance').check(bare)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /no system prompt surface/)
+  })
+
+  it('fails when no request/header event exists', () => {
+    const outcome = promptBefore('a', 'b').check(trace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /request\/header event/)
+  })
+})
+
 describe('toolMounted', () => {
   it('matches a mounted tool name in the request header', () => {
     assert.equal(toolMounted('subagent_at').check(headerTrace).ok, true)
@@ -414,6 +501,10 @@ describe('requiresEvidence', () => {
       finalTextMatches(/x/u),
       assistantTextIncludes('x'),
       systemPromptIncludes('x'),
+      // Prompt-face matchers refuse channel absence, so excludes/ordering
+      // measure real evidence too — they never pass on an empty projection.
+      systemPromptExcludes('x'),
+      promptBefore('a', 'b'),
       toolMounted('read'),
       userMessageTextIncludes('gates', 'x'),
       subagentDispatched('gates:fix:x'),

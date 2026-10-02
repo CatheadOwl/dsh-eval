@@ -89,6 +89,13 @@ function truncate(text, max = 200) {
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
+/** A window around `idx` in `text`, ellipsized at both ends, for diagnostics. */
+function windowAround(text, idx, radius = 60) {
+  const start = Math.max(0, idx - radius)
+  const end = Math.min(text.length, idx + radius)
+  return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`
+}
+
 /** A tool matching `matcher` was called at least once. */
 export function toolCalled(matcher) {
   return {
@@ -337,6 +344,29 @@ export function finalTextMatches(regex) {
 }
 
 /**
+ * Resolve the readable prompt face shared by the prompt-surface matchers.
+ * Returns `{ prompt, nodeCount }` when the folded `system/message` face
+ * exists, or `{ failure }` when it does not: an absent channel is refused
+ * for includes, excludes, and ordering alike — "cannot see the prompt" is
+ * never read as an answer about the prompt's content.
+ */
+function promptFace(trace) {
+  const systemMessages = trace.systemMessages ?? []
+  if (systemMessages.length > 0) {
+    return { prompt: trace.systemPrompt ?? '', nodeCount: systemMessages.length }
+  }
+  const headers = trace.requestHeaders ?? []
+  if (headers.length === 0) {
+    return { failure: 'expected a request/header event; the run produced none' }
+  }
+  return {
+    failure: 'no system prompt surface in the trace: requests happened but no system/message events did'
+      + ' — the prompt-surface channel is absent (the seam moved);'
+      + " refusing to read this as an answer about the prompt's content",
+  }
+}
+
+/**
  * The effective assembled system prompt contains `substring`. Format v3
  * persists the prompt as streaming `system/message` surface events and the
  * request header no longer carries it: the matcher reads the folded
@@ -348,26 +378,92 @@ export function systemPromptIncludes(substring) {
   return {
     describe: `system prompt includes: '${substring}'`,
     check(trace) {
-      const systemMessages = trace.systemMessages ?? []
-      if (systemMessages.length > 0) {
-        const prompt = trace.systemPrompt ?? ''
-        return prompt.includes(substring)
-          ? { ok: true, message: '' }
-          : {
-            ok: false,
-            message: `effective system prompt (last non-empty of ${systemMessages.length} surviving system/message node(s))`
-              + ` does not include '${substring}'; prompt: ${JSON.stringify(prompt.slice(0, 400))}`,
-          }
+      const face = promptFace(trace)
+      if (face.failure !== undefined) {
+        return { ok: false, message: face.failure }
       }
-      const headers = trace.requestHeaders ?? []
-      if (headers.length === 0) {
-        return { ok: false, message: 'expected a request/header event; the run produced none' }
+      return face.prompt.includes(substring)
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `effective system prompt (last non-empty of ${face.nodeCount} surviving system/message node(s))`
+              + ` does not include '${substring}'; prompt: ${JSON.stringify(face.prompt.slice(0, 400))}`,
+          }
+    },
+  }
+}
+
+/**
+ * The effective assembled system prompt does NOT contain `substring` — the
+ * negative regression face of conditional injection (an empty section must
+ * be dropped, not injected as a stub). The channel-absence refusal mirrors
+ * `systemPromptIncludes`, so unlike `userMessageTextExcludes` this matcher
+ * has NO vacuous-pass path: every outcome is measured against an assembled
+ * prompt, making it a positive-polarity evidence anchor (it does not
+ * self-report `requiresEvidence: false`).
+ */
+export function systemPromptExcludes(substring) {
+  return {
+    describe: `system prompt excludes: '${substring}'`,
+    check(trace) {
+      const face = promptFace(trace)
+      if (face.failure !== undefined) {
+        return { ok: false, message: face.failure }
+      }
+      const idx = face.prompt.indexOf(substring)
+      if (idx === -1) {
+        return { ok: true, message: '' }
       }
       return {
         ok: false,
-        message: 'no system prompt surface in the trace: requests happened but no system/message events did'
-          + ' — the prompt-surface channel is absent (the seam moved);'
-          + ' refusing to read this as "the prompt lacks the substring"',
+        message: `effective system prompt (last non-empty of ${face.nodeCount} surviving system/message node(s))`
+          + ` includes '${substring}' at offset ${idx}: ${JSON.stringify(windowAround(face.prompt, idx))}`,
+      }
+    },
+  }
+}
+
+/**
+ * Within the effective assembled system prompt, the FIRST occurrence of
+ * `before` precedes the first occurrence of `after` — the ordering contract
+ * of injection-style plugins (a lazy section must land ahead of the tool
+ * guidance that references it, for example). Both operands must be present:
+ * a missing operand fails loudly naming it, never passes. Shares the
+ * channel-absence refusal of the other prompt-surface matchers, so it is a
+ * positive-polarity evidence anchor.
+ */
+export function promptBefore(before, after) {
+  return {
+    describe: `system prompt order: '${before}' before '${after}'`,
+    check(trace) {
+      const face = promptFace(trace)
+      if (face.failure !== undefined) {
+        return { ok: false, message: face.failure }
+      }
+      const prompt = face.prompt
+      const beforeIdx = prompt.indexOf(before)
+      if (beforeIdx === -1) {
+        return {
+          ok: false,
+          message: `the 'before' operand '${before}' is not in the effective system prompt`
+            + ` — cannot assert ordering; prompt: ${JSON.stringify(prompt.slice(0, 400))}`,
+        }
+      }
+      const afterIdx = prompt.indexOf(after)
+      if (afterIdx === -1) {
+        return {
+          ok: false,
+          message: `the 'after' operand '${after}' is not in the effective system prompt`
+            + ` — cannot assert ordering; prompt: ${JSON.stringify(prompt.slice(0, 400))}`,
+        }
+      }
+      if (beforeIdx < afterIdx) {
+        return { ok: true, message: '' }
+      }
+      return {
+        ok: false,
+        message: `'${before}' first occurs at offset ${beforeIdx}, not before '${after}' at offset ${afterIdx}`
+          + `; prompt: ${JSON.stringify(prompt.slice(0, 400))}`,
       }
     },
   }

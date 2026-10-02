@@ -22,6 +22,8 @@ export {
   finalTextMatches,
   assistantTextIncludes,
   systemPromptIncludes,
+  systemPromptExcludes,
+  promptBefore,
   toolMounted,
   userMessageTextIncludes,
   userMessageTextExcludes,
