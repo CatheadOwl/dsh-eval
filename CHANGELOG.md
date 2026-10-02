@@ -43,7 +43,8 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   negative matcher. `promptBefore(before, after)` asserts the first occurrence
   of `before` precedes the first occurrence of `after` in the effective prompt
   (section-ordering contracts of injection-style plugins); a missing operand
-  fails loudly naming it.
+  fails loudly naming it, and an empty-string operand is rejected at factory
+  time (it would otherwise pass vacuously as `indexOf('') === 0`).
 - **`dsh-review --judge`: machine first-pass grading for comprehension review.**
   One extra dispatch through the same blank-environment executor sees the hidden
   rubric (which the blind reviewers never saw), the byte-identical observations,

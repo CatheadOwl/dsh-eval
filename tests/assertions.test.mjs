@@ -346,6 +346,13 @@ describe('promptBefore', () => {
     assert.equal(outcome.ok, false)
     assert.match(outcome.message, /request\/header event/)
   })
+
+  // indexOf('') === 0 would make an empty 'before' operand pass vacuously —
+  // a failed interpolation must not satisfy an ordering contract.
+  it('rejects empty-string operands at construction', () => {
+    assert.throws(() => promptBefore('', 'x'), /non-empty/)
+    assert.throws(() => promptBefore('x', ''), /non-empty/)
+  })
 })
 
 describe('toolMounted', () => {

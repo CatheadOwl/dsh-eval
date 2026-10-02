@@ -44,7 +44,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 
 - `systemPromptIncludes(substring)`：组装后的 system prompt 含子串，读 `system/message` 面事件折叠（`systemPrompt`）。面事件**不存在**时响亮失败（渠道空置，不读作「prompt 缺子串」）——守卫因此能区分「没写进 prompt」与「根本看不到 prompt」；
 - `systemPromptExcludes(substring)`：组装后的 system prompt **不含**子串（条件注入纪律的负向回归面——空 section 丢弃即此类）。渠道空置语义与 includes 同：面事件不存在照样响亮失败，因此它**没有真空通过路径、极性为正向**（不像 `userMessageTextExcludes` 自报负向）——通过即证明「prompt 已组装且测过缺席」。命中时失败文案带首个命中偏移与上下文摘录；
-- `promptBefore(before, after)`：有效 system prompt 内 `before` 的**首次出现**先于 `after` 的首次出现（注入类插件的定序契约——如惰性 section 须落在引用它的工具指引之前）。任一操作数缺席响亮失败并点名缺席者（缺操作数 ≠ 定序成立）；渠道空置同上拒读，极性同上为正向；
+- `promptBefore(before, after)`：有效 system prompt 内 `before` 的**首次出现**先于 `after` 的首次出现（注入类插件的定序契约——如惰性 section 须落在引用它的工具指引之前）。任一操作数缺席响亮失败并点名缺席者（缺操作数 ≠ 定序成立）；**空串操作数在工厂期即拒**（`indexOf('') === 0` 会真空通过，视作插值失败而非契约）；渠道空置同上拒读，极性同上为正向；
 - `toolMounted(name)`：工具出现在某个 request/header 的挂载列表；
 - `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `kind`（生产方自己的 kind，如 steer 生产方 `'gates'`），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（steer/注入为 v4 producer-owned `{ kind: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
 

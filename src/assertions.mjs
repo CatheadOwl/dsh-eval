@@ -433,6 +433,13 @@ export function systemPromptExcludes(substring) {
  * positive-polarity evidence anchor.
  */
 export function promptBefore(before, after) {
+  if (before === '' || after === '') {
+    throw new Error(
+      "promptBefore(before, after): operands must be non-empty strings"
+        + " — an empty operand reads as `indexOf('') === 0` and would pass"
+        + " vacuously; treat it as a failed interpolation, not a contract",
+    )
+  }
   return {
     describe: `system prompt order: '${before}' before '${after}'`,
     check(trace) {
