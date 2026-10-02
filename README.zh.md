@@ -130,4 +130,4 @@ export default {
 
 runner 用 `try/finally` 保证临时目录与链接在任何路径（`prepare` 抛错、mock 校验失败、spawn 错误）都被清理，不污染真实 profile store。behavior 与 review CLI 共享目录扫描（跳过 `.runs` 与 `node_modules`）；behavior CLI 在加载期做 case shape 校验与跨文件重复 id 检测，尽早失败。
 
-License: MIT。框架自身的测试与发布自检由仓库 CI 承接，不随包发布。开发与贡献：[CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md)。
+License: MIT。框架自身的测试与发布自检由仓库 CI 承接，不随包发布。发布历史：[CHANGELOG.md](CHANGELOG.md)。

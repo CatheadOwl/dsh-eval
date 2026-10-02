@@ -10,28 +10,6 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
-### Changed
-
-- **Session-log parsing tracks the host's current format generation (v4).**
-  `KNOWN_SESSION_FORMAT_VERSIONS` moves from v3 to v4 together with the
-  six-projection re-verification; stale v3 artifacts no longer parse (fresh
-  runs are unaffected — eval only reads the artifacts its own runs write
-  through the staged host).
-- **Source matchers and injection classification read v4 producer-owned
-  sources.** `userMessageTextIncludes` / `userMessageTextExcludes` match
-  `source.kind` (e.g. `'gates'`, `'enrichment'`) instead of the retired
-  `source.plugin` wrapper; `answerText` cuts at the first formless non-user
-  injection landing after the first substantive assistant text (declared
-  context forms and pre-answer setup no longer cut the answer chain); the
-  mock-determinism hint names formless injectors the same way.
-
-### Fixed
-
-- discovery test re-points the repo corpus case at its post-2026-09-01
-  location (`extras/modules/enrichment/eval/behavior/mock/` — the prompt
-  module was absorbed into enrichment); stale path broke the suite on fresh
-  checkouts.
-
 ### Added
 
 - **`mountedToolSchema` / `trace.mountedTools`: the wiring face for tool
@@ -41,8 +19,7 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `mountedToolSchema(name, predicate)` asserts a mounted tool's schema shape
   without scripting any tool call. Registration-time schema violations
   already kill the boot (the run goes red); this covers the
-  boots-but-drifted class — raw-layer vocabulary drift, parameter-set drift
-  — surfaced by the any-nav adapter's first host round (ADR 0009).
+  boots-but-drifted class — raw-layer vocabulary drift, parameter-set drift.
 - **`systemPromptExcludes` / `promptBefore`: prompt-face negative and ordering
   matchers.** `systemPromptExcludes(substring)` asserts the assembled system
   prompt does NOT contain a substring (the conditional-injection discipline —
@@ -57,32 +34,49 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 - **`dsh-review --judge`: machine first-pass grading for comprehension review.**
   One extra dispatch through the same blank-environment executor sees the hidden
   rubric (which the blind reviewers never saw), the byte-identical observations,
-  and every reviewer answer, then prefills the report's three human columns under
-  a fixed four-section contract (`Verdicts` / `Intentional design hits` /
-  `New red flags` / `Next step`). Judge output is evidence, never an exit-code
-  gate; contract-violating output is recorded loudly as `unparsed` (`judge.txt`
-  raw + `judge.json` accounting, `run.json` judge field with profile + judgedAt).
-  The three human-judgment sections remain the authoritative record — the judge
-  narrows what a human must read. Programmatic primitives on the `experimental`
-  subpath (`buildJudgeTask` / `executeReviewJudge` / `parseJudgeOutput` /
-  `loadRubricText` / `JUDGE_OUTPUT_SECTIONS`).
+  and every successful reviewer's answer, then prefills the report's three
+  human columns under a fixed four-section contract (`Verdicts` / `Intentional
+  design hits` / `New red flags` / `Next step`). Judge output is evidence,
+  never an exit-code gate; contract-violating output is recorded loudly as
+  `unparsed` (`judge.txt` raw + `judge.json` accounting, `run.json` judge field
+  with profile + judgedAt). The three human-judgment sections remain the
+  authoritative record — the judge narrows what a human must read. Programmatic
+  primitives on the `experimental` subpath (`buildJudgeTask` /
+  `executeReviewJudge` / `parseJudgeOutput` / `loadRubricText` /
+  `JUDGE_OUTPUT_SECTIONS`).
+
+### Changed
+
+- **Session-log parsing tracks the host's current format generation (v4).**
+  `KNOWN_SESSION_FORMAT_VERSIONS` moves from v3 to v4 together with the
+  six-projection re-verification; stale v3 artifacts no longer parse (fresh
+  runs are unaffected — eval only reads the artifacts its own runs write
+  through the staged host).
+- **Source matchers and injection classification read v4 producer-owned
+  sources.** `userMessageTextIncludes` / `userMessageTextExcludes` match
+  `source.kind` (e.g. `'gates'`, `'enrichment'`) instead of the retired
+  `source.plugin` wrapper; `answerText` cuts at the first formless non-user
+  injection landing after the first substantive assistant text (declared
+  context forms and pre-answer setup no longer cut the answer chain); the
+  mock-determinism hint names formless injectors the same way.
+  Migrating: string/RegExp source matchers keep working where the producer's
+  `kind` equals its former plugin id (e.g. `'gates'`); predicates over the
+  full `source` object must switch from `.plugin` to `.kind`.
+- **Review tasks ride stdin** (`-` positional, natively supported by the host
+  headless app) instead of the command line: the judge dispatch's task — rubric
+  + observations + every successful reviewer's answer — exceeds the Windows
+  command-line ceiling and dies `ENAMETOOLONG` before the CLI even boots.
+  `spawnHeadlessDsh` gains an optional `input`; reviewer and judge dispatches
+  now share one path.
 
 ### Fixed
 
 - **Review runs no longer fail the tool-boundary check on host 0.1.6 plan
   mode.** The base template's `plan-mode` row keeps `exit_plan_mode` in the
   request tool catalog "across modes for request-cache stability", and the
-  blank-environment static disable list (host template rows never appear in the
-  out-of-tree enumeration) did not cover it — on such hosts every review run
-  died as a tool-boundary violation. The list now includes `plan-mode`.
-
-### Changed
-
-- **Review tasks ride stdin** (`-` positional, natively supported by the host
-  headless app) instead of the command line: the judge dispatch's task — rubric
-  + observations + every reviewer answer — exceeds the Windows command-line
-  ceiling and dies `ENAMETOOLONG` before the CLI even boots. `spawnHeadlessDsh`
-  gains an optional `input`; reviewer and judge dispatches now share one path.
+  blank-environment static disable list (host template rows never appear in
+  the out-of-tree enumeration) did not cover it — on such hosts every review
+  run died as a tool-boundary violation. The list now includes `plan-mode`.
 
 ## [0.4.2] — 2026-09-19
 

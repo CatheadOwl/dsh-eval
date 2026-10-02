@@ -7,8 +7,9 @@ description: dsh-eval 文档索引——安装与宿主接线、review、matcher
 | 文档 | 主题 |
 |---|---|
 | [host-wiring.md](host-wiring.md) | 安装与宿主接线：peer 依赖（dsh-llm）、构建 CLI、profile、模型选择（real 模型来源链与钉版）、凭证、spawn 要求 |
-| [review.md](review.md) | comprehension review：实验定义、空白环境 reviewer、产物清单、六条评审规则 |
+| [review.md](review.md) | comprehension review：实验定义、空白环境 reviewer、产物清单、评审规则与 judge 第一道 |
 | [matchers.md](matchers.md) | trace matcher 与 mock helper 全集 |
+| [concepts.md](concepts.md) | 概念对照：主流 agent eval 词汇（dataset / metric / LLM-as-judge / trajectory / CI…）到本包 cases / matchers / review 的映射与「刻意不做」档 |
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
 | [cross-turn.md](cross-turn.md) | `followups` 跨轮异步驱动契约（driver 行换装、子 agent settle 等待、mock 单 cursor 编排、有界重派断言） |

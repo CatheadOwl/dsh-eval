@@ -80,7 +80,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空；但**只要 `label` 缺**（`withoutLabel`），按 label 匹配的 `*Count(label, 0)` 就会真空通过——哪怕 `supportedDescriptors` 看起来健康、mode/provider 都在。两个计数分开报就是为了这个档；
 - **子会话集合是启发式**：`subagentChildren` 收「header 带 `parentSession`」的日志，而宿主对 fork/resume/seed 日志也写这个字段——它们会以「无身份子记录」出现在普查里。这是集合的性质，不是本次降级（日志层无法复现宿主的 agent 链所有权判定）；
 - 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带；**无 trace 的记录没有**）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动），失败文案也不带计数。
-- **`mountedTools` 不入普查配对**：它是跨 `request/header` 去重的派生目录（非逐事件投影，count−length 语义不配对），输入面已在 `requestHeaders` 计数；且它只服务正向断言（工具缺席即红），普查要救的「负向真空通过」形态不存在（ADR 0009）。
+- **`mountedTools` 不入普查配对**：它是跨 `request/header` 去重的派生目录（非逐事件投影，count−length 语义不配对），输入面已在 `requestHeaders` 计数；且它只服务正向断言（工具缺席即红），普查要救的「负向真空通过」形态不存在。
 
 ## 证据锚（`requiresEvidence`）
 

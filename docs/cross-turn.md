@@ -8,7 +8,7 @@ description: followups 跨轮驱动契约——case 声明 followups 后 overlay
 
 ## 为什么是 driver 行而不是 CLI resume
 
-实测定案（「跨轮异步修复驱动」FR 调研，见开发仓的 eval 状态板记录）：
+实测定案（「跨轮异步修复驱动」FR 调研）：
 
 - headless runner 在主 agent 首次 idle 即退出，**进程退出会把 in-process 后台子 agent 当场 abort**（fire-and-forget 子 agent 存活窗口 = driver 的生命周期）；
 - dsh CLI 无 resume 表面（one task per invocation；resume 只在 cordis config 层）。

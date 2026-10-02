@@ -130,4 +130,4 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 
 The runner uses `try/finally` so temp directories and links are cleaned up on every path (`prepare` throwing, mock validation failure, spawn errors) — the real profile store is never polluted. The behavior and review CLIs share directory scanning (skipping `.runs` and `node_modules`); the behavior CLI validates case shapes and detects cross-file duplicate ids at load time, failing as early as possible.
 
-License: MIT. The framework's own tests and release self-checks are carried by the repository CI and do not ship with the package. Development & contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md).
+License: MIT. The framework's own tests and release self-checks are carried by the repository CI and do not ship with the package. Release history: [CHANGELOG.md](CHANGELOG.md).
