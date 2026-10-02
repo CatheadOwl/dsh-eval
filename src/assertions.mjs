@@ -495,6 +495,45 @@ export function toolMounted(matcher) {
 }
 
 /**
+ * A tool matching `matcher` is mounted AND its mounted schema satisfies
+ * `predicate(tool)` — the wiring face for schema shape. The predicate
+ * receives the raw request-header tool entry (`{ name, description,
+ * parameters }`), the same schema face the model sees, so a case can pin
+ * raw-layer vocabulary (e.g. `parameters.type === 'object'` with known
+ * property names) without scripting any tool call. Registration-time
+ * schema violations kill the boot (the run itself goes red); this matcher
+ * covers the boots-but-drifted class. Fails loudly when the tool is not
+ * mounted or no request happened — positive polarity, a self-sufficient
+ * evidence anchor.
+ */
+export function mountedToolSchema(matcher, predicate) {
+  if (typeof predicate !== 'function') {
+    throw new Error('mountedToolSchema(matcher, predicate): predicate must be a function over the raw tool entry')
+  }
+  return {
+    describe: `mounted tool schema: ${describeMatcher(matcher)}`,
+    check(trace) {
+      const mounted = trace.mountedTools ?? []
+      const hit = mounted.find(tool => nameMatches(matcher, tool.name))
+      if (hit === undefined) {
+        const names = [...new Set((trace.requestHeaders ?? []).flatMap(header => header.toolNames))]
+        return {
+          ok: false,
+          message: `expected ${describeMatcher(matcher)} among mounted tools; saw [${names.join(', ')}]`,
+        }
+      }
+      return predicate(hit) === true
+        ? { ok: true, message: '' }
+        : {
+            ok: false,
+            message: `mounted ${hit.name} schema rejected by the predicate;`
+              + ` entry: ${truncate(JSON.stringify(hit), 400)}`,
+          }
+    },
+  }
+}
+
+/**
  * Whether a subagent child record satisfies a label matcher: string/RegExp
  * against the child's durable `label` (`subagent/descriptor`), or a predicate
  * over the full child record (mode/provider/delegationDepth-based matching).

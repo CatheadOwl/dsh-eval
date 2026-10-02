@@ -362,6 +362,10 @@ export function buildTrace(logs) {
   const userMessages = []
   const requestHeaders = []
   const systemNodes = []
+  // Mounted-tool catalog keyed by name, later headers overriding earlier
+  // entries (the final mounted state is what the model sees; first-appearance
+  // order is kept for readable diagnostics).
+  const mountedToolsByName = new Map()
   const gaps = {}
   const recordGap = key => { gaps[key] = (gaps[key] ?? 0) + 1 }
   for (const event of events) {
@@ -381,6 +385,11 @@ export function buildTrace(logs) {
           ? event.data.header.tools.map(tool => tool?.name).filter(name => typeof name === 'string')
           : [],
       })
+      if (Array.isArray(event.data?.header?.tools)) {
+        for (const tool of event.data.header.tools) {
+          if (typeof tool?.name === 'string') mountedToolsByName.set(tool.name, tool)
+        }
+      }
     } else if (event.type === 'tool/call') {
       if (typeof event.data?.name !== 'string') recordGap('toolCallWithoutName')
       if (typeof event.data?.callId !== 'string') recordGap('toolCallWithoutCallId')
@@ -474,6 +483,7 @@ export function buildTrace(logs) {
     answerText,
     userMessages,
     requestHeaders,
+    mountedTools: [...mountedToolsByName.values()],
     systemMessages: systemNodes,
     systemPrompt,
     subagentChildren,
@@ -615,6 +625,14 @@ export function collectSessionTrace(sessionsRoot) {
  *     reason. The assembled prompt is NOT here — the header has carried no
  *     `system` field since format v3 (the prompt lives in streaming
  *     system/message events, see `systemMessages` / `systemPrompt`).
+ * @property {{ name: string, description: string | undefined, parameters: object | undefined }[]} mountedTools
+ *   - the mounted-tool catalog derived from every `request/header`: raw
+ *     header tool entries (the schema face the model sees), deduped by name
+ *     with later headers overriding earlier ones (the final mounted state),
+ *     first-appearance order. A derived face, not a per-event projection —
+ *     its input (`request/header`) is already census-counted, and it serves
+ *     positive assertions only (an absent tool fails loudly), so it joins
+ *     neither `projectionLengths` pairing nor the field-gap counters.
  * @property {{ seq: number, text: string }[]} systemMessages
  *   - the SURVIVING `system/message` nodes of the system-prompt
  *     surface, folded in surface (seq) order: appends add a node, a replace

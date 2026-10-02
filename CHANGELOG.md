@@ -34,6 +34,15 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Added
 
+- **`mountedToolSchema` / `trace.mountedTools`: the wiring face for tool
+  schemas.** The raw request-header tool entries (`{ name, description,
+  parameters }` — the schema face the model sees) are now projected as a
+  name-deduped mounted catalog (later headers override), and
+  `mountedToolSchema(name, predicate)` asserts a mounted tool's schema shape
+  without scripting any tool call. Registration-time schema violations
+  already kill the boot (the run goes red); this covers the
+  boots-but-drifted class — raw-layer vocabulary drift, parameter-set drift
+  — surfaced by the any-nav adapter's first host round (ADR 0009).
 - **`systemPromptExcludes` / `promptBefore`: prompt-face negative and ordering
   matchers.** `systemPromptExcludes(substring)` asserts the assembled system
   prompt does NOT contain a substring (the conditional-injection discipline —

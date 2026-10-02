@@ -18,6 +18,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 | `finalText` | 最后一个组装 assistant 文本（无则 `''`） |
 | `userMessages` | `{ seq, source, text }[]`（`source` 原样透传：任务 prompt `{ kind: 'user' }`，steer/注入为 v4 producer-owned 形状 `{ kind: '<生产方>' }`——如 `{ kind: 'gates' }`、`{ kind: 'enrichment' }`，无共享 `plugin` 包裹；上下文类注入自带 `form` 字段，如 runtime-context 的 `{ kind: 'runtime-context', form: 'snapshot' }`） |
 | `requestHeaders` | `{ seq, reason, toolNames }[]`（挂载工具名与 request reason；v3 起 header **不带** system 字段，prompt 一律读 `systemMessages` / `systemPrompt`） |
+| `mountedTools` | `{ name, description?, parameters? }[]`——挂载工具**目录**：跨全部 `request/header` 按名去重、后见覆盖（以最终挂载态为准）、首见排序；条目为 header 原始 schema 面（模型所见同一份）。派生面：输入面（`request/header`）已在 census 计数，不进 `projectionLengths` 配对与字段缺口计数（只服务正向断言，无真空负向风险） |
 | `systemMessages` / `systemPrompt` | system prompt 面：`{ seq, text }[]` 存活 `system/message` 节点（append/replace 面折叠、按面序）+ 有效 prompt（存活节点最后一个非空，无则 `''`） |
 | `subagentChildren` | `{ sessionId, parentSession, delegationDepth, label, mode, provider, assistantTexts, finalText }[]`——每个子 agent 独立 session 日志一条；身份（label/mode/provider）取子日志首条 version-3 的 `subagent/descriptor` 事件（镜像宿主 `foldSubagentDescriptor` 的首条权威语义），`finalText` 是子会话自己的最后一条非空 assistant 文本（无则 `''` = 派发了但没答） |
 | `census` | 投影普查（只报数，不判定）：`{ eventTypeCounts, projectionLengths, projectionSkipped: { main, children }, projectionFieldGaps, subagent: { mainLogDescriptorEvents, supportedDescriptors, children } }`。语义见下「投影普查」节；手搓 trace（不经 `buildTrace`）时可为 `undefined` |
@@ -46,6 +47,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - `systemPromptExcludes(substring)`：组装后的 system prompt **不含**子串（条件注入纪律的负向回归面——空 section 丢弃即此类）。渠道空置语义与 includes 同：面事件不存在照样响亮失败，因此它**没有真空通过路径、极性为正向**（不像 `userMessageTextExcludes` 自报负向）——通过即证明「prompt 已组装且测过缺席」。命中时失败文案带首个命中偏移与上下文摘录；
 - `promptBefore(before, after)`：有效 system prompt 内 `before` 的**首次出现**先于 `after` 的首次出现（注入类插件的定序契约——如惰性 section 须落在引用它的工具指引之前）。任一操作数缺席响亮失败并点名缺席者（缺操作数 ≠ 定序成立）；**空串操作数在工厂期即拒**（`indexOf('') === 0` 会真空通过，视作插值失败而非契约）；渠道空置同上拒读，极性同上为正向；
 - `toolMounted(name)`：工具出现在某个 request/header 的挂载列表；
+- `mountedToolSchema(name, predicate)`：匹配工具已挂载**且**其 schema 满足谓词——谓词收原始挂载条目 `{ name, description, parameters }`（模型所见的同一 schema 面），可钉 raw 层词表（如 `parameters.type === 'object'` 与参数名集）而无须脚本化任何工具调用。boot 期注册校验错误由 run 本身变红承担；本 matcher 管「能 boot 但形状漂移」档。工具未挂载 / 无 request 均响亮失败（正向极性，自足证据锚）；谓词非函数在工厂期即拒；
 - `userMessageTextIncludes(source, substring)` / `userMessageTextExcludes(source, substring)`：按 `source` 过滤的 `user/message` 文本含/不含子串。`source` 用字符串/RegExp 匹配 `kind`（生产方自己的 kind，如 steer 生产方 `'gates'`），或谓词取整个 `source`——steer 在持久化日志里没有专名事件（`agent.steer()` 落为 `user/message`），区分靠 `source`（steer/注入为 v4 producer-owned `{ kind: '<id>' }`，任务 prompt 为 `{ kind: 'user' }`）。
 
 ## 派发面（子 agent）
@@ -78,6 +80,7 @@ description: trace matcher 与 mock helper 全集——工具面/文本面/输�
 - **身份缺失型降级**：某子日志 `descriptorEvents > 0` 而 `supportedDescriptors === 0`，即它进了 `subagentChildren` 但身份全空；但**只要 `label` 缺**（`withoutLabel`），按 label 匹配的 `*Count(label, 0)` 就会真空通过——哪怕 `supportedDescriptors` 看起来健康、mode/provider 都在。两个计数分开报就是为了这个档；
 - **子会话集合是启发式**：`subagentChildren` 收「header 带 `parentSession`」的日志，而宿主对 fork/resume/seed 日志也写这个字段——它们会以「无身份子记录」出现在普查里。这是集合的性质，不是本次降级（日志层无法复现宿主的 agent 链所有权判定）；
 - 只出现在**运行面**：`--format json` 的每条 case 记录（`census` 字段，pass 与 fail 都带；**无 trace 的记录没有**）与 `.runs/<id>/trace.json` 的 `trace.census`；**文本输出零新增**（逐字节输出契约不动），失败文案也不带计数。
+- **`mountedTools` 不入普查配对**：它是跨 `request/header` 去重的派生目录（非逐事件投影，count−length 语义不配对），输入面已在 `requestHeaders` 计数；且它只服务正向断言（工具缺席即红），普查要救的「负向真空通过」形态不存在（ADR 0009）。
 
 ## 证据锚（`requiresEvidence`）
 

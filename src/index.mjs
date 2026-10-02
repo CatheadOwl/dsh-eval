@@ -25,6 +25,7 @@ export {
   systemPromptExcludes,
   promptBefore,
   toolMounted,
+  mountedToolSchema,
   userMessageTextIncludes,
   userMessageTextExcludes,
   subagentDispatched,

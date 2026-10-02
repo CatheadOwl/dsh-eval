@@ -21,6 +21,7 @@ import {
   systemPromptExcludes,
   promptBefore,
   toolMounted,
+  mountedToolSchema,
   userMessageTextIncludes,
   userMessageTextExcludes,
   subagentDispatched,
@@ -368,6 +369,62 @@ describe('toolMounted', () => {
   })
 })
 
+describe('mountedToolSchema', () => {
+  // Two headers: nav's parameters change between them (later header wins in
+  // the mounted catalog); read carries no schema fields at all (tolerant).
+  const schemaLog = '{"type":"session","version":4,"id":"s"}'
+    + '\n{"seq":1,"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"p"}],"source":{"kind":"system-prompt"}}},"surfaceOp":"append"}'
+    + '\n{"seq":2,"type":"request/header","data":{"reason":"initial","header":{"config":{"provider":"p","model":"m"},"tools":['
+    + '{"name":"nav","description":"route","parameters":{"type":"object","properties":{"source":{"type":"string"}}}},'
+    + '{"name":"read"}]}}}'
+    + '\n{"seq":3,"type":"request/header","data":{"reason":"continue","header":{"config":{"provider":"p","model":"m"},"tools":['
+    + '{"name":"nav","description":"route","parameters":{"type":"object","properties":{"source":{"type":"string"},"depth":{"type":"integer"}}}}]}}}'
+  const schemaTrace = buildTrace([parseSessionLog(schemaLog)])
+
+  it('passes the raw mounted entry to the predicate', () => {
+    assert.equal(
+      mountedToolSchema('nav', tool => tool.description === 'route'
+        && tool.parameters?.type === 'object'
+        && 'depth' in tool.parameters.properties).check(schemaTrace).ok,
+      true,
+    )
+  })
+
+  it('later headers override earlier entries in the mounted catalog', () => {
+    // The first header's nav lacks `depth`; only the override makes this pass.
+    assert.equal(
+      mountedToolSchema('nav', tool => 'depth' in (tool.parameters?.properties ?? {})).check(schemaTrace).ok,
+      true,
+    )
+  })
+
+  it('tolerates entries without schema fields', () => {
+    assert.equal(mountedToolSchema('read', tool => tool.parameters === undefined).check(schemaTrace).ok, true)
+  })
+
+  it('fails with the rejected entry when the predicate is unsatisfied', () => {
+    const outcome = mountedToolSchema('nav', tool => tool.parameters?.type === 'json').check(schemaTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /rejected by the predicate/)
+    assert.match(outcome.message, /"type":"object"/)
+  })
+
+  it('fails loudly when the tool is not mounted', () => {
+    const outcome = mountedToolSchema('grep', () => true).check(schemaTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /among mounted tools/)
+    assert.match(outcome.message, /nav, read/)
+  })
+
+  it('fails on an empty projection instead of passing vacuously', () => {
+    assert.equal(mountedToolSchema('nav', () => true).check(buildTrace([])).ok, false)
+  })
+
+  it('rejects a non-function predicate at construction', () => {
+    assert.throws(() => mountedToolSchema('nav', 'not a function'), /predicate/)
+  })
+})
+
 describe('userMessageTextIncludes', () => {
   it('matches a plugin-sourced user message by plugin name', () => {
     assert.equal(userMessageTextIncludes('gates', 'task-a.md').check(steerTrace).ok, true)
@@ -513,6 +570,7 @@ describe('requiresEvidence', () => {
       systemPromptExcludes('x'),
       promptBefore('a', 'b'),
       toolMounted('read'),
+      mountedToolSchema('read', () => true),
       userMessageTextIncludes('gates', 'x'),
       subagentDispatched('gates:fix:x'),
       subagentCompleted('gates:fix:x'),
