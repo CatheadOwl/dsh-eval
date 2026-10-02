@@ -8,7 +8,7 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-## [Unreleased]
+## [0.5.0] — 2026-10-02
 
 ### Added
 
@@ -332,6 +332,7 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `@deepseek-ai/dsh-llm` is a peerDependency provided by the host
   ecosystem.
 
+[0.5.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.5.0
 [0.4.2]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.2
 [0.4.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.1
 [0.3.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.3.0
