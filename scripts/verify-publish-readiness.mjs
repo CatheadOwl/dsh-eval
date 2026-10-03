@@ -439,7 +439,8 @@ export async function hostClosureViolations(manifest, options = {}) {
 // carry functional semantics only — docs MAY cite dev-repo evidence, but only
 // via the accepted by-name provenance form. The un-actionable forms are
 // rejected mechanically: decision-record ids (ADR/RFC/PRD + number), workline
-// ids (W-number), workunit references, and promotion/migration lineage verbs.
+// ids (W-number), workunit references, promotion/migration lineage verbs, and
+// consumer-occupancy lineup notes on provider-face pages (「首个占用者」).
 // Fenced code blocks and inline code spans are stripped before matching
 // (fixture strings and identifiers live there).
 const DOC_META_TERMS = [
@@ -447,6 +448,7 @@ const DOC_META_TERMS = [
   { rule: 'PKG-6', pattern: /\bW\d{1,2}\b/u },
   { rule: 'PKG-6', pattern: /\bworkunits?\b/u },
   { rule: 'PKG-9', pattern: /已归档|原仓库级|薄\s?shim|升格/u },
+  { rule: 'PKG-9', pattern: /首个占用者/u },
 ]
 
 function docsMetaLocality(root, cfg, extraMarkdown = []) {
