@@ -32,15 +32,15 @@ describe('validateToolBoundary', () => {
   it('fails when trace contains unexpected tools', () => {
     const trace = {
       requestHeaders: [
-        { seq: 0, reason: 'initial', system: 's', toolNames: ['coggit_status', 'subagent_at'] },
+        { seq: 0, reason: 'initial', system: 's', toolNames: ['coggit_status', 'sample_tool'] },
       ],
       toolCalls: [], toolResults: [], assistantTexts: [], sessions: [], finalText: '',
     }
     const result = validateToolBoundary(trace)
     assert.equal(result.status, 'checked')
     assert.equal(result.ok, false)
-    assert.deepEqual(result.unexpected, ['coggit_status', 'subagent_at'])
-    assert.deepEqual(result.actual, ['coggit_status', 'subagent_at'])
+    assert.deepEqual(result.unexpected, ['coggit_status', 'sample_tool'])
+    assert.deepEqual(result.actual, ['coggit_status', 'sample_tool'])
   })
 
   it('passes when every mounted tool is in the allowed set', () => {

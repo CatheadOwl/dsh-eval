@@ -239,7 +239,7 @@ describe('assistantTextIncludes', () => {
 
 describe('systemPromptIncludes', () => {
   it('matches a substring of the folded system prompt', () => {
-    assert.equal(systemPromptIncludes('subagent_at tool when a task must run').check(headerTrace).ok, true)
+    assert.equal(systemPromptIncludes('sample_tool tool when a task must run').check(headerTrace).ok, true)
     assert.equal(systemPromptIncludes('Use the read tool').check(headerTrace).ok, false)
   })
 
@@ -358,7 +358,7 @@ describe('promptBefore', () => {
 
 describe('toolMounted', () => {
   it('matches a mounted tool name in the request header', () => {
-    assert.equal(toolMounted('subagent_at').check(headerTrace).ok, true)
+    assert.equal(toolMounted('sample_tool').check(headerTrace).ok, true)
     assert.equal(toolMounted('bash').check(headerTrace).ok, false)
   })
 

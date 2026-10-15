@@ -78,9 +78,9 @@ describe('buildTrace', () => {
     assert.equal(headerTrace.requestHeaders.length, 1)
     assert.equal(headerTrace.requestHeaders[0].reason, 'initial')
     assert.equal('system' in headerTrace.requestHeaders[0], false, 'the pre-v3 header.system channel is gone from the projection')
-    assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'subagent_at'])
+    assert.deepEqual(headerTrace.requestHeaders[0].toolNames, ['read', 'sample_tool'])
     // The prompt itself is read from the system/message fold.
-    assert.ok(headerTrace.systemPrompt.includes('subagent_at'))
+    assert.ok(headerTrace.systemPrompt.includes('sample_tool'))
   })
 
   // The format moved the assembled prompt out of request/header into streaming

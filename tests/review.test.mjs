@@ -150,7 +150,7 @@ test('blank environment by default: staged plugin rows are disabled, wiring rows
     }, null, 2))
     writeFileSync(join(profileDir, 'cordis.yml'), '[]\n')
     writeFileSync(join(profileDir, 'cordis.patch.yml'), [
-      '- id: subagent-at',
+      '- id: sample-plugin',
       '  config:',
       '    profile: sdk',
     ].join('\n'))
@@ -182,7 +182,7 @@ test('blank environment by default: staged plugin rows are disabled, wiring rows
     })
     const overlay = await execute('task')
 
-    assert.match(overlay.stdout, /- id: "subagent-at"\n  disabled: true/)
+    assert.match(overlay.stdout, /- id: "sample-plugin"\n  disabled: true/)
     assert.match(overlay.stdout, /- id: "gates"\n  disabled: true/)
     assert.match(overlay.stdout, /- id: "markdown"\n  disabled: true/)
     assert.match(overlay.stdout, /- id: "tool-fs"\n  disabled: true/)
