@@ -26,7 +26,7 @@
 //   6. npm scripts locality: path arguments in `scripts` entries must stay
 //      inside the package root; borrowing host checkout paths (L0) is allowed.
 //   7. meta locality: module sources must not cite dev-repo control-plane
-//      terms (ADR/RFC/PRD/SPEC ids, spec docs, dated workunit TODOs) —
+//      terms (ADR/PRD/SPEC ids, spec docs, dated workunit TODOs) —
 //      comments carry functional semantics, design attribution lives in the
 //      cognition layer.
 //   8. host closure membership (network, opt-in via `hostClosureCheck`):
@@ -40,7 +40,7 @@
 //      exist.
 //  10. docs meta locality: published docs (README.md + configured docsRoots)
 //      must not cite dev-repo control-plane ids or lineage verbs —
-//      ADR/RFC/PRD ids, workline (W-number) ids, workunit references, and
+//      ADR/PRD ids, workline (W-number) ids, workunit references, and
 //      promotion/migration lineage verbs (升格 / 已归档 / 原仓库级 / 薄 shim).
 //      Plain-text by-name provenance ("original design record, by name")
 //      stays the accepted citation form; fenced code blocks and inline code
@@ -302,9 +302,11 @@ function docsLocality(root, cfg, extraMarkdown = []) {
 // layer. Scanned on the configured srcDirs of each content root only —
 // docs/README may cite dev-repo evidence as plain text, and dev-repo path
 // namespaces double as example data in prompt/routes sources, so they stay
-// out of scope. Widen the token set by evidence only.
+// out of scope. Widen the token set by evidence only. RFC ids are NOT
+// control-plane: they cite public standards (IETF), resolvable by any reader
+// without the dev repo — citing them adds self-containment, so they stay out.
 const META_TERMS = [
-  /\b(?:ADR|RFC|PRD|SPEC)[ -]?\d+/u,
+  /\b(?:ADR|PRD|SPEC)[ -]?\d+/u,
   /\bspec\s*[§:「]/u,
   /\bspec's\b/u,
   /\bworkunit spec\b/u,
@@ -438,13 +440,14 @@ export async function hostClosureViolations(manifest, options = {}) {
 // (README.md + configured docsRoots) either: unlike sources — where comments
 // carry functional semantics only — docs MAY cite dev-repo evidence, but only
 // via the accepted by-name provenance form. The un-actionable forms are
-// rejected mechanically: decision-record ids (ADR/RFC/PRD + number), workline
+// rejected mechanically: decision-record ids (ADR/PRD + number), workline
 // ids (W-number), workunit references, promotion/migration lineage verbs, and
 // consumer-occupancy lineup notes on provider-face pages (「首个占用者」).
 // Fenced code blocks and inline code spans are stripped before matching
-// (fixture strings and identifiers live there).
+// (fixture strings and identifiers live there). RFC ids stay out of every
+// term set: they cite public standards, resolvable without the dev repo.
 const DOC_META_TERMS = [
-  { rule: 'PKG-6', pattern: /\b(?:ADR|RFC|PRD)[ -]?\d{2,}\b/u },
+  { rule: 'PKG-6', pattern: /\b(?:ADR|PRD)[ -]?\d{2,}\b/u },
   { rule: 'PKG-6', pattern: /\bW\d{1,2}\b/u },
   { rule: 'PKG-6', pattern: /\bworkunits?\b/u },
   { rule: 'PKG-9', pattern: /已归档|原仓库级|薄\s?shim|升格/u },
