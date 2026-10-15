@@ -1,3 +1,7 @@
+---
+description: Evaluation layer for dsh plugin authors — behavior cases over real headless traces, scripted mock-LLM runs, and comprehension review of plugin outputs
+---
+
 # @catheadowl/dsh-eval
 
 English | [中文](README.zh.md)
