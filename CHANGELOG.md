@@ -47,6 +47,15 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Changed
 
+- **publish gate: id-form vocabulary derives from the ls-gates leak canon.**
+  The decision-record-id and dated-TODO-id lines of the publish gate's
+  source-comment and published-docs term tables are now a materialized
+  verbatim copy of the ls-gates leak registry canon (single fleet source),
+  exported as `ID_FORM_VOCAB` and locked by the dev repo's reconciliation
+  gate; domain lines (W-numbers, workunit words, lineage verbs) stay local.
+  Detection widens accordingly: SPEC ids join the docs face, hyphen-separated
+  TODO dates join both faces, and decision-record ids floor at two digits
+  (the fleet-calibrated floor).
 - **Session-log parsing tracks the host's current format generation (v4).**
   `KNOWN_SESSION_FORMAT_VERSIONS` moves from v3 to v4 together with the
   six-projection re-verification; stale v3 artifacts no longer parse (fresh

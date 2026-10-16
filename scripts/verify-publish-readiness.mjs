@@ -296,22 +296,34 @@ function docsLocality(root, cfg, extraMarkdown = []) {
   return violations
 }
 
+// id-form control-plane vocabulary, MATERIALIZED verbatim from the ls-gates
+// leak registry canon (publish/gates/leak.mjs, tokens `decision-record-id` /
+// `todo-date-id` — the fleet's single source for this family). Do not
+// hand-tune: the repo-side reconciliation lock fails loud when this copy
+// drifts from the canon. Domain vocabulary (W-numbers, workunit words,
+// lineage verbs, occupancy phrasing) stays local in the tables below —
+// per-cosmology terms never enter the canon.
+export const ID_FORM_VOCAB = [
+  { id: 'decision-record-id', re: /\b(?:ADR|PRD|SPEC)[ -]?\d{2,}\b/ },
+  { id: 'todo-date-id', re: /\bTODO[ -]?\d{8}\b/ },
+]
+
 // Dev-repo control-plane vocabulary (decision-record ids, spec citations,
 // dated workunit TODOs) must not appear in module source code: comments there
 // carry functional semantics only, design attribution lives in the cognition
 // layer. Scanned on the configured srcDirs of each content root only —
 // docs/README may cite dev-repo evidence as plain text, and dev-repo path
 // namespaces double as example data in prompt/routes sources, so they stay
-// out of scope. Widen the token set by evidence only. RFC ids are NOT
+// out of scope. The id-form lines derive from the ls-gates canon (see
+// ID_FORM_VOCAB); domain lines widen by evidence only. RFC ids are NOT
 // control-plane: they cite public standards (IETF), resolvable by any reader
 // without the dev repo — citing them adds self-containment, so they stay out.
 const META_TERMS = [
-  /\b(?:ADR|PRD|SPEC)[ -]?\d+/u,
+  ...ID_FORM_VOCAB.map(({ re }) => re),
   /\bspec\s*[§:「]/u,
   /\bspec's\b/u,
   /\bworkunit spec\b/u,
   /\bworkunits\/[a-z0-9-]+ [WT]\d+\b/u,
-  /TODO \d{8}/u,
 ]
 
 // Comment-shaped lines only: `spec` doubles as an ordinary noun / identifier
@@ -440,14 +452,15 @@ export async function hostClosureViolations(manifest, options = {}) {
 // (README.md + configured docsRoots) either: unlike sources — where comments
 // carry functional semantics only — docs MAY cite dev-repo evidence, but only
 // via the accepted by-name provenance form. The un-actionable forms are
-// rejected mechanically: decision-record ids (ADR/PRD + number), workline
-// ids (W-number), workunit references, promotion/migration lineage verbs, and
+// rejected mechanically: decision-record ids and dated TODO ids (the id-form
+// lines derive from the ls-gates canon, see ID_FORM_VOCAB), workline ids
+// (W-number), workunit references, promotion/migration lineage verbs, and
 // consumer-occupancy lineup notes on provider-face pages (「首个占用者」).
 // Fenced code blocks and inline code spans are stripped before matching
 // (fixture strings and identifiers live there). RFC ids stay out of every
 // term set: they cite public standards, resolvable without the dev repo.
 const DOC_META_TERMS = [
-  { rule: 'PKG-6', pattern: /\b(?:ADR|PRD)[ -]?\d{2,}\b/u },
+  ...ID_FORM_VOCAB.map(({ re }) => ({ rule: 'PKG-6', pattern: re })),
   { rule: 'PKG-6', pattern: /\bW\d{1,2}\b/u },
   { rule: 'PKG-6', pattern: /\bworkunits?\b/u },
   { rule: 'PKG-9', pattern: /已归档|原仓库级|薄\s?shim|升格/u },
