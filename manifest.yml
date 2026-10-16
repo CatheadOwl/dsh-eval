@@ -1,0 +1,22 @@
+schema_version: 1
+kind: directory
+
+metadata:
+  name: eval
+  description: The @catheadowl/dsh-eval publication face — bin, src, docs and reader faces mirroring the npm files set; link-target enforcement of this set lives here (publication closure)
+
+publication:
+  enabled: true
+  mode: closed
+  root: .
+  include:
+    - "package.json"
+    - "README.md"
+    - "README.zh.md"
+    - "CHANGELOG.md"
+    - "LICENSE"
+    - "bin/**"
+    - "src/**"
+    - "docs/**"
+  exclude:
+    - "manifest.yml"

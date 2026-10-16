@@ -17,12 +17,15 @@
 //      dev-time packages); public packages must use registry ranges.
 //   4. import coverage: every bare specifier imported from the configured
 //      `srcDirs` must be declared in dependencies or peerDependencies.
-//   5. docs locality: markdown links in README.md and the configured
-//      `docsRoots` must stay inside the package root and must not use
-//      absolute repo paths — the published docs cannot reach the dev repo.
-//      Plain-text relative path tokens that escape the package root are
-//      rejected for the same reason; host checkout borrows
-//      (deepseek-harness paths) stay exempt as everywhere else.
+//   5. docs locality: plain-text relative path tokens in README.md and the
+//      configured `docsRoots` must resolve to an existing path inside the
+//      package root — tokens escaping the root are unreachable for published
+//      readers, and tokens landing on a nonexistent in-package path are
+//      dangling pointers (stale dev-repo citations that mis-counted their
+//      `../` levels). Markdown link targets are the folder-manifest
+//      publication closure's territory (the package's manifest.yml declares
+//      the set); host checkout borrows (deepseek-harness paths) stay exempt
+//      as everywhere else.
 //   6. npm scripts locality: path arguments in `scripts` entries must stay
 //      inside the package root; borrowing host checkout paths (L0) is allowed.
 //   7. meta locality: module sources must not cite dev-repo control-plane
@@ -232,40 +235,6 @@ function npmScriptsLocality(manifest, root) {
   return violations
 }
 
-function markdownLinks(markdown) {
-  const withoutFences = markdown.replace(/```[\s\S]*?```/gu, '').replace(/`[^`\n]*`/gu, '')
-  const links = []
-  for (const match of withoutFences.matchAll(/\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/gu)) links.push(match[1])
-  return links
-}
-
-// Plain-text relative path tokens (`../../../outside-the-package.md`) in published
-// docs must resolve to an existing path inside the package root: tokens
-// escaping the root are unreachable for published readers, and tokens landing
-// on a nonexistent in-package path are dangling pointers (stale dev-repo
-// citations that mis-counted their `../` levels). Fenced code blocks and
-// markdown link targets are excluded (links have their own pass);
-// `deepseek-harness` tokens are the documented host-borrow exemption. This
-// is the only citation form mechanically separable from functional example
-// data (namespace-shaped tokens double as parser fixtures, so those stay
-// judgment-side — see the package AGENTS.md).
-function devRepoPathCitations(markdown, base, displayed, root, violations) {
-  const withoutFences = markdown.replace(/```[\s\S]*?```/gu, '')
-  // Whole markdown links (text + target) are removed: links have their own
-  // pass above, and a path-shaped link text (`[../README.md](...)`) is part
-  // of that link, not a plain-text citation.
-  const withoutLinks = withoutFences.replace(/\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\)/gu, '')
-  for (const match of withoutLinks.matchAll(/(?:\.\.[/\\])+[^\s`'"，。；：））、】》]*/gu)) {
-    const token = match[0]
-    if (token.includes('deepseek-harness')) continue
-    const target = resolve(base, token)
-    const insideRoot = target === root || target.startsWith(root + '/') || target.startsWith(root + '\\')
-    if (!insideRoot || !existsSync(target)) {
-      violations.push(`PKG-1: ${relative(root, displayed).replaceAll('\\', '/')} cites dev-repo path ${token} which does not resolve to an existing in-package path — name the source instead of pathing it`)
-    }
-  }
-}
-
 function docsLocality(root, cfg, extraMarkdown = []) {
   const violations = []
   const targets = [
@@ -278,22 +247,38 @@ function docsLocality(root, cfg, extraMarkdown = []) {
   for (const file of targets) {
     const text = typeof file === 'string' ? readFileSync(file, 'utf8') : file.text
     const displayed = typeof file === 'string' ? file : file.path
-    for (const link of markdownLinks(text)) {
-      if (/^[a-z][a-z0-9+.-]*:/iu.test(link) || link.startsWith('#')) continue
-      const pathPart = link.split('#', 1)[0]
-      if (pathPart === '') continue
-      if (pathPart.startsWith('/')) {
-        violations.push(`PKG-1: ${relative(root, displayed).replaceAll('\\', '/')} links absolute repo path ${link} — published docs cannot reach the dev repository`)
-        continue
-      }
-      const target = resolve(dirname(String(displayed)), pathPart)
-      if (!target.startsWith(root + '/') && !target.startsWith(root + '\\')) {
-        violations.push(`PKG-1: ${relative(root, displayed).replaceAll('\\', '/')} links outside the package root: ${link}`)
-      }
-    }
     devRepoPathCitations(text, dirname(String(displayed)), String(displayed), root, violations)
   }
   return violations
+}
+
+// Plain-text relative path tokens (`../../../outside-the-package.md`) in published
+// docs must resolve to an existing path inside the package root: tokens
+// escaping the root are unreachable for published readers, and tokens landing
+// on a nonexistent in-package path are dangling pointers (stale dev-repo
+// citations that mis-counted their `../` levels). Fenced code blocks and
+// whole markdown links are excluded (a path-shaped link text belongs to its
+// link, and link targets are the publication closure's territory);
+// `deepseek-harness` tokens are the documented host-borrow exemption. This
+// is the only citation form mechanically separable from functional example
+// data (namespace-shaped tokens double as parser fixtures, so those stay
+// judgment-side — see the package AGENTS.md).
+function devRepoPathCitations(markdown, base, displayed, root, violations) {
+  const withoutFences = markdown.replace(/```[\s\S]*?```/gu, '')
+  // Whole markdown links (text + target) are removed: a path-shaped link
+  // text (`[../README.md](...)`) is part of that link, not a plain-text
+  // citation — and the link's target resolution belongs to the folder-
+  // manifest publication closure, not this pass.
+  const withoutLinks = withoutFences.replace(/\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\)/gu, '')
+  for (const match of withoutLinks.matchAll(/(?:\.\.[/\\])+[^\s`'"，。；：））、】》]*/gu)) {
+    const token = match[0]
+    if (token.includes('deepseek-harness')) continue
+    const target = resolve(base, token)
+    const insideRoot = target === root || target.startsWith(root + '/') || target.startsWith(root + '\\')
+    if (!insideRoot || !existsSync(target)) {
+      violations.push(`PKG-1: ${relative(root, displayed).replaceAll('\\', '/')} cites dev-repo path ${token} which does not resolve to an existing in-package path — name the source instead of pathing it`)
+    }
+  }
 }
 
 // id-form control-plane vocabulary, MATERIALIZED verbatim from the ls-gates

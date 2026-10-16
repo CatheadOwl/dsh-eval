@@ -47,6 +47,14 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Changed
 
+- **publish gate: markdown-link target enforcement retires onto the
+  folder-manifest publication closure.** The package root now carries a
+  manifest.yml declaring the publication set (mirroring the npm files
+  list) with closure validation enabled; link targets that escape the
+  set are the closure's findings now, a class the old check could
+  structurally not see (in-package files that do not ship). Rule 5
+  narrows to the plain-text path-token half (unchanged semantics). The
+  eval publication set was closure-clean on first validation.
 - **publish gate: id-form vocabulary derives from the ls-gates leak canon.**
   The decision-record-id and dated-TODO-id lines of the publish gate's
   source-comment and published-docs term tables are now a materialized
