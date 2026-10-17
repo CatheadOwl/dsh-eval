@@ -48,7 +48,7 @@ behavior real 全部 run 适用的环境面规则。环境面清单、失效模�
 
 ## References
 
-- Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., & Narasimhan, K. (2023). SWE-bench: Can language models resolve real-world GitHub issues? *arXiv preprint* arXiv:2310.06770.
-- Nielsen Norman Group. Confounding variables in quantitative studies.
-- Pourhoseingholi, M. A., Baghestani, A. R., & Vahidi, M. (2012). How to control confounding effects by statistical analysis in research. *Nephro-urology Monthly*, 4(4).
-- SWE-bench. Evaluation harness reference (official documentation).
+- Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., & Narasimhan, K. (2023). SWE-bench: Can language models resolve real-world GitHub issues? *arXiv preprint* arXiv:2310.06770. https://arxiv.org/abs/2310.06770
+- Nielsen Norman Group. Confounding variables in quantitative studies. https://www.nngroup.com/articles/confounding-variables-quantitative-ux
+- Pourhoseingholi, M. A., Baghestani, A. R., & Vahidi, M. (2012). How to control confounding effects by statistical analysis in research. *Nephro-urology Monthly*, 4(4). https://pmc.ncbi.nlm.nih.gov/articles/PMC4017459/
+- SWE-bench. Evaluation harness reference (official documentation). https://www.swebench.com/SWE-bench/reference/harness
