@@ -1,5 +1,5 @@
 ---
-description: 安装与宿主接线——dsh-llm peer 的三形解析结局与 junction 步骤、构建 CLI 与 profile/模型/凭证/spawn 运行前置、模型选择链（real 模型 = profile 合成的 agent-default-model 行；settings 用户层不进暂存 home、默认不钉版本、钉版三法）、本包对宿主 session seam 的五处硬断言及其执法面（artifact 代际命名 / header 代际戳 / 拼接帧容器 / snapshotEvents 读取面 / system prompt 面事件），以及 mock 模式依赖的宿主 LLM adapter 线上契约（prepareCall，自带覆写对 peer 实例代差免疫）。
+description: Host wiring and run prerequisites — dsh-llm peer resolution, CLI build, profile/model/credential resolution chain, and the hard session-seam assertions
 ---
 
 # 安装与宿主接线
@@ -87,6 +87,7 @@ mock 模式经 `eval-mock-llm` 插件（`src/mock/mock-adapter.mjs`）注册 `Ev
 - 被测插件须已装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`；
 - 每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，通过 `--patch` 把 session JSONL 定向到本次 run——不污染真实 profile store；
 - review 默认空白环境：任意 profile 均可，树外插件行由 overlay 枚举禁用（详见 [review.md](review.md)）。
+- 暂存面**不覆盖**的环境性表面（用户技能目录等漏入通道）与混杂控制方法见 [environment.md](environment.md)——接线只管拷什么，覆盖边界是实验者的事。
 
 ## 模型选择
 

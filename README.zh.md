@@ -118,6 +118,7 @@ export default {
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig](docs/rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换、重述所需键） |
+| [environment](docs/environment.md) | 实验环境纪律：认知并控制运行环境——staging 覆盖边界与漏入通道、混杂两形态（假红/假绿）、行级钉面默认 + case 级恢复的方向原则 |
 | [cross-turn](docs/cross-turn.md) | `followups` 跨轮异步驱动契约（driver 行换装、子 agent settle 等待、mock 单 cursor 编排、有界重派断言） |
 | [experiments](docs/experiments.md) | 行为实验契约：臂 = case 字段覆写 × 重复 × 守卫 × 聚合（`defineBehaviorExperiment`、臂覆写深合并、INVALID 纪律、预注册 decisionRule） |
 | [intent-cases](docs/intent-cases.md) | real 意图 case 规约：何时写、断言面、守卫、CI 语义 |

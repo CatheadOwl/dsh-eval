@@ -1,5 +1,5 @@
 ---
-description: real 意图 case 规约——何时写的触发表、断言面最小化（toolCalled/toolCallArgs/inspect 守卫）、fixture 与门禁交互规避、凭证 auto-skip 与 CI 语义
+description: Spec for real intent cases — when to write one, minimal assertion face (toolCalled/toolCallArgs/inspect guards), fixture and gate-interaction avoidance, CI semantics
 ---
 
 # Real 意图 case 规约
@@ -29,6 +29,7 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 - `inspect` 守结果面 + 反捏造（不重建旧路径、不凭空造文件），不管模型走什么中间路径；
 - fixture 必须可区分（不同分支的 fixture 不能靠巧合区分）；
 - turn-close 门禁交互：见 [disablerows.md](disablerows.md)（case 级出口 `assistantTextIncludes`；splice 步骤与脚本本体的区分尚无框架级方案）。
+- 环境前提：意图测量的候选面必须受控（钉环境行，防假红/假绿）——守卫管结果面，环境面在断言之前，见 [environment.md](environment.md)。
 
 ## CI 语义
 

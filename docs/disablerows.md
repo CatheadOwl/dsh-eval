@@ -1,5 +1,5 @@
 ---
-description: disableRows 边界契约——按 loader 行 id 禁用插件行的通用机制、turn-close 门禁 splice 与 finalText 失效的交互根因、case/config 取值优先级
+description: Boundary contract of disableRows — per-run disabling of any loader row by id, turn-close gate splice interaction, and case-over-config precedence
 ---
 
 # `disableRows` 与 turn-close 门禁边界契约
@@ -19,6 +19,7 @@ eval 的临时工作区通常**不是 git 仓库**——doc-link 类 gate 在其
 - gate 交互 case 在默认禁用的包里声明 `disableRows: []` 显式恢复装载。
 - 不依赖插件开关的断言出口：`assistantTextIncludes`（断言脚本台词出现过，不要求是最终文本）。终态干净时仍应优先 `finalText*`。
 - per-gate 白名单（如只关某个 gate）暂不支持：per-gate disable 需要 gate 框架侧先提供 config 面。
+- 环境性混杂的实验学论证、staging 覆盖边界与「默认钉、case 级开」的方向原则（本机制不只是 gate 交互出口，也是钉出环境面的正字）见 [environment.md](environment.md)。
 
 ## 失败自解释
 

@@ -1,5 +1,5 @@
 ---
-description: 概念对照——从主流 agent eval 叙事（dataset / metric / LLM-as-judge / trajectory / CI）进入本包的词汇映射与差异理由
+description: Concept mapping from mainstream agent eval vocabulary (dataset/metric/LLM-as-judge/trajectory/CI) into this package's cases, matchers, and review, with deliberate non-goals
 ---
 
 # 概念对照：从主流 agent eval 进入
@@ -16,7 +16,7 @@ description: 概念对照——从主流 agent eval 叙事（dataset / metric / 
 | trace / span | dsh session JSONL → `EvalTrace` 投影（tool calls / steer / system prompt 面）+ `census` 普查 | trace 是一等公民且机器可断言；census 防投影静默降级的假绿 |
 | trajectory eval | 原生模式：matcher 断工具调用序列、参数路由、模型可见面 | 是对轨迹上的**契约**做断言，不是对轨迹打质量分 |
 | end-to-end / task success | behavior real（自然语言意图 → 真实工具选择）+ `inspect` 终态守卫（显式 `evidence: 'inspect'`） | 终态可查走确定性 verifier |
-| environment / sandbox | 每 run 暂存 profile 到隔离临时 home + overlay 钉死会话工件形状 | 环境重置是框架保证（try/finally 全路径清理），不是运维前提 |
+| environment / sandbox | 每 run 暂存 profile 到隔离临时 home + overlay 钉死会话工件形状 | 环境重置是框架保证（try/finally 全路径清理），不是运维前提；重置覆盖不到的环境性表面是实验者自觉面（[environment.md](environment.md)） |
 | eval suite / experiment | case 目录 + `defineBehaviorExperiment`（臂 = case 字段覆写 × 重复 × 守卫 × 聚合） | decisionRule 预注册带指纹，防事后挑规则 |
 | CI 集成 | mock 档免凭证、确定性，可作 CI 门（`--fail-on-skip`）；real 档无凭证自动 skip；`--format json` 供聚合 | CI 门按确定性分层，不按范式分层 |
 | agent harness | 被测对象本身：plugin + profile + patch + loader row + tool registry 装配成的图 | 主流语境 harness 是承载面；这里它同时是被测对象 |
