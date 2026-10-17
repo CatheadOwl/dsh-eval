@@ -161,7 +161,7 @@ export function check(root, cfg = undefined) {
 function collectMarkdown(dir, result = []) {
   if (!existsSync(dir)) return result
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) collectMarkdown(join(dir, entry), result)
+    if (entry.isDirectory()) collectMarkdown(join(dir, entry.name), result)
     else if (extname(entry.name) === '.md') result.push(join(dir, entry.name))
   }
   return result
