@@ -110,9 +110,16 @@ real 层的模型配置面**全在 dsh profile，本包零模型知识**：runne
 
 ## 凭证
 
-real 层的**模型凭证由 dsh 自行解析**，本包不做任何凭证配置：spawn 的是 dsh 本体，env 原样透传，真实 home 的托管凭证文档（`.credentials.yaml`）经 `stageSandboxHome` 复制进暂存 home。解析分两级：组合面加载了 `dsh-credentials-local` 时，`apiKeyEnv` 引用按其优先级逐请求解析（存储文件优先，env 后备）；未加载时只读启动环境。宿主 `dsh-headless` bundle 默认禁用 credentials 行（一次性作业走启动时凭据），所以**原生 headless profile 下 key 只认启动环境**——key 由 env 供给即开箱即跑，「你的 dsh 能正常跑，real case 就能跑」成立；key 只存在托管文档里（web Models 页保存的常态）则不随行，且存在性探测只看可见性（env 或托管文档任一存在即不 skip），case 会直接以 `MISSING_CREDENTIAL` 失败。
+real 层的**模型凭证由 dsh 自行解析**，本包的凭证面只有三件事：spawn dsh 本体、env 原样透传；真实 home 的托管凭证文档（`.credentials.yaml`）经 `stageSandboxHome` 复制进暂存 home——中性暂存，读不读由启动的组合决定；启动前的存在性探测（env 或托管文档任一可见即不 auto-skip），只判可见性、不判可解析性。
 
-让托管文档生效：profile patch 重启用 credentials 行，一行，机器级生效，此后库存 key 同样满足上句承诺：
+其余是宿主组合面的事实（dsh / dsh-headless 所有，非本包行为），重述以校准预期：
+
+- dsh 的凭证解析两级：组合加载 `dsh-credentials-local` 时，`apiKeyEnv` 引用按其优先级逐请求解析（存储文件优先，env 后备）；未加载时只读启动环境。
+- `dsh-headless` bundle 默认禁用 credentials 行，原生 headless profile 因此只认启动环境。
+
+据此，「你的 dsh 能正常跑，real case 就能跑」的成立面是：key 由 env 供给，或 profile 组合启用了 credentials 行（库存 key 随行）。key 只在托管文档里而组合未加载读取者时，探测不 skip，case 以 `MISSING_CREDENTIAL` 结束——失败面在组合的凭证解析，不在本包。
+
+要让托管文档生效，走 profile patch（宿主的组合扩展点，不是本包配置），一行、机器级生效：
 
 ```yaml
 - id: credentials
@@ -120,7 +127,7 @@ real 层的**模型凭证由 dsh 自行解析**，本包不做任何凭证配置
   disabled: false
 ```
 
-真实 home 没有托管凭证文档的机器（典型为 CI）不受影响：staging 对缺失文档不复制，空库走 env 后备层。mock 与 review dry-run 完全不需要凭证。
+真实 home 没有托管凭证文档的机器（典型为 CI）不受影响：staging 对缺失文档不复制，走 env。mock 与 review dry-run 完全不需要凭证。
 
 ## spawn 要求
 
