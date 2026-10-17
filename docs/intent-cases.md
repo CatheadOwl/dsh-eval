@@ -37,4 +37,4 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 
 ## 实例
 
-「同一意图 × 数据面分流」成对设计的可模仿形态：一组意图集检查（review 通道断言理解）配一组同意图的行为四连——repair / discovery / no-evidence / oldpath-missing（behavior 通道断言执行）——同一意图在两个数据面上分流成对，互为回归网。
+「同一意图 × 数据面分流」成对设计的可模仿形态：一组意图集检查（review 通道断言理解）配一组同意图的行为三连——repair / discovery / oldpath-missing（behavior 通道断言执行）——同一意图在两个数据面上分流成对，互为回归网。（曾有 no-evidence 第四成员钉「预判徒劳仍委派」，因预判徒劳的调用被模型类一致绕行、轨迹断言不可钉而撤出；成员数以 md-rename 的 `eval/behavior/real/` 现状为准。）
