@@ -39,7 +39,7 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @catheadowl/dsh-eval
 ```
 
-**Requirements**（接线细节与失败自诊断见 [docs/host-wiring.md](docs/host-wiring.md)）：
+**Requirements**（接线细节与失败自诊断见 [docs/host-wiring/README.md](docs/host-wiring/README.md)）：
 
 - 一个已构建的 deepseek-harness 检出（`apps/cli/lib/bin.js`）；
 - 被测插件已装进某个 dsh profile；
@@ -71,7 +71,7 @@ dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 
 命令需要知道用哪个 dsh profile：显式传 `--profile <name>`，或放一份 `dsh-eval.config.mjs` 到包根（见下节「统一配置」）。
 
-真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring.md](docs/host-wiring.md) 的「模型选择」一节。
+真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md)。
 
 ## 规范目录
 
@@ -112,7 +112,7 @@ export default {
 
 | 文档 | 主题 |
 |---|---|
-| [host-wiring](docs/host-wiring.md) | peer 接线（含 npm 古董 peer 坑）、构建 CLI、profile、模型选择、凭证、spawn 要求 |
+| [host-wiring](docs/host-wiring/README.md) | 安装与宿主接线的主题索引：peer 接线（含 npm 古董 peer 坑）、CLI 定位链、宿主契约断言、模型选择、凭证、spawn 要求 |
 | [concepts](docs/concepts.md) | 主流 agent eval 概念对照：dataset / metric / LLM-as-judge / trajectory / CI 如何映射到 case / matcher / review（behavior 即 unittest 语义，判断冻结于写作时） |
 | [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则、机器 judge 第一道（`--judge`） |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |

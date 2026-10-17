@@ -25,7 +25,7 @@ pnpm test           # unit suite + verify:publish + verify:face + README i18n pa
 ```
 
 A few review-adapter tests spawn the dsh CLI; they need a built host checkout
-resolvable via the resolution chain (see `docs/host-wiring.md`). The sandboxed
+resolvable via the resolution chain (see `docs/host-wiring/README.md`). The sandboxed
 environments where spawning is denied should run the suite from a normal
 terminal rather than skipping tests.
 

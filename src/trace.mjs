@@ -10,7 +10,7 @@
  * Both seam directions carry an explicit boundary: an artifact whose header
  * stamp is not a known generation is refused here (`parseSessionLog`), and a
  * collection that finds no artifact yields a named diagnosis rather than an
- * unexplained `undefined` (`collectSessionTrace`). See docs/host-wiring.md.
+ * unexplained `undefined` (`collectSessionTrace`). See docs/host-wiring/host-contracts.md.
  */
 
 import { readdirSync, readFileSync } from 'node:fs'
@@ -571,7 +571,7 @@ function traceGapMessage(sessionsRoot, files) {
  * The `gap` string exists so that "the host's artifact/session layout moved"
  * surfaces as that sentence in the behavior runner's failure text and in the
  * review adapter's accounting, instead of as a bare `undefined` the reader
- * has to trace back through the parser (see docs/host-wiring.md).
+ * has to trace back through the parser (see docs/host-wiring/host-contracts.md).
  *
  * @param {string} sessionsRoot - the run's `session-persistence-jsonl` root.
  * @returns {{ trace: EvalTrace | undefined, gap: string | undefined }} the

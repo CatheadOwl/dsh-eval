@@ -1,5 +1,5 @@
 ---
-description: experimental 子路径符号清单——机制原语（沙箱/overlay/trace、review 执行器、CLI 解析链）的逃生面；无兼容承诺，随 minor 变更
+description: Escape-hatch symbol list for the experimental subpath — sandbox, overlay, trace, review executor, and CLI resolution primitives with no compatibility promise
 ---
 
 # experimental 子路径（逃生面）
@@ -16,7 +16,7 @@ import { resolveDshCliChain } from '@catheadowl/dsh-eval/experimental'
 
 | 符号 | 用途 |
 |---|---|
-| `resolveDshCliChain` | 现代三段式 dsh CLI 解析链（`--repo` 旗标 → 解析层 node_modules → config `repo`），返回 `{ cli, repo, source }`；解析失败同步抛错（指引见 [host-wiring.md](host-wiring.md)） |
+| `resolveDshCliChain` | 现代三段式 dsh CLI 解析链（`--repo` 旗标 → 解析层 node_modules → config `repo`），返回 `{ cli, repo, source }`；解析失败同步抛错（指引见 [cli-resolution.md](host-wiring/cli-resolution.md)） |
 | `stageProfileStore` | 把真实 profile store junction 感知地暂存进沙箱 home（沙箱机制） |
 | `buildOverlayYaml` | 由片段拼装 dsh overlay YAML（整段发射器） |
 | `overlayDisableRows` | 生成 `disabled: true` 的行禁用 overlay 片段 |

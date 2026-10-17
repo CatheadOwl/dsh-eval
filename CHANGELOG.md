@@ -283,7 +283,7 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `registration.adapter.prepareCall is not a function`. The override mirrors
   the host base-class default (`{ model, stream }` bound to one adapter
   generation), making the wire contract independent of the peer instance's
-  generation; the seam is now documented in `docs/host-wiring.md` with a
+  generation; the seam is now documented in `docs/host-wiring/host-contracts.md` with a
   maintenance trigger.
 - `census.eventTypeCounts` counts prototype-named event types correctly: a
   plug-in event type such as `constructor` or `__proto__` used to produce a

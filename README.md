@@ -43,7 +43,7 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @catheadowl/dsh-eval
 ```
 
-**Requirements** (wiring details and failure self-diagnostics in [docs/host-wiring.md](docs/host-wiring.md)):
+**Requirements** (wiring details and failure self-diagnostics in [docs/host-wiring/README.md](docs/host-wiring/README.md)):
 
 - a built deepseek-harness checkout (`apps/cli/lib/bin.js`);
 - the plugin under test installed into a dsh profile;
@@ -75,7 +75,7 @@ dsh-review --dry-run eval/comprehension     # model-free dry run of the review l
 
 The command needs to know which dsh profile to use: pass `--profile <name>` explicitly, or drop a `dsh-eval.config.mjs` at the package root (see "Unified config" below).
 
-Real runs use `dsh-eval run --profile <p> --repo <harness checkout> <case path>`; all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in the "Model selection" section of [docs/host-wiring.md](docs/host-wiring.md).
+Real runs use `dsh-eval run --profile <p> --repo <harness checkout> <case path>`; all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md).
 
 ## Canonical layout
 
@@ -116,7 +116,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 
 | Doc | Topic |
 |---|---|
-| [host-wiring](docs/host-wiring.md) | peer wiring (incl. the npm antique-peer trap), building the CLI, profiles, model selection, credentials, spawn requirements |
+| [host-wiring](docs/host-wiring/README.md) | install and host wiring topic index: peer wiring (incl. the npm antique-peer trap), CLI resolution, host contract assertions, model selection, credentials, spawn requirements |
 | [concepts](docs/concepts.md) | concept mapping from mainstream agent eval (dataset / metric / LLM-as-judge / trajectory / CI) into cases / matchers / review — behavior cases are unittest semantics, judgment frozen at authoring time |
 | [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules, machine judge first-pass (`--judge`) |
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
