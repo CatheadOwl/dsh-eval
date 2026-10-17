@@ -27,5 +27,5 @@ description: docs/ 维护规则——各篇的上游重查触发器与目录内�
 ## 目录约定
 
 - 新篇进 `README.md` 索引表；带 frontmatter description（md-metadata 门禁）。
-- 篇间互链用相对路径；发布闸拦一切越出包根的链接与路径 token。
+- 篇间互链用相对路径。
 - 语义级"出处 vs 噪音"裁量不归机械闸（机械门只拦可分离形态）——拿不准时跑包根 `AGENTS.md` 指向的主页评审协议（`.agents/homepage-review.md`）。
