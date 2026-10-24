@@ -298,7 +298,7 @@ export const ID_FORM_VOCAB = [
 // carry functional semantics only, design attribution lives in the cognition
 // layer. Scanned on the configured srcDirs of each content root only —
 // docs/README may cite dev-repo evidence as plain text, and dev-repo path
-// namespaces double as example data in prompt/routes sources, so they stay
+// namespaces double as example data in prompt sources, so they stay
 // out of scope. The id-form lines derive from the ls-gates canon (see
 // ID_FORM_VOCAB); domain lines widen by evidence only. RFC ids are NOT
 // control-plane: they cite public standards (IETF), resolvable by any reader
