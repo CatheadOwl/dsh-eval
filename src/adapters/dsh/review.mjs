@@ -28,14 +28,17 @@ const REVIEW_DISABLED_TOOL_ROWS = [
   'tool-skill',
   'tool-todo',
   'tool-goal',
-  'tool-ralph',
-  'tool-str-replace-editor',
   'tool-web',
+  // Host 0.2.1-rc.3 base template: new row mounting the model-visible
+  // `working_directory` tool; without it every review run on that host
+  // generation fails the tool-boundary check.  Re-enumerated against the
+  // same template: `tool-ralph`, `tool-str-replace-editor`, and
+  // `tool-subagent-report` no longer exist upstream and are dropped.
+  'tool-working-directory',
   'tool-subagent-control',
   'tool-subagent-list-agents',
   'tool-subagent',
   'tool-subagent-fork',
-  'tool-subagent-report',
   'tool-workflow',
   // Host 0.1.6 plan mode: the bundle lists `exit_plan_mode` in the request
   // tool catalog "across modes for request-cache stability", so the tool
