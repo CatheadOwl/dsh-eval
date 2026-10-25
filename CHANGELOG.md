@@ -8,6 +8,25 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [0.5.1] — 2026-10-25
+
+### Fixed
+
+- **Review blank-environment lockdown tracks the host 0.2.1-rc.3 base
+  template.** The static disabled-row list gains `tool-working-directory` —
+  a new base row mounting a model-visible `working_directory` tool that
+  would fail the tool-boundary check on every review run — and drops rows
+  the host no longer ships (`tool-ralph`, `tool-str-replace-editor`,
+  `tool-subagent-report`).
+
+### Changed
+
+- **Docs face: `docs/host-wiring.md` is now the `docs/host-wiring/` topic
+  folder** (peer resolution, CLI resolution, host contracts, model
+  selection, and credentials as per-topic pages) and a new
+  `docs/environment.md` page covers experiment-environment discipline;
+  follow the README docs table for the new paths.
+
 ## [0.5.0] — 2026-10-02
 
 ### Added
@@ -47,23 +66,6 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Changed
 
-- **publish gate: markdown-link target enforcement retires onto the
-  folder-manifest publication closure.** The package root now carries a
-  manifest.yml declaring the publication set (mirroring the npm files
-  list) with closure validation enabled; link targets that escape the
-  set are the closure's findings now, a class the old check could
-  structurally not see (in-package files that do not ship). Rule 5
-  narrows to the plain-text path-token half (unchanged semantics). The
-  eval publication set was closure-clean on first validation.
-- **publish gate: id-form vocabulary derives from the ls-gates leak canon.**
-  The decision-record-id and dated-TODO-id lines of the publish gate's
-  source-comment and published-docs term tables are now a materialized
-  verbatim copy of the ls-gates leak registry canon (single fleet source),
-  exported as `ID_FORM_VOCAB` and locked by the dev repo's reconciliation
-  gate; domain lines (W-numbers, workunit words, lineage verbs) stay local.
-  Detection widens accordingly: SPEC ids join the docs face, hyphen-separated
-  TODO dates join both faces, and decision-record ids floor at two digits
-  (the fleet-calibrated floor).
 - **Session-log parsing tracks the host's current format generation (v4).**
   `KNOWN_SESSION_FORMAT_VERSIONS` moves from v3 to v4 together with the
   six-projection re-verification; stale v3 artifacts no longer parse (fresh
