@@ -114,6 +114,7 @@ export default {
 |---|---|
 | [host-wiring](docs/host-wiring/README.md) | 安装与宿主接线的主题索引：peer 接线（含 npm 古董 peer 坑）、CLI 定位链、宿主契约断言、模型选择、凭证、spawn 要求 |
 | [concepts](docs/concepts.md) | 主流 agent eval 概念对照：dataset / metric / LLM-as-judge / trajectory / CI 如何映射到 case / matcher / review（behavior 即 unittest 语义，判断冻结于写作时） |
+| [host-machinery](docs/host-machinery.md) | 与宿主自带源码机台（test-support 组、快照/e2e/bench 轨）的关系与场景选型表：给定测试场景该用哪个机台 |
 | [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则、机器 judge 第一道（`--judge`） |
 | [matchers](docs/matchers.md) | trace matcher 与 mock helper 全集（工具面 / 文本面 / 模型可见面） |
 | [disablerows](docs/disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |

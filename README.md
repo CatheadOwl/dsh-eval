@@ -118,6 +118,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 |---|---|
 | [host-wiring](docs/host-wiring/README.md) | install and host wiring topic index: peer wiring (incl. the npm antique-peer trap), CLI resolution, host contract assertions, model selection, credentials, spawn requirements |
 | [concepts](docs/concepts.md) | concept mapping from mainstream agent eval (dataset / metric / LLM-as-judge / trajectory / CI) into cases / matchers / review — behavior cases are unittest semantics, judgment frozen at authoring time |
+| [host-machinery](docs/host-machinery.md) | relationship to the host's own in-tree test machinery (test-support group, snapshot/e2e/bench tracks) and a scenario-to-machinery dispatch table for plugin authors |
 | [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules, machine judge first-pass (`--judge`) |
 | [matchers](docs/matchers.md) | the full trace-matcher and mock-helper set (tool face / text face / model-visible face) |
 | [disablerows](docs/disablerows.md) | `disableRows` and the turn-close gate boundary contract |

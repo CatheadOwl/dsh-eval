@@ -10,6 +10,7 @@ description: Docs index for the dsh-eval published doc set — routing table int
 | [review.md](review.md) | comprehension review：实验定义、空白环境 reviewer、产物清单、评审规则与 judge 第一道 |
 | [matchers.md](matchers.md) | trace matcher 与 mock helper 全集 |
 | [concepts.md](concepts.md) | 概念对照：主流 agent eval 词汇（dataset / metric / LLM-as-judge / trajectory / CI…）到本包 cases / matchers / review 的映射与「刻意不做」档 |
+| [host-machinery.md](host-machinery.md) | 与宿主自带源码机台的关系：机台一览（test-support 组、快照/e2e/bench 轨）、三层关系（机制血缘 / 契约 / 判读分野）与场景选型表 |
 | [disablerows.md](disablerows.md) | `disableRows` 与 turn-close 门禁边界契约 |
 | [rowconfig.md](rowconfig.md) | `rowConfig` 行 config 覆写契约（整段替换语义、形状限制、与 disableRows 分工） |
 | [environment.md](environment.md) | 实验环境纪律：环境认知与混杂控制——real run 环境面四分法、staging 覆盖边界与漏入通道、假红/假绿两形态、行级钉面默认与 case 级恢复的方向原则 |
