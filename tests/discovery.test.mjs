@@ -289,11 +289,12 @@ describe('validateEvalCase', () => {
     )
   })
 
-  // The rule must load the repo's own corpus: a wiring smoke that asserts only
-  // inside its inspect hook (`expect: []`) is the shape that made a first cut of
-  // this rule reject a shipped case — it now carries the explicit declaration.
-  it('loads the repo case that declares an inspect anchor with an empty expect', async () => {
-    const fromEval = fileURLToPath(new URL('../../extras/modules/enrichment/eval/behavior/mock/injection-smoke.eval.mjs', import.meta.url))
+  // The rule must load a real file, not just inline objects: the corpus case
+  // that shaped it (a wiring smoke asserting only inside its inspect hook,
+  // `expect: []`) was retired with its module, so the loading guarantee rides
+  // an in-package twin of the same shape.
+  it('loads a case file that declares an inspect anchor with an empty expect', async () => {
+    const fromEval = fileURLToPath(new URL('./fixtures/inspect-anchor-shape.eval.mjs', import.meta.url))
     const loaded = (await import(pathToFileURL(fromEval).href)).default
     assert.deepEqual(loaded.expect, [])
     assert.equal(loaded.evidence, 'inspect')
