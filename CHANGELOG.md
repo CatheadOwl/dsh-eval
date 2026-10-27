@@ -8,6 +8,22 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Changed
+
+- **Install face: npm host co-install is the default, zero peer wiring.**
+  Requirements now read `npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval` —
+  the host's dependency tree ships a same-generation `dsh-llm`, so the
+  peer is satisfied without any manual wiring. The built checkout
+  (previously stated as required) is an optional host source via
+  `--repo`; manual peer wiring applies only to eval-only installs with
+  no host in the tree (npm then auto-installs an incompatible antique
+  `latest` of `@deepseek-ai/dsh-llm`). Verified 2026-10-26: two-line
+  cold install + shipped `headless` profile passes a mock case end to
+  end. Config example drops the legacy `repo` key; the real-run example
+  leads with the install-tree CLI resolution.
+
 ## [0.5.1] — 2026-10-25
 
 ### Fixed

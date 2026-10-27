@@ -40,14 +40,14 @@ behavior *.eval.mjs ───────────────────►
 ## Install
 
 ```bash
-npm i -D @catheadowl/dsh-eval
+npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
 **Requirements** (wiring details and failure self-diagnostics in [docs/host-wiring/README.md](docs/host-wiring/README.md)):
 
-- a built deepseek-harness checkout (`apps/cli/lib/bin.js`);
+- the dsh host as a dev dependency (`@deepseek-ai/dsh`) — its dependency tree ships a same-generation `dsh-llm`, so the peer needs **zero manual wiring**; a built checkout (`apps/cli/lib/bin.js`, pinned via `--repo`) works as an alternative host source but is optional;
 - the plugin under test installed into a dsh profile;
-- the peer dependency `@deepseek-ai/dsh-llm` must be wired manually (npm auto-installs an incompatible antique version; replace it with a link pointing at the host checkout).
+- the only form still needing manual peer wiring is an eval-only install with no host in the tree (npm then auto-installs an incompatible antique `latest` of `@deepseek-ai/dsh-llm` — see the host-wiring doc).
 
 ## Quickstart
 
@@ -75,7 +75,7 @@ dsh-review --dry-run eval/comprehension     # model-free dry run of the review l
 
 The command needs to know which dsh profile to use: pass `--profile <name>` explicitly, or drop a `dsh-eval.config.mjs` at the package root (see "Unified config" below).
 
-Real runs use `dsh-eval run --profile <p> --repo <harness checkout> <case path>`; all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md).
+Real runs use `dsh-eval run --profile <p> <case path>` (the CLI resolves from the install tree; pass `--repo <harness checkout>` to pin a built checkout instead); all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md).
 
 ## Canonical layout
 
@@ -101,7 +101,6 @@ Drop one at the consumer package root; both CLIs walk upward from the working di
 ```js
 export default {
   profile: 'headless',              // dsh profile
-  repo: '../../deepseek-harness',   // relative, anchored at the config file's directory
   mode: 'mock',                     // behavior CLI's --mode default (review has none)
   failOnSkip: false,                // behavior CI gate default
   report: 'eval-report.json',       // --report default (anchored at the config dir)
@@ -116,7 +115,7 @@ Unknown keys fail loudly (typos never degrade silently). The `disableRows` seman
 
 | Doc | Topic |
 |---|---|
-| [host-wiring](docs/host-wiring/README.md) | install and host wiring topic index: peer wiring (incl. the npm antique-peer trap), CLI resolution, host contract assertions, model selection, credentials, spawn requirements |
+| [host-wiring](docs/host-wiring/README.md) | install and host wiring topic index: peer wiring (the antique-peer trap applies to host-absent installs only), CLI resolution, host contract assertions, model selection, credentials, spawn requirements |
 | [concepts](docs/concepts.md) | concept mapping from mainstream agent eval (dataset / metric / LLM-as-judge / trajectory / CI) into cases / matchers / review — behavior cases are unittest semantics, judgment frozen at authoring time |
 | [host-machinery](docs/host-machinery.md) | relationship to the host's own in-tree test machinery (test-support group, snapshot/e2e/bench tracks) and a scenario-to-machinery dispatch table for plugin authors |
 | [review](docs/review.md) | comprehension review: experiment definition, blank-environment reviewers, artifacts, the six review rules, machine judge first-pass (`--judge`) |

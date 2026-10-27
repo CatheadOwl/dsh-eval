@@ -36,14 +36,14 @@ behavior *.eval.mjs ───────────────────►
 ## Install
 
 ```bash
-npm i -D @catheadowl/dsh-eval
+npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
 **Requirements**（接线细节与失败自诊断见 [docs/host-wiring/README.md](docs/host-wiring/README.md)）：
 
-- 一个已构建的 deepseek-harness 检出（`apps/cli/lib/bin.js`）；
+- dsh 宿主作为 devDependency（`@deepseek-ai/dsh`）——其依赖树自带同代 `dsh-llm`，peer **零手工接线**；已构建检出（`apps/cli/lib/bin.js`，经 `--repo` 钉定）可作为替代宿主来源，非必需；
 - 被测插件已装进某个 dsh profile；
-- peer 依赖 `@deepseek-ai/dsh-llm` 需手工接线（npm 会自动装到不兼容的古董版，须替换为指向宿主检出的链接）。
+- 唯一仍需手工接 peer 的形态：裸装本包且安装树内没有宿主（此时 npm 会自动装到不兼容的古董 `latest` `@deepseek-ai/dsh-llm`——见 host-wiring 文档）。
 
 ## Quickstart
 
@@ -71,7 +71,7 @@ dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 
 命令需要知道用哪个 dsh profile：显式传 `--profile <name>`，或放一份 `dsh-eval.config.mjs` 到包根（见下节「统一配置」）。
 
-真实运行用 `dsh-eval run --profile <p> --repo <harness 检出> <case 路径>`；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md)。
+真实运行用 `dsh-eval run --profile <p> <case 路径>`（CLI 从安装树解析；`--repo <harness 检出>` 可钉定已构建检出）；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md)。
 
 ## 规范目录
 
@@ -97,7 +97,6 @@ dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 ```js
 export default {
   profile: 'headless',              // dsh profile
-  repo: '../../deepseek-harness',   // 相对路径锚定 config 文件所在目录
   mode: 'mock',                     // behavior CLI 的 --mode 默认（review 无此项）
   failOnSkip: false,                // behavior CI 门禁默认
   report: 'eval-report.json',       // --report 默认（锚定 config 目录）
@@ -112,7 +111,7 @@ export default {
 
 | 文档 | 主题 |
 |---|---|
-| [host-wiring](docs/host-wiring/README.md) | 安装与宿主接线的主题索引：peer 接线（含 npm 古董 peer 坑）、CLI 定位链、宿主契约断言、模型选择、凭证、spawn 要求 |
+| [host-wiring](docs/host-wiring/README.md) | 安装与宿主接线的主题索引：peer 接线（古董 peer 坑只在裸装无宿主形态）、CLI 定位链、宿主契约断言、模型选择、凭证、spawn 要求 |
 | [concepts](docs/concepts.md) | 主流 agent eval 概念对照：dataset / metric / LLM-as-judge / trajectory / CI 如何映射到 case / matcher / review（behavior 即 unittest 语义，判断冻结于写作时） |
 | [host-machinery](docs/host-machinery.md) | 与宿主自带源码机台（test-support 组、快照/e2e/bench 轨）的关系与场景选型表：给定测试场景该用哪个机台 |
 | [review](docs/review.md) | comprehension review：实验定义、空白环境 reviewer、产物、六条评审规则、机器 judge 第一道（`--judge`） |
