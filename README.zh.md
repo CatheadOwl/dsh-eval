@@ -39,6 +39,8 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
+用 **npm** 安装、宿主同树共装——这是已验证路径。其他包管理器与 store 布局（如 pnpm 虚拟 store）可能让 `dsh-llm` peer 无可解析位置；拓扑注记见 [docs/host-wiring/README.md](docs/host-wiring/README.md)。一切从被测包根跑起（`eval/` 所在处）。Node `^22.19 || >=24`。
+
 **Requirements**（接线细节与失败自诊断见 [docs/host-wiring/README.md](docs/host-wiring/README.md)）：
 
 - dsh 宿主作为 devDependency（`@deepseek-ai/dsh`）——其依赖树自带同代 `dsh-llm`，peer **零手工接线**；已构建检出（`apps/cli/lib/bin.js`，经 `--repo` 钉定）可作为替代宿主来源，非必需；
@@ -54,22 +56,25 @@ import { toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
 
 export default {
   id: 'my-first-case',
-  mode: 'mock',
+  mode: 'mock',                    // case 缺省 mode 为 'real'，mock 必须显式声明
   task: '把 guide.md 重命名为 intro.md',
-  async prepare(workspace) { /* 播种 fixture 文件 */ },
+  async prepare(workspace) { /* 可选：播种 fixture 文件 */ },
   script: { steps: [toolCallStep('md_rename', { oldPath: 'guide.md', newPath: 'intro.md' }), textStep('done')] },
   expect: [toolCalled('md_rename')],
 }
 ```
 
+被测插件先一次性装进 profile——`dsh plugin add` 的写入面转发 **pnpm**，须在 PATH（`corepack enable pnpm` 或 `npm i -g pnpm`）——再运行；两个 CLI 是本地 bin，经 `npx` 调用：
+
 ```bash
-dsh-eval run --mode mock eval/behavior/mock
-dsh-review --dry-run eval/comprehension     # review 层的免模型预演
+npx dsh plugin --profile headless add <插件目录 | tgz>
+npx dsh-eval run --profile headless --mode mock eval/behavior/mock
+npx dsh-review --dry-run eval/comprehension     # review 层的免模型预演
 # → PASS my-first-case
 #   1 selected, 1 passed, 0 failed, 0 skipped
 ```
 
-命令需要知道用哪个 dsh profile：显式传 `--profile <name>`，或放一份 `dsh-eval.config.mjs` 到包根（见下节「统一配置」）。
+`--profile headless` 是零 setup 默认——自带模板在隔离 home 首次使用时自动物化。传入的 profile 须为 headless 形 app：case 的 task 以位置参数抵达，web 形 app 会拒绝运行。包根放一份 `dsh-eval.config.mjs` 可替代显式 flag（见下节「统一配置」）。real（`mode: 'real'`）面的完整示例见 [docs/intent-cases.md](docs/intent-cases.md)；real 运行需 env 供 provider key（见 [docs/host-wiring/credentials.md](docs/host-wiring/credentials.md)）。
 
 真实运行用 `dsh-eval run --profile <p> <case 路径>`（CLI 从安装树解析；`--repo <harness 检出>` 可钉定已构建检出）；全部 flags（`--mode/--keep-artifacts/--fail-on-skip/--format/--report`）见 [docs/report.md](docs/report.md)。real case 无凭证时 auto-skip（dsh 自己解析凭证），mock 与 dry-run 不需要任何凭证。real run 用的模型由所选 profile 决定（**不是**交互会话当前选的那个）——来源链、查证方法与钉版做法见 [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md)。
 

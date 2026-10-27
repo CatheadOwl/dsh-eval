@@ -24,6 +24,24 @@ behavior real 断言「自然语言意图 → 工具选择与参数路由」，m
 - `toolCalled`（不是 `firstTool`——探索在前合法）+ `toolCallArgs` 子集（路由 payoff 在参数对）+ 语义关键时 `toolResultTextIncludes` 状态锚（如 `"status": "repaired"`）；
 - 不约束措辞与中间步骤——意图测试的模型措辞天然漂移，工具选择才是契约。
 
+## 最小完整示例
+
+```js
+// <plugin>/eval/behavior/real/intent.eval.mjs —— mode 缺省即 'real'，可省略
+import { toolCalled, toolCallArgs } from '@catheadowl/dsh-eval'
+
+export default {
+  id: 'my-tool-intent',
+  task: '把 demo 目录里的旧配置文件清掉',   // 自然语言；不出现工具名亦可
+  expect: [
+    toolCalled('my_tool'),
+    toolCallArgs('my_tool', { path: 'demo/config.old' }),   // 子集断言
+  ],
+}
+```
+
+无凭证时 auto-skip；CI 门禁加 `--fail-on-skip` 防「根本没跑但成功」。运行：`npx dsh-eval run --profile <headless 形 profile> eval/behavior/real`。
+
 ## 守卫
 
 - `inspect` 守结果面 + 反捏造（不重建旧路径、不凭空造文件），不管模型走什么中间路径；

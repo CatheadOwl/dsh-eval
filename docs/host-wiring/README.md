@@ -9,17 +9,16 @@ description: Host wiring index — install, the three host dependency faces (pee
 ## Install
 
 ```bash
-npm i -D @catheadowl/dsh-eval
-# 或 pnpm add -D @catheadowl/dsh-eval
+npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
-安装后 `node_modules/.bin` 提供两个 CLI：`dsh-eval`（behavior case）与 `dsh-review`（comprehension review）。
+安装后 `node_modules/.bin` 提供两个 CLI：`dsh-eval`（behavior case）与 `dsh-review`（comprehension review）；均为本地 bin，经 `npx dsh-eval …` 调用（或把 `node_modules/.bin` 加进 PATH）。用 npm、宿主同树共装——pnpm 虚拟 store 布局下 peer 可能无可解析位置（见 [peer-resolution](peer-resolution.md)）。
 
 ## 快速接线路径
 
-1. 宿主来源：与 `@deepseek-ai/dsh` 同装（`npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval`）时 peer 由宿主依赖树满足，零接线——此为推荐形态（2026-10-26 实测，冷装宿主勿带 `--legacy-peer-deps`）。未同装宿主时才需接通 [dsh-llm peer](peer-resolution.md)。缺包与古董版本都会使 case 失败；古董版本（npm 自动安装的 registry `latest` 副本，仅在宿主不在安装树时出现）症状更隐蔽。
+1. 宿主来源：与 `@deepseek-ai/dsh` 同装（`npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval`，用 npm——pnpm 虚拟 store 布局下 peer 可能无可解析位置）时 peer 由宿主依赖树满足，零接线——此为推荐形态（2026-10-26 实测，冷装宿主勿带 `--legacy-peer-deps`）。未同装宿主时才需接通 [dsh-llm peer](peer-resolution.md)。缺包与古董版本都会使 case 失败；古董版本（npm 自动安装的 registry `latest` 副本，仅在宿主不在安装树时出现）症状更隐蔽。
 2. 确保 [dsh CLI 可定位](cli-resolution.md)。三层解析链，先命中者生效；三层全缺时 fail-loud。
-3. 被测插件装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`。
+3. 被测插件装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`；零 setup 用自带模板 `--profile headless`（隔离 home 首用自动物化）。所选 profile 须为 headless 形 app——case 的 task 以位置参数抵达，web 形 app 拒收。
 
 每条 behavior case 在隔离的临时 `DSH_HOME` 与 workspace 中启动 dsh，session JSONL 经 `--patch` 定向到本次 run，不写真实 profile store。review 默认空白环境：任意 profile 均可，树外插件行由 overlay 枚举禁用（见 [review.md](../review.md)）。暂存面**不覆盖**的环境性表面（用户技能目录等漏入通道）与混杂控制方法见 [environment.md](../environment.md)——接线只决定拷什么，覆盖边界是实验设计的事。
 

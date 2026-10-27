@@ -43,6 +43,8 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
+Install with **npm**, host co-installed in the same tree — the verified path. Other package managers and store layouts (e.g. a pnpm virtual store) can leave the `dsh-llm` peer without a resolvable position; topology notes in [docs/host-wiring/README.md](docs/host-wiring/README.md). Run everything from the package root under test (where `eval/` lives). Node `^22.19 || >=24`.
+
 **Requirements** (wiring details and failure self-diagnostics in [docs/host-wiring/README.md](docs/host-wiring/README.md)):
 
 - the dsh host as a dev dependency (`@deepseek-ai/dsh`) — its dependency tree ships a same-generation `dsh-llm`, so the peer needs **zero manual wiring**; a built checkout (`apps/cli/lib/bin.js`, pinned via `--repo`) works as an alternative host source but is optional;
@@ -58,22 +60,25 @@ import { toolCalled, toolCallStep, textStep } from '@catheadowl/dsh-eval'
 
 export default {
   id: 'my-first-case',
-  mode: 'mock',
+  mode: 'mock',                    // cases default to mode 'real' — mock must say so
   task: 'rename guide.md to intro.md',
-  async prepare(workspace) { /* seed fixture files */ },
+  async prepare(workspace) { /* optional: seed fixture files */ },
   script: { steps: [toolCallStep('md_rename', { oldPath: 'guide.md', newPath: 'intro.md' }), textStep('done')] },
   expect: [toolCalled('md_rename')],
 }
 ```
 
+Install the plugin under test into the profile once — the `dsh plugin add` write face forwards to **pnpm**, which must be on PATH (`corepack enable pnpm` or `npm i -g pnpm`) — then run; the CLIs are local bins, invoke them via `npx`:
+
 ```bash
-dsh-eval run --mode mock eval/behavior/mock
-dsh-review --dry-run eval/comprehension     # model-free dry run of the review layer
+npx dsh plugin --profile headless add <plugin dir | tarball>
+npx dsh-eval run --profile headless --mode mock eval/behavior/mock
+npx dsh-review --dry-run eval/comprehension     # model-free dry run of the review layer
 # → PASS my-first-case
 #   1 selected, 1 passed, 0 failed, 0 skipped
 ```
 
-The command needs to know which dsh profile to use: pass `--profile <name>` explicitly, or drop a `dsh-eval.config.mjs` at the package root (see "Unified config" below).
+`--profile headless` is the zero-setup default — the shipped template auto-materializes in an isolated home on first use. Any profile you pass must run the headless app: the case task reaches it as a positional argument, so web-based profiles reject the run. A `dsh-eval.config.mjs` at the package root replaces the explicit flag (see "Unified config" below). A complete real-model case (`mode: 'real'`) is in [docs/intent-cases.md](docs/intent-cases.md); real runs need a provider key by env (see [docs/host-wiring/credentials.md](docs/host-wiring/credentials.md)).
 
 Real runs use `dsh-eval run --profile <p> <case path>` (the CLI resolves from the install tree; pass `--repo <harness checkout>` to pin a built checkout instead); all flags (`--mode/--keep-artifacts/--fail-on-skip/--format/--report`) are documented in [docs/report.md](docs/report.md). Real cases auto-skip without credentials (dsh resolves credentials itself); mock and dry runs need no credentials. The model a real run uses comes from the chosen profile (NOT your interactive session's current pick) — provenance, how to check what a run used, and how to pin it live in [docs/host-wiring/model-selection.md](docs/host-wiring/model-selection.md).
 

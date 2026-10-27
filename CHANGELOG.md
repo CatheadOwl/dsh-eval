@@ -23,6 +23,14 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   cold install + shipped `headless` profile passes a mock case end to
   end. Config example drops the legacy `repo` key; the real-run example
   leads with the install-tree CLI resolution.
+- **Cold-start path completed**: the quickstart now carries the one-time
+  plugin-install step (`dsh plugin add` forwards to pnpm — prerequisite
+  stated with the corepack/npm remedy), `npx` invocation for the local
+  bins, the `mode` default (`'real'`), and a link to a complete
+  real-case example ([docs/intent-cases.md](docs/intent-cases.md) gains
+  a minimal full example). credentials.md names the env var
+  (`DEEPSEEK_API_KEY` for the default deepseek route), the default home
+  (`~/.dsh`), and Node `^22.19 || >=24` is stated in the README.
 
 ## [0.5.1] — 2026-10-25
 
