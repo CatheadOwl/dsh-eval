@@ -17,7 +17,7 @@ npm i -D @catheadowl/dsh-eval
 
 ## 快速接线路径
 
-1. 接通 [dsh-llm peer](peer-resolution.md)。缺包与古董版本都会使 case 失败；古董版本（npm 自动安装的 registry `latest` 副本）症状更隐蔽。
+1. 宿主来源：与 `@deepseek-ai/dsh` 同装（`npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval`）时 peer 由宿主依赖树满足，零接线——此为推荐形态（2026-10-26 实测，冷装宿主勿带 `--legacy-peer-deps`）。未同装宿主时才需接通 [dsh-llm peer](peer-resolution.md)。缺包与古董版本都会使 case 失败；古董版本（npm 自动安装的 registry `latest` 副本，仅在宿主不在安装树时出现）症状更隐蔽。
 2. 确保 [dsh CLI 可定位](cli-resolution.md)。三层解析链，先命中者生效；三层全缺时 fail-loud。
 3. 被测插件装进所选 profile：`dsh plugin --profile <profile> add <插件目录>`。
 
