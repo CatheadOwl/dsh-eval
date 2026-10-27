@@ -17,7 +17,7 @@ behavior real 全部 run 适用的环境面规则。环境面清单、失效模�
 
 ## 附则一：环境面清单与 staging 边界
 
-每条 real case 在隔离临时 `DSH_HOME` 与临时 workspace 中启动（接线事实见 [host-wiring](host-wiring/README.md) 的快速接线路径）。暂存面（`stageSandboxHome`）拷贝 profile store 与托管凭证文档，不含 settings。两条机制事实（隔离 home 常踩的两类坑在此不适用）：**link 按链接重建、永不跟随**——profile 树内的 junction 原样重建为 junction（Windows 下 `cpSync` 会解引用递归、无环守卫，staging 不走这条路），不存在「junction 过拷贝被展开」；**profile 自身 `node_modules` 在暂存 home 里重新 junction 指回真实 store**——同机不变量，暂存内的树外插件解析与真实解析同源。暂存 home 也不需要 home 级 runtime 物化：被驱动的 CLI 在 boot 时把自己的安装闭包注入 Node 解析器（运行时拦截，机制见 explorer plugin-dep-resolution），bundle 行的宿主依赖不落 home 级目录。
+每条 real case 在隔离临时 `DSH_HOME` 与临时 workspace 中启动（接线事实见 [host-wiring](host-wiring/README.md) 的快速接线路径）。暂存面（`stageSandboxHome`）拷贝 profile store 与托管凭证文档，不含 settings。两条机制事实（隔离 home 常踩的两类坑在此不适用）：**link 按链接重建、永不跟随**——profile 树内的 junction 原样重建为 junction（Windows 下 `cpSync` 会解引用递归、无环守卫，staging 不走这条路），不存在「junction 过拷贝被展开」；**profile 自身 `node_modules` 在暂存 home 里重新 junction 指回真实 store**——同机不变量，暂存内的树外插件解析与真实解析同源。暂存 home 也不需要 home 级 runtime 物化：被驱动的 CLI 在 boot 时把自己的安装闭包注入 Node 解析器（运行时拦截，机制见 explorer plugin-dep-resolution），bundle 行的宿主依赖不落 home 级目录。机制声明已获消费方真实 profile 形态实测印证（2026-10-27：junction 型 bundle link 过 0.5.3 staging 存活，real run 免兜底）。
 
 | 面 | 内容 | 控制正字 |
 |---|---|---|
