@@ -8,6 +8,22 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [0.5.3] — 2026-10-27
+
+### Changed
+
+- **Consumer-pilot frictions answered in the docs.** environment.md
+  staging boundary now states the mechanism facts: junctions are
+  recreated as links and never followed (no expansion-through-copy), the
+  profile's own `node_modules` is re-junctioned to the real store
+  (same-machine invariant), and staged homes need no home-level runtime
+  materialization (the driven CLI injects its install closure into the
+  resolvers at boot). cli-resolution.md and both READMEs: pin
+  `@deepseek-ai/dsh` to the same version as the CLI your profiles run
+  on — a driving-vs-production generation mismatch silently produces
+  false verdicts. README: pnpm-workspace projects give eval its own
+  npm-managed directory instead of installing into the workspace.
+
 ## [0.5.2] — 2026-10-26
 
 ### Changed
