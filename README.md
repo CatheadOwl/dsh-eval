@@ -43,7 +43,7 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
-Install with **npm**, host co-installed in the same tree — the verified path. Other package managers and store layouts (e.g. a pnpm virtual store) can leave the `dsh-llm` peer without a resolvable position; topology notes in [docs/host-wiring/README.md](docs/host-wiring/README.md). Run everything from the package root under test (where `eval/` lives). Node `^22.19 || >=24`.
+Install with **npm**, host co-installed in the same tree — the verified path. Other package managers and store layouts (e.g. a pnpm virtual store) can leave the `dsh-llm` peer without a resolvable position; for pnpm-workspace projects, give eval its own npm-managed directory (own `package.json`) instead of installing into the workspace — topology notes in [docs/host-wiring/README.md](docs/host-wiring/README.md). Pin `@deepseek-ai/dsh` to the same version as the CLI your profiles run on — eval drives the binary from this install tree, and a driving-vs-production generation mismatch silently produces false verdicts. Run everything from the package root under test (where `eval/` lives). Node `^22.19 || >=24`.
 
 **Requirements** (wiring details and failure self-diagnostics in [docs/host-wiring/README.md](docs/host-wiring/README.md)):
 

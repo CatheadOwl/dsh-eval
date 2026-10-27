@@ -12,6 +12,8 @@ dsh CLI 按以下顺序定位，先命中者生效：
 
 checkout 钉定开发形态下，解析层由 junction 指到宿主检出；junction 失效时须重建为指回本地宿主检出（机器相关的开发环境事务，不入库，同 peer 接线的 gitignore 纪律）。
 
+**代际钉版**：被驱动的就是本安装树的 CLI——把 `@deepseek-ai/dsh` 钉在与你的 profile 所跑宿主相同的版本（`npm i -D @deepseek-ai/dsh@<version>`）。驱动宿主与生产宿主的代际错位不会报错，只会给假判定：case 验的是驱动闭包的组装，不是你生产闭包的组装。
+
 三层全缺时 fail-loud，报错含占位符修法指引。自诊断：
 
 ```bash

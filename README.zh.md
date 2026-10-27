@@ -39,7 +39,7 @@ behavior *.eval.mjs ───────────────────►
 npm i -D @deepseek-ai/dsh @catheadowl/dsh-eval
 ```
 
-用 **npm** 安装、宿主同树共装——这是已验证路径。其他包管理器与 store 布局（如 pnpm 虚拟 store）可能让 `dsh-llm` peer 无可解析位置；拓扑注记见 [docs/host-wiring/README.md](docs/host-wiring/README.md)。一切从被测包根跑起（`eval/` 所在处）。Node `^22.19 || >=24`。
+用 **npm** 安装、宿主同树共装——这是已验证路径。其他包管理器与 store 布局（如 pnpm 虚拟 store）可能让 `dsh-llm` peer 无可解析位置；pnpm workspace 项目请给 eval 单开一个 npm 管的目录（自带 `package.json`），不要装进 workspace——拓扑注记见 [docs/host-wiring/README.md](docs/host-wiring/README.md)。把 `@deepseek-ai/dsh` 钉在与你的 profile 所跑宿主相同的版本——eval 驱动的是本安装树的二进制，驱动宿主与生产宿主的代际错位会静默给出假判定。一切从被测包根跑起（`eval/` 所在处）。Node `^22.19 || >=24`。
 
 **Requirements**（接线细节与失败自诊断见 [docs/host-wiring/README.md](docs/host-wiring/README.md)）：
 
