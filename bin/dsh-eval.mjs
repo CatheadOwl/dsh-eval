@@ -33,7 +33,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runEvalCase } from '../src/runner.mjs'
 import { discoverFiles, validateEvalCase, detectDuplicateIds } from '../src/discovery.mjs'
-import { createCaseRecord, buildRunReport, reportExitCode, mockDeterminismHint } from '../src/report.mjs'
+import { createCaseRecord, buildRunReport, reportExitCode, mockDeterminismHint, stderrDeathLine, stagedHomeAdapterHint } from '../src/report.mjs'
 import { loadEvalConfig } from '../src/config.mjs'
 import { resolveDshCliChain } from '../src/cli.mjs'
 
@@ -288,8 +288,11 @@ for (const file of files.sort()) {
     const failures = []
     if (result.exitCode !== 0) {
       // Headless SSOT: exit 0 iff the turn completed. A run that errored out
-      // must not pass on coincidentally satisfied matchers.
-      failures.push(`dsh CLI exited with code ${result.exitCode} (the turn did not complete)`)
+      // must not pass on coincidentally satisfied matchers. The death line
+      // rides the failure — the bare exit code sent every consumer digging
+      // through artifacts/stderr.txt for a cause stderr names outright.
+      const death = stderrDeathLine(result.stderr)
+      failures.push(`dsh CLI exited with code ${result.exitCode} (the turn did not complete)${death === undefined ? '' : `: ${death}`}`)
     }
     for (const matcher of evalCase.expect) {
       const outcome = matcher.check(result.trace)
@@ -311,21 +314,26 @@ for (const file of files.sort()) {
       say(`PASS ${evalCase.id}`)
     } else {
       const artifactsDir = writeArtifacts(evalCase, result, mode)
-      // Self-explaining failure for broken mock determinism: when non-host
-      // plugin injections are visible in the
-      // trace, the failure names them and the two framework-native exits —
-      // consumers stop rediscovering the mechanism from raw traces.
-      let hint
-      if (mode === 'mock') hint = mockDeterminismHint({ trace: result.trace, failures })
+      // Self-explaining failures: when the mechanism behind a failure is
+      // visible in the run's own evidence (mock-determinism injections in
+      // the trace, the staged-home adapter gap in stderr), the failure names
+      // it — consumers stop rediscovering the mechanism from raw traces.
+      const hints = []
+      if (mode === 'mock') {
+        const mockHint = mockDeterminismHint({ trace: result.trace, failures })
+        if (mockHint !== undefined) hints.push(mockHint)
+      }
+      const stageHint = stagedHomeAdapterHint(result.stderr)
+      if (stageHint !== undefined) hints.push(stageHint)
       records.push(createCaseRecord({
-        id: evalCase.id, file, mode, status: 'fail', failures: hint ? [...failures, hint] : failures,
+        id: evalCase.id, file, mode, status: 'fail', failures: hints.length > 0 ? [...failures, ...hints] : failures,
         exitCode: result.exitCode, timedOut: result.timedOut,
         durationMs, artifactsDir,
         ...(result.trace?.census !== undefined ? { census: result.trace.census } : {}),
         ...(result.evidenceAnchor === 'inspect' ? { evidenceAnchor: 'inspect' } : {}),
       }))
       process.stderr.write(`FAIL ${evalCase.id} (exit ${result.exitCode}):\n${failures.map(f => `  - ${f}`).join('\n')}\n`)
-      if (hint !== undefined) process.stderr.write(`  ! ${hint}\n`)
+      for (const hint of hints) process.stderr.write(`  ! ${hint}\n`)
       process.stderr.write(`     artifacts: ${artifactsDir}\n`)
     }
   }

@@ -8,6 +8,24 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [0.5.4] — 2026-10-29
+
+### Added
+
+- **Turn-death diagnosis rides the failure line.** A case whose dsh CLI
+  exits non-zero now carries the last stderr line in the failure itself
+  (`dsh CLI exited with code N (the turn did not complete): <death line>`),
+  and the `NO_ADAPTER: no adapter registered for provider "X"` signature
+  earns a stage-gap hint (recorded in the case's failures and printed on
+  stderr): the sandbox home stages the profile directory and managed
+  credentials only — the machine-level home-layer patch never enters the
+  sandbox — so a provider whose adapter row lives there must be restated
+  into the profile patch (docs/host-wiring/model-selection.md); the
+  home-layer row of the same id wins on real runs, so an equal-value
+  restatement changes no real behavior. Motivated by the 2026-10-28
+  glm-e2e incident where the failure line said only "the turn did not
+  complete" while the death sat in `artifacts/stderr.txt`.
+
 ## [0.5.3] — 2026-10-27
 
 ### Changed

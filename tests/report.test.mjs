@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { createCaseRecord, summarizeRecords, buildRunReport, reportExitCode, mockDeterminismHint } from '../src/report.mjs'
+import { createCaseRecord, summarizeRecords, buildRunReport, reportExitCode, mockDeterminismHint, stderrDeathLine, stagedHomeAdapterHint } from '../src/report.mjs'
 
 describe('createCaseRecord', () => {
   it('includes only the fields the outcome actually has', () => {
@@ -113,5 +113,38 @@ describe('mockDeterminismHint', () => {
     assert.equal(mockDeterminismHint({ trace, failures: ['toolCalled: x'] }), undefined)
     assert.equal(mockDeterminismHint({ trace: traceWith([{ kind: 'user' }, { kind: 'runtime-context', form: 'snapshot', sections: [] }]), failures: finalTextFailure }), undefined)
     assert.equal(mockDeterminismHint({ trace: undefined, failures: finalTextFailure }), undefined)
+  })
+})
+
+describe('stderrDeathLine', () => {
+  it('returns the last non-blank line, trimmed', () => {
+    assert.equal(
+      stderrDeathLine('warning: something\ndsh: NO_ADAPTER: no adapter registered for provider "zai-coding-cn"\n'),
+      'dsh: NO_ADAPTER: no adapter registered for provider "zai-coding-cn"',
+    )
+  })
+  it('caps a long terminal line', () => {
+    const death = stderrDeathLine('x'.repeat(400))
+    assert.equal(death.length, 301)
+    assert.ok(death.endsWith('…'))
+  })
+  it('returns undefined when stderr says nothing', () => {
+    assert.equal(stderrDeathLine(''), undefined)
+    assert.equal(stderrDeathLine('  \n\n'), undefined)
+    assert.equal(stderrDeathLine(undefined), undefined)
+  })
+})
+
+describe('stagedHomeAdapterHint', () => {
+  it('names the provider and the restatement contract on the signature', () => {
+    const hint = stagedHomeAdapterHint('dsh: NO_ADAPTER: no adapter registered for provider "zai-coding-cn"')
+    assert.ok(hint.includes('provider "zai-coding-cn" has no adapter in the staged composition'))
+    assert.ok(hint.includes('docs/host-wiring/model-selection.md'))
+    assert.ok(hint.includes('home-layer row of the same id wins on real runs'))
+  })
+  it('stays silent without the signature', () => {
+    assert.equal(stagedHomeAdapterHint('dsh: WEB_PROVIDER_ERROR: upstream 500'), undefined)
+    assert.equal(stagedHomeAdapterHint(''), undefined)
+    assert.equal(stagedHomeAdapterHint(undefined), undefined)
   })
 })

@@ -155,3 +155,49 @@ export function mockDeterminismHint(parts) {
     + ` — if this case does not need that plugin, declare disableRows: [${names}];`
     + ` otherwise account for the interaction in the script or assert with assistantTextIncludes`
 }
+
+/** The death line of a run that did not complete: the last non-blank stderr
+ * line, trimmed and capped. Riding the failure line spares every consumer
+ * the dig through `artifacts/stderr.txt` (the 2026-10-28 glm-e2e incident:
+ * the failure said only "the turn did not complete" while stderr named
+ * `NO_ADAPTER` outright). The last line is the heuristic — headless CLI
+ * deaths print one terminal diagnostic — and this is a diagnostic aid, not
+ * a contract consumers script against.
+ * @param {string | undefined} stderr - the dead run's captured stderr.
+ * @returns {string | undefined} the single death line, or undefined when
+ *   stderr says nothing.
+ */
+export function stderrDeathLine(stderr) {
+  if (typeof stderr !== 'string') return undefined
+  const lines = stderr.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+  if (lines.length === 0) return undefined
+  const last = lines[lines.length - 1]
+  return last.length > 300 ? `${last.slice(0, 300)}…` : last
+}
+
+/** Stage-gap diagnosis for the `NO_ADAPTER` death: the CLI died before any
+ * model call because the selected provider has no adapter row in the STAGED
+ * composition. The sandbox home stages the profile directory and the managed
+ * credential document only — the machine-level home-layer patch never enters
+ * the sandbox, and that exclusion is deliberate (the shared machine layer is
+ * exactly the ambient surface isolation exists to keep out). When the adapter
+ * row lives in the home-layer `cordis.patch.yml`, the profile patch must
+ * restate it (the model-selection doc's rule for non-DeepSeek routes); the
+ * restatement is inert on real runs — the home-layer row of the same id wins
+ * over the profile layer — so an equal-value restatement changes no real
+ * behavior.
+ * @param {string | undefined} stderr - the dead run's captured stderr.
+ * @returns {string | undefined} the hint line, or undefined when the
+ *   signature is absent.
+ */
+export function stagedHomeAdapterHint(stderr) {
+  const match = typeof stderr === 'string'
+    ? stderr.match(/NO_ADAPTER: no adapter registered for provider "([^"]+)"/)
+    : null
+  if (match === null) return undefined
+  return `provider "${match[1]}" has no adapter in the staged composition: dsh-eval's sandbox home`
+    + ` stages the profile directory and managed credentials only — the machine-level home-layer`
+    + ` patch never enters the sandbox. If the adapter row lives there, restate it into the profile`
+    + ` patch (docs/host-wiring/model-selection.md); the home-layer row of the same id wins on real`
+    + ` runs, so an equal-value restatement changes no real behavior`
+}
