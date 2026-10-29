@@ -1,5 +1,5 @@
 ---
-description: rowConfig 边界契约——case 级按 loader 行 id 覆写行 config 的机制、整段替换语义与「重述所需键」义务、叶值形状限制、与 disableRows 的分工
+description: rowConfig 边界契约——case 级按 loader 行 id 覆写行 config 的机制、整段替换语义与「重述所需键」义务、叶值形状限制（含对象数组）、与 disableRows 的分工
 ---
 
 # rowConfig：case 级行 config 覆写
@@ -17,8 +17,9 @@ cordis patch 层的 config 覆写是**整段替换**，不是深合并：`rowCon
 
 ## 形状限制
 
-- 叶值支持**标量**（string / number / boolean）、**标量数组**（如 `disabledProviders: ['a', 'b']`）与**嵌套 plain object**（同样递归限制，任意深度）——参数组（如 `variant: { form, emphasis }`）作为**一个值**表达，不必拍平成互不相关的标量键；嵌套对象以 YAML flow mapping 发射；
-- 数组元素仍须是标量（数组内对象拒绝）；`null` 叶值拒绝；
+- 叶值支持**标量**（string / number / boolean）、**数组**（元素为标量或 plain object）与**嵌套 plain object**（同样递归限制，任意深度）——参数组（如 `variant: { form, emphasis }`）与词表（如 `allowedModels: [{ provider, model }, ...]`）都作为**一个值**表达，不必拍平成互不相关的标量键；
+- 数组元素为 plain object 时，对象内部递归遵守同一形状（叶 = 标量 / 数组 / 嵌套对象）；**数组内嵌套数组**（任意深度的 array-in-array）与 `null`（叶值或数组元素）仍拒——null 拒绝沿用放宽前规则，嵌套数组无消费用例故保持关闭（日后开放是向后兼容的放宽，收回则是破坏性变更）；
+- 发射形态：标量叶 YAML 原生发射；数组 / 对象叶以一条 JSON flow 值发射——JSON 数组 / 对象即 YAML 1.2 flow sequence / mapping 语法（对象数组即 flow sequence of flow mappings），宿主侧 YAML 解析还原等价对象；
 - 校验双点：discovery 加载期与 `runEvalCase` 执行期同一份 `validateRowConfig`。
 
 ## 与 disableRows 的分工
@@ -32,9 +33,12 @@ cordis patch 层的 config 覆写是**整段替换**，不是深合并：`rowCon
 ## 校验示例
 
 ```js
-// 合法：标量 / 标量数组 / 嵌套参数组
+// 合法：标量 / 标量数组 / 嵌套参数组 / 对象数组（词表）
 rowConfig: { prompt: { disabledProviders: ['breadcrumb-description-enricher'], totalTimeoutMs: 5000, variant: { form: 'standard', emphasis: 2 } } }
-// 非法：数组内对象 / null 叶值
-rowConfig: { prompt: { a: [{}] } }        // validateRowConfig 拒绝
-rowConfig: { prompt: { a: null } }        // validateRowConfig 拒绝
+rowConfig: { 'model-router': { allowedModels: [{ provider: 'deepseek', model: 'deepseek-chat' }, { provider: 'p2', model: 'm2' }] } }
+// 非法：数组内嵌套数组 / null（叶值、数组元素或对象内叶）
+rowConfig: { prompt: { a: [[1]] } }                          // validateRowConfig 拒绝（嵌套数组）
+rowConfig: { prompt: { allowedModels: [{ model: null }] } }  // validateRowConfig 拒绝（对象内 null 叶，路径 allowedModels[].model）
+rowConfig: { prompt: { a: [null] } }                         // validateRowConfig 拒绝（数组内 null）
+rowConfig: { prompt: { a: null } }                           // validateRowConfig 拒绝（null 叶）
 ```

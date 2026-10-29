@@ -61,6 +61,38 @@ describe('buildOverlayYaml', () => {
     assert.match(yaml, /- id: "prompt"\n  config:\n    variant: \{"form":"standard","emphasis":2,"flag":false,"tags":\["a"\]\}/)
   })
 
+  it('emits rowConfig object arrays as YAML flow sequences of flow mappings', () => {
+    const yaml = buildOverlayYaml({
+      sessionsRoot: 's',
+      rowConfig: { 'model-router': { allowedModels: [{ provider: 'deepseek', model: 'deepseek-chat' }, { provider: 'p2', model: 'm2' }] } },
+    })
+    assert.match(yaml, /- id: "model-router"\n  config:\n    allowedModels: \[\{"provider":"deepseek","model":"deepseek-chat"\},\{"provider":"p2","model":"m2"\}\]/)
+  })
+
+  it('round-trips object-array leaves through the emitted flow value', () => {
+    const allowedModels = [
+      { provider: 'deepseek', model: 'deepseek-chat', quota: 2, flags: [true, false] },
+      { provider: 'p2', model: 'a "quoted" \\ model', tags: ['x', 'y'] },
+      { provider: 'p3', model: 'm3', route: { tier: 'fast', retries: 1 } },
+    ]
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', rowConfig: { 'model-router': { allowedModels } } })
+    const emitted = yaml.match(/^    allowedModels: (.+)$/m)[1]
+    // The emitter's premise (overlay.mjs): a JSON value IS YAML 1.2 flow
+    // syntax, so the host's YAML parse of the overlay restores the
+    // equivalent objects. The package is deliberately dependency-free (no
+    // YAML parser ships or dev-depends), so the losslessness pin parses the
+    // emitted flow text with JSON.parse — the same value modulo the
+    // YAML-contains-JSON spec fact: identical strings (JSON quoting and
+    // escaping), native numbers and booleans, nested objects preserved.
+    assert.deepEqual(JSON.parse(emitted), allowedModels)
+  })
+
+  it('emits scalar arrays with YAML-native numbers and booleans', () => {
+    const yaml = buildOverlayYaml({ sessionsRoot: 's', rowConfig: { demo: { tiers: [1, 2], flags: [true, false] } } })
+    assert.match(yaml, /tiers: \[1,2\]/)
+    assert.match(yaml, /flags: \[true,false\]/)
+  })
+
   it('swaps in the multi-turn driver only when followups is supplied', () => {
     const yaml = buildOverlayYaml({ sessionsRoot: 's', followups: ['rescan now'] })
     assert.match(yaml, /- id: headless-runner\n  disabled: true/)

@@ -8,6 +8,29 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [0.6.0] — 2026-10-29
+
+### Added
+
+- **`rowConfig` array leaves accept plain-object items.** A vocabulary-style
+  leaf (`allowedModels: [{ provider, model }, ...]`) is now legal: array
+  items may be scalars or plain objects, and an object inside an array
+  follows the same grammar recursively at every depth (scalars, arrays of
+  scalars or objects, nested plain objects). Object arrays are emitted as
+  YAML flow sequences of flow mappings, so the host's YAML parse restores
+  the equivalent objects; whole-replace overlay semantics are unchanged.
+  Still refused, deliberately: `null` (leaf or array item) and nested arrays
+  (an array inside an array, at any depth) — no driving use case, and
+  reopening later stays a compatible relaxation. Previously rejected configs
+  now load; no migration.
+
+### Fixed
+
+- **Scalar-array leaves no longer stringify numbers and booleans.** A leaf
+  like `tiers: [1, 2]` now emits YAML-native `[1,2]` instead of `["1","2"]`,
+  matching the fidelity the scalar and nested-object branches already had —
+  a host plugin whose schema expects a number array now receives one.
+
 ## [0.5.4] — 2026-10-29
 
 ### Added

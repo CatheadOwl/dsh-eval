@@ -98,7 +98,7 @@ describe('validateEvalCase', () => {
     }, file), /'persona' field was removed.*rowConfig: \{ 'system-prompt': \{ personaPrefix, personaSuffix \} \}/s)
   })
 
-  it('accepts rowConfig with scalar / scalar-array / nested-object leaves and rejects non-scalar leaves', () => {
+  it('accepts rowConfig with scalar / scalar-array / nested-object / object-array leaves and rejects null and nested-array shapes', () => {
     assert.doesNotThrow(() => validateEvalCase({
       id: 'rowconfig-ok', task: 'test', expect: [validMatcher],
       rowConfig: { prompt: { disabledProviders: ['a-enricher'], totalTimeoutMs: 5000, flag: false } },
@@ -106,6 +106,17 @@ describe('validateEvalCase', () => {
     assert.doesNotThrow(() => validateEvalCase({
       id: 'rowconfig-nested-ok', task: 'test', expect: [validMatcher],
       rowConfig: { prompt: { variant: { form: 'standard', emphasis: 2, tags: ['a'] }, deep: { inner: { n: 1 } } } },
+    }, file))
+    // Object-array leaves: vocabulary-style config as ONE value (the
+    // workflow-lab allowedModels shape). Object items follow the same
+    // grammar recursively; mixed scalar/object items are legal too.
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'rowconfig-object-array-ok', task: 'test', expect: [validMatcher],
+      rowConfig: { 'model-router': { allowedModels: [{ provider: 'deepseek', model: 'deepseek-chat' }, { provider: 'p2', model: 'm2' }] } },
+    }, file))
+    assert.doesNotThrow(() => validateEvalCase({
+      id: 'rowconfig-object-array-nested-ok', task: 'test', expect: [validMatcher],
+      rowConfig: { prompt: { variant: { presets: [{ form: 'standard', emphasis: 2, tags: ['x'], inner: { n: 1 } }, 'plain-scalar'] } } },
     }, file))
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-not-object', task: 'test', expect: [validMatcher], rowConfig: ['prompt'],
@@ -115,13 +126,28 @@ describe('validateEvalCase', () => {
     }, file), /must be a config object/)
     assert.throws(() => validateEvalCase({
       id: 'rowconfig-null-leaf', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: null } },
-    }, file), /must be a scalar, scalar array, or nested object/)
+    }, file), /must be a scalar, an array of scalars or plain objects, or a nested object/)
+    // Null and nested arrays are refused at every depth — as array items
+    // just as much as leaves.
     assert.throws(() => validateEvalCase({
-      id: 'rowconfig-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: [{}] } },
-    }, file), /must be an array of scalars/)
+      id: 'rowconfig-null-item', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: ['x', null] } },
+    }, file), /must be an array of scalars or plain objects \(null items are refused/)
     assert.throws(() => validateEvalCase({
-      id: 'rowconfig-nested-array-object', task: 'test', expect: [validMatcher], rowConfig: { prompt: { variant: { tags: [{}] } } },
-    }, file), /'variant.tags'\] must be an array of scalars/)
+      id: 'rowconfig-nested-array', task: 'test', expect: [validMatcher], rowConfig: { prompt: { a: [[1]] } },
+    }, file), /must be an array of scalars or plain objects \(nested arrays are refused/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-nested-array-deep', task: 'test', expect: [validMatcher], rowConfig: { prompt: { variant: { tags: [[1]] } } },
+    }, file), /'variant.tags'\] must be an array of scalars or plain objects \(nested arrays are refused/)
+    // The grammar recursion reaches inside object items, with the array
+    // element visible in the offending key path.
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-object-array-null', task: 'test', expect: [validMatcher],
+      rowConfig: { prompt: { allowedModels: [{ provider: 'x' }, { model: null }] } },
+    }, file), /'allowedModels\[\].model'\] must be a scalar, an array of scalars or plain objects, or a nested object/)
+    assert.throws(() => validateEvalCase({
+      id: 'rowconfig-object-array-nested-array', task: 'test', expect: [validMatcher],
+      rowConfig: { prompt: { allowedModels: [{ provider: 'x', fallbacks: [['y']] }] } },
+    }, file), /'allowedModels\[\].fallbacks'\] must be an array of scalars or plain objects \(nested arrays are refused/)
   })
 
   it('accepts followups with optional settleTimeoutMs and rejects malformed values', () => {

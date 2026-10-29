@@ -7,9 +7,11 @@
  * `disabled: true`) identical everywhere.
  *
  * YAML strategy: JSON double-quoted strings are valid YAML scalars, and JSON
- * arrays / objects are valid YAML flow sequences / mappings, so the emitters
- * lean on JSON.stringify — zero dependencies, identical quoting across
- * scalar, array, and nested-object leaves.
+ * arrays / objects are valid YAML flow sequences / mappings — including
+ * sequences OF mappings (arrays of plain objects) — so the emitters lean on
+ * JSON.stringify: zero dependencies, identical quoting across scalar,
+ * array, and nested-object leaves, and a host-side YAML parse restores the
+ * equivalent values.
  */
 
 import { join } from 'node:path'
@@ -31,13 +33,16 @@ function yamlScalar(value) {
 }
 
 /**
- * One rowConfig leaf or branch: a scalar, an array of scalars emitted as a
- * YAML flow sequence, or a nested plain object emitted as a YAML flow mapping
- * (a JSON object is valid YAML flow syntax, and keeps quoting rules identical
- * to `yamlScalar` — numbers and booleans stay YAML-native either way).
+ * One rowConfig leaf or branch: a scalar, an array of scalars or plain
+ * objects, or a nested plain object — every array/object shape emits as ONE
+ * JSON value (a JSON array/object is valid YAML flow sequence/mapping
+ * syntax, so an array of objects lands as a YAML flow sequence of flow
+ * mappings and the host parser restores the equivalent objects). Sharing
+ * JSON.stringify with `yamlScalar`'s string quoting keeps escaping rules
+ * identical everywhere, and numbers/booleans stay YAML-native in arrays and
+ * objects alike.
  */
 function yamlConfigValue(value) {
-  if (Array.isArray(value)) return JSON.stringify(value.map(item => typeof item === 'string' ? item : String(item)))
   if (value !== null && typeof value === 'object') return JSON.stringify(value)
   return yamlScalar(value)
 }

@@ -158,9 +158,10 @@ export function validateFollowups(followups, label) {
  *   from `dsh-eval.config.mjs`, which is how gate-interaction cases opt
  *   back in inside a package that disables the gate row by default.
  * - `rowConfig` (if present) maps loader row ids to config objects whose
- *   leaves are scalars, arrays of scalars, or nested plain objects of the
- *   same (see `validateRowConfig`). The overlay REPLACES the row's whole
- *   config — restate any keys the row needs, not just the ones being changed.
+ *   leaves are scalars, arrays of scalars or plain objects, or nested
+ *   plain objects of the same (see `validateRowConfig`). The overlay
+ *   REPLACES the row's whole config — restate any keys the row needs, not
+ *   just the ones being changed.
  * - `followups` (if present) is a non-empty array of followup turn texts
  *   (cross-turn driving; see `validateFollowups`), with optional positive
  *   finite `settleTimeoutMs`.
@@ -240,9 +241,17 @@ export function validateEvalCase(evalCase, file) {
 
 /**
  * Validate one rowConfig value at `path` (a dotted key path): a scalar, an
- * array of scalars, or a nested plain object of the same — parameter groups
- * stay expressible as ONE value instead of being flattened into unrelated
- * scalar keys. Throws with `label` context and the offending key path.
+ * array whose items are scalars or plain objects, or a nested plain object
+ * of the same — parameter groups stay expressible as ONE value instead of
+ * being flattened into unrelated scalar keys, and arrays of objects keep
+ * vocabulary-style config (`[{ provider, model }, ...]`) expressible as one
+ * leaf. An object inside an array follows the SAME grammar recursively. Two
+ * shapes stay refused at every depth, deliberately: `null` (leaf or array
+ * item — carried over unchanged from the pre-relaxation grammar) and nested
+ * arrays (an array inside an array — no driving use case; reopening later
+ * is a compatible relaxation, while retracting would be breaking). Throws
+ * with `label` context and the offending key path (a key inside an array
+ * element reports as `<path>[].<key>`).
  * @param {string} rowId - the row id the config belongs to (error context).
  * @param {string} path - dotted key path within the row's config.
  * @param {unknown} value - the value to validate.
@@ -251,12 +260,23 @@ export function validateEvalCase(evalCase, file) {
 function validateConfigValue(rowId, path, value, label) {
   const where = `${label}: rowConfig['${rowId}']['${path}']`
   if (Array.isArray(value)) {
-    if (value.some(item => item === null || typeof item === 'object')) {
-      throw new Error(`${where} must be an array of scalars`)
+    for (const item of value) {
+      if (item === null) {
+        throw new Error(`${where} must be an array of scalars or plain objects (null items are refused at every depth)`)
+      }
+      if (Array.isArray(item)) {
+        throw new Error(`${where} must be an array of scalars or plain objects (nested arrays are refused at every depth)`)
+      }
+      if (typeof item === 'object') {
+        for (const [key, nested] of Object.entries(item)) {
+          if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
+          validateConfigValue(rowId, `${path}[].${key}`, nested, label)
+        }
+      }
     }
   } else if (value === null || typeof value === 'object') {
     if (value === null) {
-      throw new Error(`${where} must be a scalar, scalar array, or nested object (got null)`)
+      throw new Error(`${where} must be a scalar, an array of scalars or plain objects, or a nested object (got null)`)
     }
     for (const [key, nested] of Object.entries(value)) {
       if (key === '') throw new Error(`${label}: rowConfig['${rowId}'] has an empty config key`)
@@ -268,9 +288,10 @@ function validateConfigValue(rowId, path, value, label) {
 /**
  * Validate a `rowConfig` mapping (case-level or ad-hoc): keys are loader row
  * ids, values are config objects whose leaves must be scalars (string /
- * number / boolean), arrays of scalars, or nested plain objects of the same
- * (emitted as YAML flow mappings — see `yamlConfigValue`). Throws with
- * `label` context.
+ * number / boolean), arrays of scalars or plain objects, or nested plain
+ * objects of the same (emitted as YAML flow sequences / mappings — see
+ * `yamlConfigValue`; `null` and nested arrays are refused at every depth).
+ * Throws with `label` context.
  * @param {unknown} rowConfig - the value to validate.
  * @param {string} label - error-message context (e.g. `case '<id>'`).
  */
