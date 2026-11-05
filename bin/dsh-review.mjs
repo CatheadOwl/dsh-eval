@@ -144,7 +144,7 @@ for (const file of files) {
     })
     const result = await executeReviewExperiment(experiment, executor, { runs: options.runs })
 
-    // Machine first-pass judge (EVAL-033): one more dispatch through the
+    // Machine first-pass judge: one more dispatch through the
     // same executor, seeing rubric + observations + every successful
     // answer. Judge trouble is ACCOUNTED, never exit-code-relevant: the
     // verdict is evidence (review never gates CI), and "the judge pass did
@@ -187,7 +187,7 @@ for (const file of files) {
       // Machine-readable boundary accounting per run: `checked` (the request
       // headers were inspected) vs `not-executed` (no session artifact, so the
       // reviewer's tool face was never verified) — the report and run-N.txt
-      // carry the same fact in prose (EVAL-021).
+      // carry the same fact in prose.
       toolBoundaries: result.attempts.map(attempt => ({
         run: attempt.index,
         status: attempt.result?.toolValidation?.status ?? 'not-reported',

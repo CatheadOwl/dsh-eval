@@ -5,7 +5,7 @@ import { validateToolBoundary, renderToolBoundaryEvidence } from '../src/tool-va
 describe('validateToolBoundary', () => {
   // A missing trace is NOT a pass: the check did not run. The result says so
   // in `status`, and `ok` is false so that no caller can read the skip as a
-  // green boundary by accident (EVAL-021).
+  // green boundary by accident.
   it('reports an explicit not-executed status when trace is undefined', () => {
     const result = validateToolBoundary(undefined)
     assert.equal(result.status, 'not-executed')

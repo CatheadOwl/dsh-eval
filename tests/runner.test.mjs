@@ -87,7 +87,7 @@ describe('runEvalCase options contract', () => {
 
 // The runner owns the seam diagnosis the CLI prints: a run that produced no
 // session artifact must hand back WHY, so the failure text names the host
-// artifact naming instead of pointing at the parser (EVAL-020).
+// artifact naming instead of pointing at the parser.
 describe('runEvalCase session seam diagnosis', () => {
   it('carries the collection gap on the result when nothing materializes', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-eval-home-'))

@@ -217,8 +217,7 @@ describe('validateEvalCase', () => {
   })
 
   // A case whose whole expect passes on an empty projection reports "nothing
-  // was measured" as "passed" — the loader refuses that shape up front
-  // (EVAL-022 / ADR 0005).
+  // was measured" as "passed" — the loader refuses that shape up front.
   it('rejects an expect set with no evidence anchor, naming the negative matchers', () => {
     const outcome = () => validateEvalCase({
       id: 'anchor-1', task: 'x',
@@ -330,7 +329,7 @@ describe('validateEvalCase', () => {
 
   // Which channel anchors a case is a fact the report carries: a matcher anchor
   // is verified by the guard, an inspect anchor is only DECLARED (nothing can
-  // audit a hook), and the two must not read alike on the record (EVAL-022 C).
+  // audit a hook), and the two must not read alike on the record.
   it('names the anchoring channel, with inspect as the declared one', () => {
     assert.equal(evidenceAnchorKind({ expect: [validMatcher] }), 'matcher')
     assert.equal(evidenceAnchorKind({ expect: [toolNotCalled('read')] }), 'none')

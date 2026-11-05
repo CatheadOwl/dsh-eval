@@ -144,7 +144,7 @@ export function loadRubricText(rubric) {
 export const JUDGE_OUTPUT_SECTIONS = ['Verdicts', 'Intentional design hits', 'New red flags', 'Next step']
 
 /**
- * Assemble the machine first-pass grading task (EVAL-033).
+ * Assemble the machine first-pass grading task.
  *
  * One dispatch sees everything a human grader would: the hidden answer key
  * (which the blind reviewers never saw), the byte-identical observations they
@@ -204,8 +204,8 @@ export function buildJudgeTask({ rubricText, observations, answers }) {
  * Returns `{ status: 'judged', sections }` where `sections` maps each heading
  * name to its body text, or `{ status: 'unparsed', missing }` naming every
  * absent heading — a judge output that does not follow the contract is
- * recorded as unread, never treated as a pass (EVAL-021 discipline: what was
- * not verified must look unverified).
+ * recorded as unread, never treated as a pass (what was not verified must
+ * look unverified).
  */
 export function parseJudgeOutput(raw) {
   const text = String(raw ?? '')

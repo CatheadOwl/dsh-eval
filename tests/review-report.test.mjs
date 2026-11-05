@@ -88,7 +88,7 @@ describe('renderReviewReport', () => {
 
   // A review whose tool face was never verified is weaker evidence: the report
   // header states the boundary status, and the affected run carries the reason
-  // next to the answer it qualifies (EVAL-021).
+  // next to the answer it qualifies.
   it('flags runs whose tool boundary check never ran, with the seam diagnosis', () => {
     const gap = 'no session trace materialized: no session artifact (session.jsonl / session.vN.jsonl) '
       + "under '/run/sessions' — the root holds no files (missing or empty); the host artifact naming may have changed generation"
@@ -145,7 +145,7 @@ describe('renderReviewReport', () => {
   })
 })
 
-describe('renderReviewReport · judge first-pass (EVAL-033)', () => {
+describe('renderReviewReport · judge first-pass', () => {
   const judgedResult = {
     runs: 1,
     observations: 'obs',

@@ -27,7 +27,7 @@ export function observationsFingerprint(observations) {
  * One-line statement of whether the tool boundary check RAN on the review
  * runs. A run without a session artifact reports `status: 'not-executed'`;
  * that must show up in the report header, because a review whose tool face was
- * never verified is weaker evidence than one whose was (EVAL-021). Executors
+ * never verified is weaker evidence than one whose was. Executors
  * that do not validate at all (custom executors, dry runs) say so instead of
  * implying a pass.
  */
@@ -47,10 +47,10 @@ function toolBoundarySummary(attempts) {
 }
 
 /**
- * Machine first-pass judge block (EVAL-033). Rendered as its own clearly
+ * Machine first-pass judge block. Rendered as its own clearly
  * labeled section between the reviewer conclusions and the human columns:
  * the judge is a prefill instrument, the human sections below stay the
- * authoritative record (R3 — "not fully automatic" is achieved by labeling,
+ * authoritative record ("not fully automatic" is achieved by labeling,
  * not by absence).
  */
 function judgeSection(judge, profile) {
@@ -103,8 +103,8 @@ function judgeSection(judge, profile) {
  * @param {string} [parts.adapter] - adapter label (e.g. 'dsh-headless'); absent
  *   for a dry run.
  * @param {string} [parts.profile] - the profile the reviewers ran under.
- * @param {object} [parts.judge] - machine first-pass judge accounting
- *   (EVAL-033): one of `{ status: 'judged', sections, profile, judgedAt }`,
+ * @param {object} [parts.judge] - machine first-pass judge accounting:
+ *   one of `{ status: 'judged', sections, profile, judgedAt }`,
  *   `{ status: 'unparsed', missing, profile, judgedAt }`,
  *   `{ status: 'failed', error }`, or `{ status: 'not-executed', reason }`.
  *   Absent for runs without the judge pass.
@@ -172,7 +172,7 @@ export function renderReviewReport(parts) {
     }
   }
 
-  // Machine first-pass prefill (EVAL-033): its own labeled section, kept
+  // Machine first-pass prefill: its own labeled section, kept
   // strictly separate from the human columns below — the human sections
   // remain the authoritative record; the judge narrows what a human must
   // read, it does not replace the reading.

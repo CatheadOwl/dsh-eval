@@ -19,7 +19,7 @@ describe('createCaseRecord', () => {
   })
 
   // The census rides BOTH outcomes: a green case whose evidence surface
-  // degraded is the exact case the report has to keep inspectable (EVAL-022).
+  // degraded is the exact case the report has to keep inspectable.
   it('carries the projection census on pass and fail records, and omits it without one', () => {
     const census = { eventTypeCounts: { 'tool/call': 1 }, projectionLengths: { toolCalls: 0 } }
     const pass = createCaseRecord({ id: 'c-3', file: '/x/c.eval.mjs', status: 'pass', census })
@@ -31,7 +31,7 @@ describe('createCaseRecord', () => {
   })
 
   // An inspect-anchored case is the one whose evidence face nobody can audit;
-  // the record says so, and a matcher-anchored one stays unmarked (EVAL-022 C).
+  // the record says so, and a matcher-anchored one stays unmarked.
   it('marks an inspect-anchored case and leaves a matcher-anchored one unmarked', () => {
     const declared = createCaseRecord({ id: 'c-6', file: '/x/c.eval.mjs', status: 'pass', evidenceAnchor: 'inspect' })
     assert.equal(declared.evidenceAnchor, 'inspect')

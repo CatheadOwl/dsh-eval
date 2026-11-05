@@ -270,7 +270,7 @@ for (const file of files.sort()) {
       // The runner's seam diagnosis (which candidate file names were actually
       // collected, or which artifact was refused) IS the failure text: a bare
       // "no session trace materialized" pointed readers at the parser while
-      // the real drift was the host's artifact naming (EVAL-019/EVAL-020).
+      // the real drift was the host's artifact naming.
       const reason = `${result.traceGap ?? 'no session trace materialized'} (exit ${result.exitCode}${result.timedOut ? ', timed out' : ''})`
       records.push(createCaseRecord({
         id: evalCase.id, file, mode, status: 'fail',

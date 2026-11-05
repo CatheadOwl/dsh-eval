@@ -357,7 +357,7 @@ test('accounts for a tool boundary check that could not run (no session log)', a
     // The fake CLI exits 0 without writing any session log — the shape a host
     // artifact-naming change produces. The check cannot run, so the result
     // must SAY that (status + seam diagnosis) instead of reporting a silent
-    // pass and an apparently normal answer (EVAL-021).
+    // pass and an apparently normal answer.
     writeFileSync(cli, 'console.log("ok")\n')
 
     const execute = createDshHeadlessReviewExecutor({
@@ -409,7 +409,7 @@ test('records a checked tool boundary on the result when the trace exists', asyn
   }
 })
 
-describe('review judge primitives (EVAL-033)', () => {
+describe('review judge primitives', () => {
   it('builds a judge task carrying the rubric, the observations, and every answer', () => {
     const task = buildJudgeTask({
       rubricText: '# Answer key\n\ndepth is relative to the anchor.',

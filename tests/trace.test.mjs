@@ -39,7 +39,7 @@ describe('parseSessionLog', () => {
 
   // The header stamp is the host's declaration of the artifact's generation.
   // The parser tracks the current generation only: any other stamp — older
-  // or unknown — is refused the same way (EVAL-020 admission + the
+  // or unknown — is refused the same way (session admission + the
   // no-legacy-compat design rule).
   it('accepts the current generation and refuses older or unknown ones by their number', () => {
     const header = version => `{"type":"session","version":${version},"id":"s"}\n`
@@ -271,7 +271,7 @@ describe('buildTrace', () => {
 
   // The census exists so that "the host log carried no such event" and "the
   // projection dropped it" are different facts on the report surface. It never
-  // judges which one it is (EVAL-022 / ADR 0005).
+  // judges which one it is.
   it('census lines up the main log event counts with the projection lengths', () => {
     assert.equal(trace.census.eventTypeCounts['tool/call'], 2)
     assert.equal(trace.census.eventTypeCounts['assistant/message'], 2)
@@ -493,7 +493,7 @@ describe('collectSessionTrace — diagnosis', () => {
 
   // The empty-collection diagnosis must name what was actually there: a host
   // that renamed its artifact otherwise reads as "the parser is broken" (the
-  // 2026-09-12 format-v3 incident, EVAL-019/EVAL-020).
+  // 2026-09-12 format-v3 incident).
   it('names session-like candidate files when no artifact matches the naming rule', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-eval-collect-'))
     try {

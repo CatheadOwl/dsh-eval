@@ -541,8 +541,7 @@ describe('subagentCompletedCount', () => {
 })
 
 // The evidence-anchor contract: a matcher that passes on an empty projection
-// must say so, or the loader cannot tell "nothing was measured" from "passed"
-// (EVAL-022 / ADR 0005).
+// must say so, or the loader cannot tell "nothing was measured" from "passed".
 describe('requiresEvidence', () => {
   it('marks the four absence-asserting factories as negative', () => {
     assert.equal(requiresEvidence(toolNotCalled(/^coggit_/)), false)

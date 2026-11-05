@@ -178,7 +178,7 @@ export function createDshHeadlessReviewExecutor(options) {
       // skip the check silently: `validateToolBoundary` reports
       // `status: 'not-executed'`, and the adapter carries that fact (plus the
       // seam diagnosis) on the result so the report and run artifacts state
-      // that the boundary guarantee was not verified (EVAL-021).
+      // that the boundary guarantee was not verified.
       // Validation inspects the main session only (buildTrace selects
       // non-subagent logs); plugin tools leaking in a subagent session
       // would not be caught — irrelevant in review where the overlay
