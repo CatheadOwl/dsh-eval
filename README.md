@@ -4,8 +4,6 @@ description: Evaluation layer for dsh plugin authors — behavior cases over rea
 
 # @catheadowl/dsh-eval
 
-English | [中文](README.zh.md)
-
 **A dsh-native (dsh = DeepSeek's deepseek-harness agent CLI) agent evaluation layer for plugin authors**: behavior cases run against real headless dsh traces, while review experiments test whether fresh models understand plugin outputs.
 
 It evaluates the **assembled agent harness** (the graph a plugin + profile + patch + tool registry form inside a real dsh headless run), not isolated functions; verdicts come from dsh-native session-trace projections and matchers (contract assertions), not metric scores. It is not a general agent-eval platform (no dashboard / dataset hosting / metric catalog, no benchmark ranking) and not a DeepEval / OpenAI Evals replacement — those projects proved the problem space; this package picks the dsh-native vertical solution. In deployment terms: eval frameworks embed the model calls inside the harness, while task artifacts (the SWE-bench shape) ship task + fixture + verifier and let the runner supply the agent. This package composes the two — mock cases are credential-free artifacts judged by deterministic trace verifiers, real cases put the assembled harness itself (profile-supplied model included) under contract assertions, and comprehension review dispatches blank-environment reviewers — models that see only the plugin's materialized output, nothing else — as the measuring instrument at the plugin's output surface, not as the subject.

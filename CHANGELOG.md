@@ -8,6 +8,14 @@ All notable changes to `@catheadowl/dsh-eval` are documented here. Versions
 follow [Semantic Versioning](https://semver.org/); entries follow
 [Keep a Changelog](https://keepachangelog.com/) conventions.
 
+## [Unreleased]
+
+### Changed
+
+- Removed the bilingual README pairing: `README.zh.md`, `README.i18n.yaml`,
+  the `verify:readme-i18n` gate, and its CI step are gone — the README is
+  English-only (docs remain Chinese-first).
+
 ## [0.5.5] — 2026-10-29
 
 ### Added

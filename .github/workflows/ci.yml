@@ -1,7 +1,7 @@
 # CI for @catheadowl/dsh-eval
 #
-# Tier-A pipeline: the two release gates + bilingual README pairing, green on
-# a clean clone with `pnpm i`. The full suite is deferred (Tier C): its four
+# Tier-A pipeline: the release gates (publish-readiness + manifest-face),
+# green on a clean clone with `pnpm i`. The full suite is deferred (Tier C): its four
 # review-adapter tests spawn the dsh CLI through the resolution chain
 # (`--repo` flag > node_modules resolution layer > legacy config repo key,
 # see docs/host-wiring.md), and wiring a dsh CLI into CI is deferred until the
@@ -24,7 +24,6 @@ jobs:
         with:
           node-version: 22
       - run: pnpm install --no-frozen-lockfile
-      # Deterministic subset: release gates + README pairing (no dsh CLI needed):
+      # Deterministic subset: release gates (no dsh CLI needed):
       - run: pnpm verify:publish
       - run: pnpm verify:face
-      - run: pnpm verify:readme-i18n

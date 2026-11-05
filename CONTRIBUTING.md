@@ -1,10 +1,10 @@
 ---
-description: Contributor guide for @catheadowl/dsh-eval — publishable-unit and framework-genericity ground rules, pnpm test entry (including verify gates and README i18n pairing), and docs conventions
+description: Contributor guide for @catheadowl/dsh-eval — publishable-unit and framework-genericity ground rules, pnpm test entry (including verify gates), and docs conventions
 ---
 
 # Contributing to @catheadowl/dsh-eval
 
-Thanks for your interest! 中文简介：欢迎 issue 与 PR；提交前请跑 `pnpm test`（含两道发布自检闸与双语 README 配对校验）。
+Thanks for your interest! 中文简介：欢迎 issue 与 PR；提交前请跑 `pnpm test`（含三道发布自检闸）。
 
 ## Ground rules
 
@@ -16,12 +16,15 @@ Thanks for your interest! 中文简介：欢迎 issue 与 PR；提交前请跑 `
   built-ins.
 - `src/index.mjs` is a pure in-package re-export facade; the exported face is
   frozen and mechanically checked by `pnpm verify:face` (docs drift included).
+- Machine-level wiring (junctions, local `file:` paths) never gets committed —
+  wiring is a deployment prerequisite (`docs/host-wiring.md`); the
+  `pnpm verify:publish` gate checks the manifest and artifact face.
 
 ## Before you submit
 
 ```sh
 pnpm install        # node >= 22
-pnpm test           # unit suite + verify:publish + verify:face + README i18n pairing
+pnpm test           # unit suite + verify:publish + verify:face + verify:experimental
 ```
 
 A few review-adapter tests spawn the dsh CLI; they need a built host checkout
@@ -31,6 +34,9 @@ terminal rather than skipping tests.
 
 ## Documentation
 
-Docs are Chinese-first with English README pairing: after editing either
-README side, bring the other along and re-record the pair
-(`node scripts/verify-readme-i18n.mjs --write`, wired into `pnpm test`).
+Docs are Chinese-first; the README is English-only. New docs files enter the
+`docs/README.md` index with a frontmatter `description` (md-metadata gate);
+cross-doc links use relative paths. Version bumps add a `CHANGELOG.md` entry
+(Keep a Changelog; one short line per consumer-perceivable change;
+release-workflow, internal-gate, and docs-only changes stay out of the
+release face).
