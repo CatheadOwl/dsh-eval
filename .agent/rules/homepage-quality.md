@@ -4,7 +4,7 @@ description: eval 包主页质量 rules seed——README 作为独立 repo 主�
 
 # eval 包主页质量 rules
 
-本文件是 `@catheadowl/dsh-eval`（dsh-plugin-dev/eval 树，含其 README、docs/
+本文件是 `@catheadowl/dsh-eval`（本仓 `codebase/` 树，含其 README、docs/
 与发布面）主页质量目标的 **rules SSOT seed**，双端消费：生成时（经
 `AGENTS.md` 指针加载）控制写作——advisory；评审时（review 技能的 dispatch
 prompt **原样嵌入**本文件）对照，finding 引用 rule id。规则只写期望形态；

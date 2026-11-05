@@ -2,7 +2,7 @@
 description: docs/ 维护规则——各篇的上游重查触发器与目录内写作约定（本文件面向仓库维护者，不随包发布，见同目录 .npmignore）
 ---
 
-# dsh-plugin-dev/eval/docs — 维护规则
+# @catheadowl/dsh-eval docs — 维护规则
 
 本目录是 `@catheadowl/dsh-eval` 的**发布文档集**（随 `files` 进 tarball）。写作不变量在包根 `AGENTS.md`（≤2 屏主页约束、代码+文档同 commit、规范不外包）；本文件管**每篇的上游锚**与目录内约定。
 
