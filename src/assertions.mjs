@@ -273,7 +273,8 @@ export function toolResultSucceeded(matcher) {
 /**
  * A call matching `matcher` produced a tool result whose text contains
  * `substring`. The text is the same projection used by `toolResultFor`
- * (concatenated inner text blocks of the tool-result wrapper).
+ * (the concatenated text blocks of the tool-result content — bare in
+ * format v4, unwrapped from the retired v3 wrapper block otherwise).
  */
 export function toolResultTextIncludes(matcher, substring) {
   return {

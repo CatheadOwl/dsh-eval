@@ -35,6 +35,10 @@ const FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const trace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'sample-session.jsonl'), 'utf8'))])
 const headerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'header-session.jsonl'), 'utf8'))])
 const errorTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8'))])
+// The same read/bash outcome scenario in the real v4 tool-result message
+// form: tool-role messages with `isError` on the message itself and bare
+// content blocks, plus a `probe` result whose flag is absent.
+const v4FormTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'error-session-v4-form.jsonl'), 'utf8'))])
 const steerTrace = buildTrace([parseSessionLog(readFileSync(join(FIXTURES, 'steer-session.jsonl'), 'utf8'))])
 const subagentTrace = buildTrace([
   parseSessionLog(readFileSync(join(FIXTURES, 'packed-parent.jsonl'), 'utf8')),
@@ -146,6 +150,19 @@ describe('toolResultIsError', () => {
     assert.equal(toolResultIsError(/^read$/).check(errorTrace).ok, false)
   })
 
+  // The regression this matcher once carried: on v4 logs the projection
+  // read only the retired v3 wrapper, so isError was undefined and this
+  // matcher could never pass.
+  it('passes on a v4 error result (flag on the message, not a wrapper)', () => {
+    assert.equal(toolResultIsError('bash').check(v4FormTrace).ok, true)
+  })
+
+  it('fails on v4 results whose flag is absent, reporting the observed flags', () => {
+    const outcome = toolResultIsError('probe').check(v4FormTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /saw isError: \[undefined\]/)
+  })
+
   it('fails when the call has no result', () => {
     const orphan = { ...errorTrace, toolResults: [] }
     const outcome = toolResultIsError('bash').check(orphan)
@@ -167,6 +184,23 @@ describe('toolResultSucceeded', () => {
     const outcome = toolResultSucceeded('bash').check(errorTrace)
     assert.equal(outcome.ok, false)
     assert.match(outcome.message, /isError: true/)
+  })
+
+  // The false positive this matcher once carried on v4 logs: with isError
+  // read from the retired v3 wrapper alone, every v4 result projected
+  // undefined and an error result passed as a success.
+  it('fails on a v4 error result — no false positive from the wrapper-only read', () => {
+    const outcome = toolResultSucceeded('bash').check(v4FormTrace)
+    assert.equal(outcome.ok, false)
+    assert.match(outcome.message, /all 1 result\(s\) had isError: true/)
+  })
+
+  it('passes on an explicit v4 success result', () => {
+    assert.equal(toolResultSucceeded('read').check(v4FormTrace).ok, true)
+  })
+
+  it('treats an absent v4 flag as success', () => {
+    assert.equal(toolResultSucceeded('probe').check(v4FormTrace).ok, true)
   })
 
   it('fails when the tool was never called', () => {

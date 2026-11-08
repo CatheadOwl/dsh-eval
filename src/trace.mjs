@@ -133,11 +133,13 @@ function foldSystemPromptSurface(nodes, event) {
 }
 
 /**
- * Extract the visible text of one tool-result message. Real messages are
- * user-role with a single wrapping `tool-result` block whose `content` holds
- * the actual blocks (see `createToolResultMessage` in
- * `deepseek-harness/packages/llm/llm/src/message.ts`); a bare block list is
- * tolerated for hand-built fixtures.
+ * Extract the visible text of one tool-result message. Format v4 tool
+ * results are tool-role messages whose `content` is the bare result-block
+ * list (see `createToolResultMessage` in
+ * `deepseek-harness/packages/llm/llm/src/message.ts`); the retired v3
+ * shape — a user-role message wrapping one `tool-result` block whose own
+ * `content` held the blocks — is still unwrapped as a fallback for
+ * hand-built fixtures.
  */
 function toolResultText(message) {
   const content = message?.content
@@ -152,11 +154,17 @@ function toolResultText(message) {
 }
 
 /**
- * Extract the `isError` flag from a tool-result message's wrapper block.
- * Returns `undefined` when the flag is absent (treated as success by
- * matchers — see `toolResultSucceeded`).
+ * Extract the outcome flag of one tool-result message. Format v4 carries
+ * `isError` on the message itself (`ToolResultMessage` /
+ * `createToolResultMessage` in
+ * `deepseek-harness/packages/llm/llm/src/message.ts`; reading the retired
+ * v3 wrapper block alone left the flag `undefined` on every v4 log); the
+ * wrapper block is still read as a fallback for hand-built fixtures.
+ * Returns `undefined` when neither shape declares the flag (treated as
+ * success by matchers — see `toolResultSucceeded`).
  */
 function toolResultIsError(message) {
+  if (typeof message?.isError === 'boolean') return message.isError
   const content = message?.content
   if (!Array.isArray(content)) return undefined
   const wrapper = content.find(block => block?.type === 'tool-result')
