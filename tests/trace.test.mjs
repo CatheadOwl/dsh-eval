@@ -157,54 +157,43 @@ describe('buildTrace', () => {
     assert.equal(trace.toolResults[0].error, undefined)
   })
 
-  // The committed sample/error fixtures carry the RETIRED v3 tool-result
-  // payload (a `tool-result` wrapper block) under v4 headers — the blind
-  // spot that kept this projection reading only the wrapper after the host
-  // moved the outcome onto the message itself. They now pin the fallback
-  // face; the v4-form fixture below pins the real one.
-  it('projects isError from the retired v3 wrapper block (fixture fallback face)', () => {
-    // sample-session: both results have isError: false
-    assert.equal(trace.toolResults[0].isError, false)
-    assert.equal(trace.toolResults[1].isError, false)
-  })
-
-  it('projects isError: true for wrapper-block error results', () => {
+  // The real v4 tool-result message: tool-role, `isError` on the message
+  // itself, `content` a bare block list (ToolResultMessage /
+  // createToolResultMessage in deepseek-harness
+  // packages/llm/llm/src/message.ts). The committed fixtures carry this
+  // shape; before the fix, isError projected undefined on every such log —
+  // toolResultIsError could never pass and toolResultSucceeded passed on
+  // error results (false positive).
+  it('projects isError from the v4 message flag over bare content', () => {
     const errorText = readFileSync(join(FIXTURES, 'error-session.jsonl'), 'utf8')
     const errorTrace = buildTrace([parseSessionLog(errorText)])
     const okResult = errorTrace.toolResults.find(r => r.callId === 'call-ok')
     const failResult = errorTrace.toolResults.find(r => r.callId === 'call-fail')
-    assert.equal(okResult.isError, false)
-    assert.equal(failResult.isError, true)
-    assert.equal(failResult.text, 'permission denied: insufficient privileges')
-  })
-
-  // The real v4 tool-result message: tool-role, `isError` on the message
-  // itself, `content` a bare block list (ToolResultMessage /
-  // createToolResultMessage in deepseek-harness
-  // packages/llm/llm/src/message.ts). Before the dual read, isError
-  // projected undefined on every v4 log — toolResultIsError could never
-  // pass and toolResultSucceeded passed on error results (false positive).
-  it('projects isError from the v4 message flag over bare content', () => {
-    const v4Text = readFileSync(join(FIXTURES, 'error-session-v4-form.jsonl'), 'utf8')
-    const v4Trace = buildTrace([parseSessionLog(v4Text)])
-    const okResult = v4Trace.toolResults.find(r => r.callId === 'call-ok')
-    const failResult = v4Trace.toolResults.find(r => r.callId === 'call-fail')
-    const silentResult = v4Trace.toolResults.find(r => r.callId === 'call-silent')
+    const silentResult = errorTrace.toolResults.find(r => r.callId === 'call-silent')
     assert.equal(okResult.isError, false, 'explicit v4 success flag')
     assert.equal(failResult.isError, true, 'v4 error flag on the message')
-    assert.equal(silentResult.isError, undefined, 'absent flag with no wrapper to fall back to')
+    assert.equal(silentResult.isError, undefined, 'absent flag stays undefined (success semantics)')
     assert.equal(failResult.text, 'permission denied: insufficient privileges', 'bare content reads as the result text')
     assert.equal(silentResult.text, 'probe settled without an outcome flag')
+    assert.equal(trace.toolResults[0].isError, false, 'sample-session projects the same v4 form')
+    assert.equal(trace.toolResults[0].text, 'status: 3 tracked nodes')
   })
 
-  it('lets the v4 message flag win when a v3 wrapper block is also present', () => {
-    const log = '{"type":"session","version":4,"id":"session-both-forms"}'
+  // No-legacy-compat pin (owner decision 2026-11-08): the retired v3
+  // `tool-result` wrapper block is not read anywhere. A wrapper-only
+  // message projects isError undefined (the success side) and its wrapped
+  // blocks do not surface as text; the message flag is the only source.
+  it('no longer reads the retired v3 wrapper block', () => {
+    const wrapperOnly = (isError) => '{"type":"session","version":4,"id":"session-v3-shape"}'
       + '\n{"seq":1,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-x","name":"bash","arguments":"{}"}}'
-      + '\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"tool","isError":true,'
-      + '"content":[{"type":"tool-result","toolCallId":"call-x","content":[{"type":"text","text":"wrapped"}],"isError":false}],'
+      + `\n{"seq":2,"type":"tool/result","data":{"turn":1,"step":1,"message":{"role":"user","isError":${isError},`
+      + '"content":[{"type":"tool-result","toolCallId":"call-x","content":[{"type":"text","text":"wrapped"}],"isError":true}],'
       + '"source":{"kind":"tool","callId":"call-x"}}}}'
-    const built = buildTrace([parseSessionLog(log)])
-    assert.equal(built.toolResults[0].isError, true, 'the message flag outranks the wrapper block')
+    const wrapperAbsent = buildTrace([parseSessionLog(wrapperOnly('null'))]).toolResults[0]
+    assert.equal(wrapperAbsent.isError, undefined, 'wrapper-only message: the flag stays undefined')
+    assert.equal(wrapperAbsent.text, '', 'wrapped blocks are not unwrapped into text')
+    const flagWins = buildTrace([parseSessionLog(wrapperOnly('false'))]).toolResults[0]
+    assert.equal(flagWins.isError, false, 'the message flag is the only source, even beside a wrapper')
   })
 
   it('takes the last non-empty assistant text as finalText', () => {

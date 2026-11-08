@@ -2,8 +2,10 @@
 {"seq":0,"time":1755446400100,"type":"turn/start","data":{"turn":1}}
 {"seq":1,"time":1755446400200,"type":"step/start","data":{"turn":1,"step":1}}
 {"seq":2,"time":1755446400300,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-ok","name":"read","arguments":"{\"path\":\"src/index.ts\"}"}}
-{"seq":3,"time":1755446400400,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[2],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-ok","content":[{"type":"text","text":"file contents here"}],"isError":false}],"source":{"kind":"tool","callId":"call-ok"}}}}
+{"seq":3,"time":1755446400400,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[2],"data":{"turn":1,"step":1,"message":{"role":"tool","toolCallId":"call-ok","isError":false,"content":[{"type":"text","text":"file contents here"}],"source":{"kind":"tool","callId":"call-ok"}}}}
 {"seq":4,"time":1755446400500,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-fail","name":"bash","arguments":"{\"command\":\"rm -rf /\"}"}}
-{"seq":5,"time":1755446400600,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[4],"data":{"turn":1,"step":1,"message":{"role":"user","content":[{"type":"tool-result","toolCallId":"call-fail","content":[{"type":"text","text":"permission denied: insufficient privileges"}],"isError":true}],"source":{"kind":"tool","callId":"call-fail"}}}}
-{"seq":6,"time":1755446400700,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"The bash command failed due to insufficient privileges."}]}}}
-{"seq":7,"time":1755446400800,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}
+{"seq":5,"time":1755446400600,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[4],"data":{"turn":1,"step":1,"message":{"role":"tool","toolCallId":"call-fail","isError":true,"content":[{"type":"text","text":"permission denied: insufficient privileges"}],"source":{"kind":"tool","callId":"call-fail"}}}}
+{"seq":6,"time":1755446400650,"type":"tool/call","data":{"turn":1,"step":1,"callId":"call-silent","name":"probe","arguments":"{}"}}
+{"seq":7,"time":1755446400700,"type":"tool/result","surfaceOp":"append","sourceEventSeqs":[6],"data":{"turn":1,"step":1,"message":{"role":"tool","toolCallId":"call-silent","content":[{"type":"text","text":"probe settled without an outcome flag"}],"source":{"kind":"tool","callId":"call-silent"}}}}
+{"seq":8,"time":1755446400800,"type":"assistant/message","surfaceOp":"append","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"The bash command failed due to insufficient privileges."}]}}}
+{"seq":9,"time":1755446400900,"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

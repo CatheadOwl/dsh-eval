@@ -94,7 +94,7 @@ export function parseSessionLog(text) {
   return { header, events }
 }
 
-/** Concatenate the text blocks of one assembled assistant message. */
+/** Concatenate the text blocks of one message's content block list. */
 function messageText(message) {
   const content = message?.content
   if (!Array.isArray(content)) return ''
@@ -133,42 +133,17 @@ function foldSystemPromptSurface(nodes, event) {
 }
 
 /**
- * Extract the visible text of one tool-result message. Format v4 tool
- * results are tool-role messages whose `content` is the bare result-block
- * list (see `createToolResultMessage` in
- * `deepseek-harness/packages/llm/llm/src/message.ts`); the retired v3
- * shape — a user-role message wrapping one `tool-result` block whose own
- * `content` held the blocks — is still unwrapped as a fallback for
- * hand-built fixtures.
- */
-function toolResultText(message) {
-  const content = message?.content
-  if (!Array.isArray(content)) return ''
-  const wrapper = content.find(block => block?.type === 'tool-result')
-  const inner = wrapper !== undefined ? wrapper.content : content
-  if (!Array.isArray(inner)) return ''
-  return inner
-    .filter(block => block?.type === 'text' && typeof block.text === 'string')
-    .map(block => block.text)
-    .join('')
-}
-
-/**
  * Extract the outcome flag of one tool-result message. Format v4 carries
  * `isError` on the message itself (`ToolResultMessage` /
  * `createToolResultMessage` in
- * `deepseek-harness/packages/llm/llm/src/message.ts`; reading the retired
- * v3 wrapper block alone left the flag `undefined` on every v4 log); the
- * wrapper block is still read as a fallback for hand-built fixtures.
- * Returns `undefined` when neither shape declares the flag (treated as
- * success by matchers — see `toolResultSucceeded`).
+ * `deepseek-harness/packages/llm/llm/src/message.ts`); the retired v3
+ * wrapper block is deliberately not read — this repo carries no
+ * legacy-format compatibility (see KNOWN_SESSION_FORMAT_VERSIONS).
+ * Returns `undefined` when the message does not declare the flag
+ * (treated as success by matchers — see `toolResultSucceeded`).
  */
 function toolResultIsError(message) {
-  if (typeof message?.isError === 'boolean') return message.isError
-  const content = message?.content
-  if (!Array.isArray(content)) return undefined
-  const wrapper = content.find(block => block?.type === 'tool-result')
-  return wrapper?.isError
+  return typeof message?.isError === 'boolean' ? message.isError : undefined
 }
 
 /** Best-effort parse of a tool call's raw JSON arguments string. */
@@ -417,7 +392,9 @@ export function buildTrace(logs) {
         turn: event.data.turn,
         step: event.data.step,
         callId: event.data.message?.source?.callId,
-        text: toolResultText(event.data.message),
+        // v4 tool-result content is the bare block list — same read as
+        // every other message (the retired v3 wrapper is not unwrapped).
+        text: messageText(event.data.message),
         error: event.data.error,
         isError: toolResultIsError(event.data.message),
       })
