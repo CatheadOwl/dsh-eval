@@ -27,11 +27,14 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `undefined` for every result: `toolResultIsError` could never pass, and
   `toolResultSucceeded` passed on any result, error or not (a silent false
   positive for every suite asserting tool outcomes on v4 logs). The
-  projection now reads the message flag first and falls back to the v3
-  wrapper block (hand-built fixtures keep working); `toolResultText` was
-  already form-agnostic and its docstring now names the real v4 shape.
-  Fixture coverage runs both faces: v4 message flag true / false / absent,
-  and the v3 wrapper fallback.
+  projection now reads the message flag only: the v3 wrapper block is not
+  read anywhere (a wrapper-only result projects `isError: undefined`,
+  i.e. the success side), matching the parser's no-legacy-compat
+  admission rule. The committed fixtures now carry the host-verbatim v4
+  tool-result message (previously they encoded the retired v3 wrapper
+  payload — the blind spot that kept the defect green), and regression
+  coverage pins the v4 flag true / false / absent plus the
+  retired-wrapper non-read.
 
 ## [0.5.5] — 2026-10-29
 
