@@ -10,11 +10,28 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-11-08
+
 ### Changed
 
 - Removed the bilingual README pairing: `README.zh.md`, `README.i18n.yaml`,
   the `verify:readme-i18n` gate, and its CI step are gone — the README is
   English-only (docs remain Chinese-first).
+
+### Fixed
+
+- **`toolResultIsError` / `toolResultSucceeded` read v4 tool outcomes.**
+  The trace projection took a result's `isError` from the retired v3
+  `tool-result` content wrapper, so on v4 logs — where the flag lives on
+  the message itself and `content` is the bare block list — it projected
+  `undefined` for every result: `toolResultIsError` could never pass, and
+  `toolResultSucceeded` passed on any result, error or not (a silent false
+  positive for every suite asserting tool outcomes on v4 logs). The
+  projection now reads the message flag first and falls back to the v3
+  wrapper block (hand-built fixtures keep working); `toolResultText` was
+  already form-agnostic and its docstring now names the real v4 shape.
+  Fixture coverage runs both faces: v4 message flag true / false / absent,
+  and the v3 wrapper fallback.
 
 ## [0.5.5] — 2026-10-29
 
