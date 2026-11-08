@@ -207,9 +207,11 @@ export function createDshHeadlessReviewExecutor(options) {
       // said LAST. If any tail interaction intervened (a turn-close gate
       // splice that slipped past the blank environment, an infra
       // complaint), stdout holds that instead of the analysis. The
-      // trace's answerText (last assistant text before the first
-      // plugin-sourced injection) IS the analysis; stdout remains the
-      // fallback for trace-less runs (recorded by `traceGap` above).
+      // trace's answerText (last assistant text before the first hijacking
+      // injection — a formless non-'user' attributed user message landing
+      // after the first substantive assistant text) IS the analysis;
+      // stdout remains the fallback for trace-less runs (recorded by
+      // `traceGap` above).
       result.answer = trace !== undefined && trace.answerText !== '' ? trace.answerText : stdout
 
       return result

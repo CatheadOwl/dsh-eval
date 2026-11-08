@@ -64,7 +64,7 @@ export function overlayDisableRows(rowIds) {
  * `isSessionLogFilename` / `parseSessionLog` consume. Shared by
  * the behavior overlay and the dsh review adapter's blank-environment overlay:
  * the review face never pinning it is how zstd-generation artifacts
- * (`session.v3.jsonl.zstd`) escaped collection (degrading to a constant
+ * (`session.v4.jsonl.zstd`) escaped collection (degrading to a constant
  * not-executed).
  * @param {string} sessionsRoot - absolute path the runner collects from.
  * @returns {string} overlay entry (no trailing newline).
