@@ -20,6 +20,9 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"
   },
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
   "devDependencies": {
     "@deepseek-ai/dsh-llm": "0.0.1-rc.1"
   },

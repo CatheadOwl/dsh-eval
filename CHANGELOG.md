@@ -14,9 +14,9 @@ follow [Semantic Versioning](https://semver.org/); entries follow
 
 ### Changed
 
-- Removed the bilingual README pairing: `README.zh.md`, `README.i18n.yaml`,
-  the `verify:readme-i18n` gate, and its CI step are gone — the README is
-  English-only (docs remain Chinese-first).
+- The README is English-only: the package no longer ships the Chinese
+  translation (`README.zh.md`) or its pairing metadata (`README.i18n.yaml`);
+  the in-package docs remain Chinese-first.
 
 ### Fixed
 
@@ -460,10 +460,16 @@ follow [Semantic Versioning](https://semver.org/); entries follow
   `@deepseek-ai/dsh-llm` is a peerDependency provided by the host
   ecosystem.
 
-[0.5.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.5.0
-[0.4.2]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.2
-[0.4.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.4.1
-[0.3.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.3.0
-[0.2.1]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.1
-[0.2.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.2.0
-[0.1.0]: https://github.com/CatheadOwl/dsh-eval/releases/tag/v0.1.0
+[0.5.6]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.6
+[0.5.5]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.5
+[0.5.4]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.4
+[0.5.3]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.3
+[0.5.2]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.2
+[0.5.1]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.1
+[0.5.0]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.5.0
+[0.4.2]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.4.2
+[0.4.1]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.4.1
+[0.3.0]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.3.0
+[0.2.1]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.2.1
+[0.2.0]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.2.0
+[0.1.0]: https://www.npmjs.com/package/@catheadowl/dsh-eval/v/0.1.0
