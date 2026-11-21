@@ -36,7 +36,7 @@ terminal rather than skipping tests.
 
 Docs are Chinese-first; the README is English-only. New docs files enter the
 `docs/README.md` index with a frontmatter `description` (md-metadata gate);
-cross-doc links use relative paths. Version bumps add a `CHANGELOG.md` entry
-(Keep a Changelog; one short line per consumer-perceivable change;
-release-workflow, internal-gate, and docs-only changes stay out of the
-release face).
+cross-doc links use relative paths. Version bumps add a `changelogs/v<semver>.md`
+file named after the release tag (one bucketed entry set per version,
+consumer-perspective wording; release-workflow, internal-gate, and docs-only
+changes stay out of the release face).

@@ -12,7 +12,7 @@ publication:
   include:
     - "package.json"
     - "README.md"
-    - "CHANGELOG.md"
+    - "changelogs/**"
     - "LICENSE"
     - "bin/**"
     - "src/**"
