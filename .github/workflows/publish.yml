@@ -5,8 +5,14 @@ name: Publish npm
 # long-lived token lives in repo secrets. Version bumps ride a `v*` tag that
 # must match package.json.
 #
+# The release-notes job is the changelog canon's "one source, two
+# projections" Release-body half: it reads changelogs/v<semver>.md (the
+# version file this repo ships per release) and posts it as the GitHub
+# Release body. Aggregation of release notes lives on the Releases page —
+# no root CHANGELOG.md.
+#
 # No host checkout needed: the package ships plain .mjs sources and its
-# prepack chain (four verify gates) runs on Node stdlib only. The
+# prepack chain (three verify gates) runs on Node stdlib only. The
 # @deepseek-ai/dsh-llm peer is runtime-provided by the dsh host ecosystem
 # and never resolved at pack time.
 
@@ -15,6 +21,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+
+concurrency:
+  # Same-ref re-pushes (tag migration) queue serially; never kill a
+  # publish in progress.
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -57,7 +69,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: "Publish (prepack chain: four verify gates)"
+      - name: "Publish (prepack chain: three verify gates)"
         if: github.event_name == 'push'
         run: npm publish --access public
 
@@ -67,3 +79,42 @@ jobs:
       - name: "Preflight pack dry-run (prepack chain, no publish)"
         if: github.event_name == 'workflow_dispatch'
         run: npm pack --dry-run
+
+  # The Release-body projection of the changelog canon: publish failure
+  # means no Release. Only this job gets contents: write; the publish job
+  # stays contents: read.
+  release-notes:
+    name: Release notes (GitHub Release body)
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: prepare release body
+        # Derive the file from package.json — alignment is guaranteed by
+        # the tag↔version guard above. A missing version file is the R2
+        # "version file in place" end state, mechanized. The dispatch path
+        # only validates the stripped body (zero side effects, no Release).
+        run: |
+          file="changelogs/v$(node -p "require('./package.json').version").md"
+          if [ ! -f "$file" ]; then
+            echo "::error::missing changelog file $file"
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const ls = fs.readFileSync(process.argv[1], "utf8").split(/\r?\n/);
+            if (ls[0] === "---") { const e = ls.indexOf("---", 1); if (e > 0) ls.splice(0, e + 1); }
+            while (ls.length && ls[0].trim() === "") ls.shift();
+            fs.writeFileSync("body.md", ls.join("\n") + "\n");
+          ' "$file"
+          head -5 body.md
+
+      - name: create release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes-file body.md
